@@ -137,3 +137,4 @@ Public: `i18n/<lang>/`
 
 ## Still not built
 The **React/Next.js PWA front end** (screens, themes, read-aloud, service worker, installability, offline answer queue). The API stores and serves everything it needs. Also not possible from code: the pilot exam itself, school sign-off of the SRS section 10 questions, and a real load test on your server.
+"# adoresExam" 
