@@ -1,6 +1,7 @@
 /** "" = same address as the web page (development: Next.js forwards /api to Django). Otherwise the full address of the API. */
 export const API = (process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "development" ? "" : "http://localhost:8000")).replace(/\/$/, "");
 export const apiBase = () => API || (typeof location !== "undefined" ? location.origin : "");
+import { offlineGet } from "./offlineStore";
 const TOKEN_KEY = "amani_token";
 
 /** Which school this web app belongs to: its own address. One build of the web app serves every school; the API picks the school's data
@@ -48,6 +49,8 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
       headers, body: opts.body === undefined ? undefined : isForm ? opts.body : JSON.stringify(opts.body), keepalive: opts.keepalive,
     });
   } catch {
+    // No signal: a copy the person downloaded in Settings > Offline use is shown instead (reading only, her own data only).
+    if (!opts.method || opts.method === "GET") { const saved = await offlineGet(path); if (saved !== undefined) return saved as T; }
     throw new ApiError(`Cannot reach the server (${apiBase()}). Check your internet. If you run it yourself, make sure the Django server is running.`, 0, "network");
   }
   let data: any = null;
@@ -55,6 +58,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   try { data = text ? JSON.parse(text) : null; } catch { data = null; }
   if (!res.ok && data === null && res.status >= 500) {
     // Not JSON from our API: a proxy or gateway answered because Django behind it is down or crashed.
+    if (!opts.method || opts.method === "GET") { const saved = await offlineGet(path); if (saved !== undefined) return saved as T; }
     throw new ApiError(`Cannot reach the server (${apiBase()}). Check your internet. If you run it yourself, make sure the Django server is running.`, 0, "network");
   }
   if (!res.ok) {

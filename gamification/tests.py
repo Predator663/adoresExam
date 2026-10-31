@@ -197,6 +197,45 @@ class PracticeTests(AnalyticsBase):
         r = self.client_for(self.admin).post("/api/practice/mark-eligible/", {"question_ids": [other.pk], "eligible": True}, format="json").json()
         self.assertEqual(r["updated"], 1)
 
+    def test_short_own_form_is_topped_up_from_lower_forms_never_higher(self):
+        cls = self.amina.school_class
+        cls.form_level = 2
+        cls.save()
+        higher = practice_question(self.maths, form_level=3)
+        ids = set(services.practice_pool(self.amina, self.maths).values_list("pk", flat=True))
+        self.assertEqual(ids, {q.pk for q in self.qs})  # her own form has none, so the Form 1 questions are used
+        self.assertNotIn(higher.pk, ids)
+
+    def test_subject_list_says_why_it_cannot_start_and_teacher_can_enable_a_whole_subject(self):
+        Question.objects.filter(pk__in=[q.pk for q in self.qs]).update(practice_eligible=False)
+
+        def row():
+            return next(r for r in self.c.get("/api/practice/subjects/").json() if r["id"] == self.maths.pk)
+
+        self.assertEqual((row()["can_start"], row()["reason"]), (False, "not_shared"))
+        r = self.client_for(self.teacher).post("/api/practice/mark-eligible/", {"subject_id": self.maths.pk, "eligible": True},
+                                              format="json").json()
+        self.assertEqual(r["updated"], 6)
+        self.assertEqual((row()["can_start"], row()["reason"]), (True, ""))
+        other = self.client_for(self.teacher).post("/api/practice/mark-eligible/", {"subject_id": self.english.pk, "eligible": True},
+                                                  format="json").json()
+        self.assertEqual(other["updated"], 0)  # not her subject
+
+    def test_offline_pack_carries_answers_for_local_marking_and_needs_enough_questions(self):
+        d = self.c.get(f"/api/practice/pack/{self.maths.pk}/").json()
+        self.assertEqual(d["count"], 6)
+        self.assertEqual(d["questions"][0]["answer"], {"correct": "b"})
+        self.assertTrue(d["expires_at"] > d["created_at"])
+        head = self.c.get(f"/api/practice/pack/{self.maths.pk}/?limit=0").json()  # heading only, for true progress
+        self.assertEqual((head["count"], head["questions"]), (6, []))
+        got = []
+        for off in (0, 4):
+            got += self.c.get(f"/api/practice/pack/{self.maths.pk}/?seed={head['seed']}&offset={off}&limit=4").json()["questions"]
+        self.assertEqual(sorted(q["id"] for q in got), sorted(q.pk for q in self.qs))  # batches add up to the whole pack, once each
+        Question.objects.filter(pk__in=[q.pk for q in self.qs[:2]]).update(practice_eligible=False)
+        r = self.c.get(f"/api/practice/pack/{self.maths.pk}/")
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "not_enough"))
+
 
 class LeaderboardTests(AnalyticsBase):
     def setUp(self):

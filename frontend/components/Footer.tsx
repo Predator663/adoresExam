@@ -13,7 +13,7 @@ export default function Footer({ compact }: { compact?: boolean }) {
     <footer className={`foot ${compact ? "compact" : ""}`}>
       <div className="foot-in">
         {!compact && (
-          <div className="foot-brand"><Logo size={44} /><div><b>{site.app}</b><small>{site.school}</small></div></div>
+          <div className="foot-brand"><Logo size={48} /><div><b>{site.app}</b><small>{site.school}</small></div></div>
         )}
         <nav className="foot-links" aria-label={t("foot_links")}>{links.map(([h, l]) => <Link key={h} href={h}>{l}</Link>)}</nav>
         <Link href="/about/#operator" className="foot-op">
@@ -21,7 +21,10 @@ export default function Footer({ compact }: { compact?: boolean }) {
           <img src={OPERATOR.avatar} alt="" width={28} height={28} aria-hidden loading="lazy" />
           <span>{OPERATOR.name} · <b>{OPERATOR.callsign.toUpperCase()}</b></span>
         </Link>
-        <p className="foot-copy">© {site.year} {site.school}. {t("foot_rights")} · v{site.version}</p>
+        <div className="foot-bar">
+          <p className="foot-copy">© {site.year} {site.school}. {t("foot_rights")}</p>
+          <span className="foot-ver">v{site.version}</span>
+        </div>
       </div>
     </footer>
   );

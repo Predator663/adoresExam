@@ -17,11 +17,17 @@ export default function Questions() {
   const [f, setF] = useState({ subject: "", topic: "", difficulty: "", qtype: "", status: "", q: "" });
   const subjects = useLoad(() => api<any[]>("/subjects/"));
   const list = usePaged<any>("/questions/", f, { size: 10 });
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState(""), [note, setNote] = useState("");
   useEffect(() => { const e = new URLSearchParams(location.search).get("edit"); if (e) setEdit(e === "new" ? "new" : Number(e)); }, []);
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
   async function act(id: number, what: "submit" | "approve" | "reject") {
     setMsg(""); try { await api(`/questions/${id}/${what}/`, { body: {} }); list.reload(); } catch (e: any) { setMsg(e.message); }
+  }
+  const subjName = subjects.data?.find((s) => String(s.id) === f.subject)?.name || "";
+  async function bulk(eligible: boolean) {
+    if (!confirm(eligible ? `Let students practise ALL approved ${subjName} questions? Questions kept for an exam whose results are not out yet are still never offered.` : `Stop students practising any ${subjName} question?`)) return;
+    setMsg(""); setNote("");
+    try { const r = await api<{ updated: number }>("/practice/mark-eligible/", { body: { subject_id: Number(f.subject), eligible } }); setNote(`${r.updated} question(s) updated.`); list.reload(); } catch (e: any) { setMsg(e.message); }
   }
   async function del(id: number) {
     if (!confirm("Delete this question? A question already used in an exam is archived instead.")) return;
@@ -43,6 +49,16 @@ export default function Questions() {
               <label className="field"><span>Search text</span><input className="input" value={f.q} onChange={(e) => set("q", e.target.value)} /></label>
             </div>
           </div>
+          {f.subject && (
+            <div className="card">
+              <p className="small muted">Students can only practise <b>approved</b> questions marked <b>practice</b>. They need at least 5 for their form (lower forms top it up).</p>
+              <div className="row">
+                <button className="btn" onClick={() => bulk(true)}>Allow practice: all approved {subjName}</button>
+                <button className="btn" onClick={() => bulk(false)}>Stop practice for {subjName}</button>
+              </div>
+            </div>
+          )}
+          {note && <p className="ok" role="status">✓ {note}</p>}
           {msg && <p className="no" role="alert">⚠ {msg}</p>}
           {list.loading ? <Loading /> : list.error ? <ErrorNote error={list.error} retry={list.reload} /> : !list.rows.length ? <div className="card"><p className="muted">No questions match.</p></div> : (
             <>

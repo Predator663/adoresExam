@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
 import { SessionProvider } from "@/lib/session";
 import { BrandProvider } from "@/lib/brand";
+import OfflineBar from "@/components/OfflineBar";
 import SwRegister from "@/components/SwRegister";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import "./globals.css";
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <SessionProvider><BrandProvider>{children}</BrandProvider></SessionProvider>
+        <SessionProvider><BrandProvider><OfflineBar />{children}</BrandProvider></SessionProvider>
         <MaintenanceGate />
         <SwRegister />
       </body>

@@ -172,6 +172,24 @@ def practice_start(request):
     return Response(services.practice_state(session), status=201)
 
 
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def practice_pack(request, subject_id):
+    """Download one subject's questions so practice works with no signal (Settings > Offline use).
+    ?limit=0 = heading only; ?seed=..&offset=..&limit=.. = one batch; no parameters = the whole pack."""
+    q = request.query_params
+    try:
+        seed = int(q["seed"]) if "seed" in q else None
+        offset = max(0, int(q.get("offset", 0)))
+        limit = int(q["limit"]) if "limit" in q else None
+    except ValueError:
+        raise ValidationError({"detail": "seed, offset and limit must be numbers."})
+    try:
+        return Response(services.practice_pack(request.user, subject_id, seed, offset, limit))
+    except services.GamificationError as e:
+        return _err(e)
+
+
 def _own_session(request, session_id):
     from .models import PracticeSession
 
@@ -216,19 +234,27 @@ def practice_toggle_subject(request, subject_id):
 @api_view(["POST"])
 @permission_classes([IsStaffUser])
 def practice_mark_eligible(request):
-    """Mark many questions 'practice eligible' (or not) in one go: {"question_ids": [1, 2], "eligible": true}.
+    """Mark many questions 'practice eligible' (or not) in one go: {"question_ids": [1, 2], "eligible": true},
+    or every APPROVED question of a subject: {"subject_id": 3, "eligible": true}.
     A teacher can only change questions of her own subjects."""
-    ids, eligible = request.data.get("question_ids"), request.data.get("eligible")
-    if not isinstance(ids, list) or not ids or len(ids) > 1000 or not all(isinstance(i, int) for i in ids):
-        raise ValidationError({"question_ids": "Send a list of question ids."})
+    ids, eligible, subject_id = request.data.get("question_ids"), request.data.get("eligible"), request.data.get("subject_id")
     if not isinstance(eligible, bool):
         raise ValidationError({"eligible": "Send true or false."})
-    qs = Question.objects.filter(pk__in=ids)
+    if subject_id is not None:
+        if not isinstance(subject_id, int) or isinstance(subject_id, bool):
+            raise ValidationError({"subject_id": "Send a subject id."})
+        qs = Question.objects.filter(subject_id=subject_id, status=Question.APPROVED)
+        wanted = qs.count()
+    else:
+        if not isinstance(ids, list) or not ids or len(ids) > 1000 or not all(isinstance(i, int) for i in ids):
+            raise ValidationError({"question_ids": "Send a list of question ids."})
+        qs = Question.objects.filter(pk__in=ids)
+        wanted = len(set(ids))
     if not request.user.is_admin_role:
         qs = qs.filter(subject__in=TeacherAssignment.objects.filter(teacher=request.user).values("subject"))
     updated = qs.update(practice_eligible=eligible)
-    audit(request.user, "practice.mark_eligible", len(ids), eligible=eligible, updated=updated)
-    return Response({"updated": updated, "skipped": len(set(ids)) - updated})
+    audit(request.user, "practice.mark_eligible", wanted, eligible=eligible, updated=updated, subject=subject_id)
+    return Response({"updated": updated, "skipped": max(0, wanted - updated)})
 
 
 # ---------------------------------------------------------------- admin settings (ADM-09)

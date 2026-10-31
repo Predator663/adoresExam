@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Listen from "@/components/Listen";
+import OfflinePlay from "@/components/OfflinePractice";
 import QuestionView, { hasAnswer, initialValue } from "@/components/QuestionView";
 import Shell from "@/components/Shell";
 import { Bar, ErrorNote, Loading, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
 import { describe } from "@/lib/answers";
+import { listPacks } from "@/lib/offline";
 import { useSession } from "@/lib/session";
 import type { Question } from "@/lib/types";
 
@@ -63,25 +65,58 @@ function Play({ initial, onExit }: { initial: PState; onExit: () => void }) {
   );
 }
 
+const WHY: Record<string, string> = { none: "practice_why_none", not_shared: "practice_why_not_shared", in_exams: "practice_why_in_exams", few: "practice_why_few" };
+
 export default function Practice() {
   const { t } = useSession();
   const subs = useLoad(() => api<any[]>("/practice/subjects/"));
   const [game, setGame] = useState<PState | null>(null), [err, setErr] = useState(""), [count, setCount] = useState(10);
+  const [offline, setOffline] = useState<string | null>(null), [packs, setPacks] = useState<ReturnType<typeof listPacks>>([]), [off, setOff] = useState(false);
+  useEffect(() => {
+    const sync = () => { setOff(!navigator.onLine); setPacks(listPacks()); };
+    sync();
+    window.addEventListener("online", sync); window.addEventListener("offline", sync);
+    return () => { window.removeEventListener("online", sync); window.removeEventListener("offline", sync); };
+  }, [subs.loading]);
   async function start(id: number) {
     setErr("");
     try { setGame(await api<PState>("/practice/start/", { body: { subject_id: id, count } })); } catch (e: any) { setErr(e.message); }
   }
+  const saved = (id: number) => packs.some((p) => p.id === String(id) && !p.expired);
+  const usable = packs.filter((p) => !p.expired);
+  const noSignal = off || !!subs.error;
   return (
     <Shell title={t("nav_practice")}>
-      {game ? <Play initial={game} onExit={() => { setGame(null); subs.reload(); }} /> : (
+      {offline ? <OfflinePlay packId={offline} count={count} onExit={() => setOffline(null)} /> : game ? <Play initial={game} onExit={() => { setGame(null); subs.reload(); }} /> : (
         <>
           <p className="muted">{t("practice_intro")}</p>
           <label className="field"><span>{t("how_many")}: {count}</span><input type="range" min={5} max={20} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label>
           {err && <p className="no" role="alert">⚠ {err}</p>}
-          {subs.loading ? <Loading /> : subs.error ? <ErrorNote error={subs.error} retry={subs.reload} /> : !subs.data?.length ? <div className="card"><p className="muted">{t("practice_none")}</p></div> :
+          {noSignal && (
+            <div className="card">
+              <h2>{t("off_practice_title")}</h2>
+              {usable.length ? (
+                <>
+                  <p className="muted small">{t("off_xp_note")}</p>
+                  {usable.map((p) => (
+                    <div key={p.id} className="row" style={{ margin: ".5rem 0" }}>
+                      <span className="grow"><b>{p.entry.name}</b><br /><span className="muted small">{t("off_pack_n", { n: p.entry.count })}</span></span>
+                      <button className="btn primary" onClick={() => setOffline(p.id)}>{t("start")}</button>
+                    </div>
+                  ))}
+                </>
+              ) : <p className="muted">{t("off_no_pack")}</p>}
+            </div>
+          )}
+          {subs.loading ? <Loading /> : subs.error ? (off ? null : <ErrorNote error={subs.error} retry={subs.reload} />) : !subs.data?.length ? <div className="card"><p className="muted">{t("practice_none")}</p></div> :
             subs.data.map((s) => (
               <div key={s.id} className="card row">
-                <span className="grow"><b>{s.name}</b><br /><span className="muted small">{t("n_questions_available", { n: s.available_questions })}</span></span>
+                <span className="grow">
+                  <b>{s.name}</b><br />
+                  <span className="muted small">{t("n_questions_available", { n: s.available_questions })}</span>
+                  {!s.can_start && WHY[s.reason] && <><br /><span className="small no">{t(WHY[s.reason])}</span></>}
+                  {saved(s.id) && <><br /><span className="small ok">✓ {t("off_saved_tag")}</span></>}
+                </span>
                 <button className="btn primary" disabled={!s.can_start} onClick={() => start(s.id)}>{s.can_start ? t("start") : t("not_enough")}</button>
               </div>
             ))}

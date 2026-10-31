@@ -67,6 +67,8 @@ XP, mfululizo na beji ni **zawadi za juhudi**. **Havibadilishi alama zako za mti
 
 **Ngazi:** Mwanzo 0, Mwanafunzi 200, Mfanikivu 500, Msomi 1,000, Nyota 2,000, Bingwa 3,500, Kipanga 5,000 XP. (Shule inaweza kubadilisha namba hizi.)
 
+**Matumizi bila mtandao:** kwenye *Mipangilio > Matumizi bila mtandao* pakua faili za programu, ratiba ya mitihani, matokeo yako na mapitio ya majibu, na maswali ya mazoezi ya kila somo. Kila upakuaji unaonyesha maendeleo halisi. Mazoezi ya nje ya mtandao ni ya kujifunza tu (hakuna XP). Maswali ya mtihani hayapakuliwi mapema; yanafika mtihani wako unapoanza.
+
 **Mfululizo:** siku huhesabiwa ukimaliza zoezi la mazoezi lenye angalau maswali 5, ukifanya mtihani, au ukipitia matokeo yako. Siku zinafuata saa za Afrika Mashariki. Una **vizuizi 2 vya mfululizo kila mwezi**: ukikosa siku, kizuizi hulinda mfululizo wako. Mfululizo ukiisha, anza tena leo, unaweza!
 
 **Beji** zina shaba, fedha na dhahabu. Mifano: Hatua za Kwanza, Alama Kamili, Kurudi kwa Nguvu, Moto wa Kuwaka (siku 7) na Hazuiliki (siku 30), Nyota ya Somo, Hodari wa Yote, Mwendo Thabiti, Bingwa wa Kurekebisha, Daima kwa Wakati, Bingwa wa Mazoezi. Fungua **kabati la beji** uone unachopaswa kulenga.

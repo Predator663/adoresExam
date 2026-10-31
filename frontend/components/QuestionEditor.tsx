@@ -16,7 +16,7 @@ type S = {
   accepted: string; numValue: string; numTol: string; items: Item[];
 };
 const blank = (n = 4): Item[] => Array.from({ length: n }, () => ({ id: uid(), text: "", image: null, alt_text: "" }));
-const fresh = (): S => ({ subject: "", form_level: 1, topic: "", subtopic: "", difficulty: "medium", marks: 1, language: "en", qtype: "mcq_single", practice_eligible: false, prompt: "", explanation: "",
+const fresh = (): S => ({ subject: "", form_level: 1, topic: "", subtopic: "", difficulty: "medium", marks: 1, language: "en", qtype: "mcq_single", practice_eligible: true, prompt: "", explanation: "",
   options: blank(4), correct: [], tf: null, left: blank(3), right: blank(3), pairs: {}, accepted: "", numValue: "", numTol: "0", items: blank(3) });
 const fromApi = (q: any): S => {
   const s = fresh();

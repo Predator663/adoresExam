@@ -71,6 +71,8 @@ XP, streaks and badges are **rewards for effort**. They **never change your exam
 
 **Badges** have bronze, silver and gold. Examples: First Steps, Perfect Score, Comeback Kid, On Fire (7 days) and Unstoppable (30 days), Subject Star, All-Rounder, Steady Pace, Mistake Master, Always On Time, Practice Pro. Open your **badge cabinet** to see what to aim for next.
 
+**Offline use:** in *Settings > Offline use* download the app files, your exam timetable, your results with answer review, and practice questions for each subject. Each download shows its real progress. Practice done with no signal is for learning only (no XP). Exam questions are never downloaded early; they arrive when your exam starts.
+
 **Practice mode:** short quizzes (5 to 20 questions) with instant feedback and explanations. They give XP and keep your streak alive in the holidays. They never count toward exam marks.
 
 **Leaderboard (if your school turns it on):** ranks XP, never marks, only inside your class, with display names. You can **hide yourself** in your profile. Your profile also lets you choose an avatar and a display name.

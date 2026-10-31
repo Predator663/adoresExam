@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import A11yPanel from "@/components/A11yPanel";
+import OfflineManager from "@/components/OfflineManager";
 import Shell from "@/components/Shell";
 import { api } from "@/lib/api";
 import { AVATAR_EMOJI } from "@/lib/emoji";
@@ -74,6 +75,8 @@ export default function Settings() {
       )}
 
       <div className="card"><h2>{t("notifications")}</h2><PushToggle /></div>
+
+      <div className="card" id="offline"><h2>{t("off_title")}</h2><OfflineManager /></div>
 
       <div className="grid2">
         <Link className="btn" href="/install/">📲 {t("install_app")}</Link>

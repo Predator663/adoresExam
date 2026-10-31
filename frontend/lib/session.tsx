@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { api, getToken, setToken } from "./api";
 import { dict } from "./i18n";
+import { clearOfflineData, setCurrentUser } from "./offlineStore";
 import type { User } from "./types";
 
 type Ctx = {
@@ -43,6 +44,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(u);
     const l = readLocal();
     if (u) {
+      setCurrentUser(u.id);  // offline downloads belong to one person: another person signing in here removes them
       const merged: Local = { ...l, language: u.language, theme: u.theme, text_size: u.accessibility.text_size,
         line_spacing: u.accessibility.line_spacing, dyslexia_font: u.accessibility.dyslexia_font, reduce_motion: u.accessibility.reduce_motion };
       localStorage.setItem(LOCAL, JSON.stringify(merged));
@@ -61,6 +63,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async (reason?: string) => {
     try { if (getToken()) await api("/auth/logout/", { method: "POST", body: {} }); } catch { /* already out */ }
+    await clearOfflineData();  // her downloaded results and practice questions leave the phone with her
     setToken(null); setUser(null);
     if (reason) setNotice(reason);
     if (!location.pathname.startsWith("/login")) location.href = "/login/";

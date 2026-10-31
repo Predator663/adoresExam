@@ -3,7 +3,9 @@
    - Anything from the API (a different address, or /api/) is NEVER cached: exam questions, results and answers
      always come live from the server, so nothing stale or private is ever kept here.
    - Pages and files of the app itself are cached so the app opens instantly and still opens with no signal. */
-const VERSION = "amani-v2";
+const VERSION = "amani-v3";
+// Files saved on purpose from Settings > Offline use live in their own caches (lib/offlineStore.ts). A new release must never delete them.
+const KEEP = ["amani-offline-static", "amani-user-data"];
 const SHELL = ["/", "/login/", "/exam/", "/results/", "/practice/", "/badges/", "/settings/", "/notifications/", "/install/", "/demo/", "/manifest.webmanifest", "/icons/icon-192.png", "/logo.png"];
 
 self.addEventListener("install", (event) => {
@@ -11,28 +13,34 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION && !KEEP.includes(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request, url = new URL(req.url);
-  if (req.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (req.method !== "GET") return;
+  // Question pictures come from the API address (/media/...). Saved ones show with no signal; anything else goes to the network as usual.
+  if (url.origin !== self.location.origin) {
+    if (url.pathname.startsWith("/media/")) event.respondWith(caches.match(req, { ignoreVary: true }).then((hit) => hit || fetch(req)));
+    return;
+  }
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/__offline__/")) return;
 
   // Page loads: network first (fresh app after a new release), cached copy when there is no signal.
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req).then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); return res; })
-        .catch(() => caches.match(req).then((hit) => hit || caches.match(url.pathname) || caches.match("/")))
+        .catch(() => caches.match(req, { ignoreVary: true }).then((hit) => hit || caches.match(url.pathname, { ignoreVary: true }) || caches.match("/", { ignoreVary: true })))
     );
     return;
   }
   // Built files (hashed names never change) and icons: cache first. Everything else: show cached, refresh quietly.
   if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
-    event.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); return res; })));
+    event.respondWith(caches.match(req, { ignoreVary: true }).then((hit) => hit || fetch(req).then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); return res; })));
     return;
   }
   event.respondWith(
-    caches.match(req).then((hit) => {
+    caches.match(req, { ignoreVary: true }).then((hit) => {
       const net = fetch(req).then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); return res; }).catch(() => hit);
       return hit || net;
     })

@@ -423,27 +423,89 @@ def mark_reviewed(attempt, numbers, now=None):
 
 # ---------------------------------------------------------------- practice mode (SRS 5.5)
 
+def _reserved_for_exams():
+    """Source questions that sit in an exam whose results are not published yet. Never offered for practice."""
+    return (ExamQuestion.objects.exclude(exam__status=Exam.PUBLISHED).filter(source__isnull=False).values("source_id"))
+
+
+def _student_form(student):
+    return student.school_class.form_level if student.school_class_id else None
+
+
 def practice_pool(student, subject, topic=None, difficulty=None):
-    """Questions a student may practise: approved, marked 'practice eligible' by a teacher, matching her form,
-    and NEVER a question that sits in an exam whose results are not published yet (so no exam is spoiled)."""
-    reserved = (ExamQuestion.objects.exclude(exam__status=Exam.PUBLISHED).filter(source__isnull=False)
-                .values("source_id"))
-    qs = Question.objects.filter(subject=subject, status=Question.APPROVED, practice_eligible=True).exclude(pk__in=reserved)
-    if student.school_class_id:
-        qs = qs.filter(form_level=student.school_class.form_level)
+    """Questions a student may practise: approved, marked 'practice eligible' by a teacher, and NEVER a question that
+    sits in an exam whose results are not published yet (so no exam is spoiled).
+    Form: her own form first. When her own form has fewer than PRACTICE_MIN questions she is also given questions
+    from LOWER forms (revision), never from a higher form, so a quiz can still be built."""
+    qs = (Question.objects.filter(subject=subject, status=Question.APPROVED, practice_eligible=True)
+          .exclude(pk__in=_reserved_for_exams()))
     if topic:
         qs = qs.filter(topic__iexact=topic)
     if difficulty in ("easy", "medium", "hard"):
         qs = qs.filter(difficulty=difficulty)
-    return qs
+    level = _student_form(student)
+    if level is None:
+        return qs
+    own = qs.filter(form_level=level)
+    return own if own.count() >= PRACTICE_MIN else qs.filter(form_level__lte=level)
+
+
+def practice_why_not(student, subject):
+    """For a subject she cannot practise yet: the plain reason, so the screen can say what is missing.
+    none = the subject has no approved questions for her form; not_shared = approved questions exist but no teacher has
+    allowed them for practice; in_exams = they are all held back for upcoming exams; few = fewer than PRACTICE_MIN."""
+    level = _student_form(student)
+    approved = Question.objects.filter(subject=subject, status=Question.APPROVED)
+    if level is not None:
+        approved = approved.filter(form_level__lte=level)
+    if not approved.exists():
+        return "none"
+    shared = approved.filter(practice_eligible=True)
+    if not shared.exists():
+        return "not_shared"
+    if not shared.exclude(pk__in=_reserved_for_exams()).exists():
+        return "in_exams"
+    return "few"
 
 
 def practice_subjects(student):
     out = []
     for s in Subject.objects.filter(practice_enabled=True):
         n = practice_pool(student, s).count()
-        out.append({"id": s.pk, "name": s.name, "available_questions": n, "can_start": n >= PRACTICE_MIN})
+        out.append({"id": s.pk, "name": s.name, "available_questions": n, "can_start": n >= PRACTICE_MIN,
+                    "reason": "" if n >= PRACTICE_MIN else practice_why_not(student, s)})
     return out
+
+
+PACK_MAX_QUESTIONS = 60  # one offline pack per subject
+PACK_VALID_DAYS = 14     # after this the phone drops the pack and asks for a fresh download
+PACK_BATCH_MAX = 50
+
+
+def practice_pack(student, subject_id, seed=None, offset=0, limit=None, now=None):
+    """Everything the phone needs to run practice quizzes of one subject with NO signal: the questions with their
+    answers and explanations (practice questions are never in an upcoming exam, and the phone marks them itself).
+    Offline quizzes are for learning only: they never earn XP, streaks or marks.
+    The phone asks in batches so it can show true progress: first limit=0 (just the heading: how many questions and a
+    seed), then offset=0,10,20... with that same seed, which always picks the same questions in the same order."""
+    now = now or timezone.now()
+    lang = lang_of(student)
+    subject = Subject.objects.filter(pk=subject_id).first()
+    if subject is None:
+        raise GamificationError("That subject does not exist.", 404, "not_found")
+    if not subject.practice_enabled:
+        raise GamificationError(t("practice.disabled", lang), 403, "practice_off")
+    pool = list(practice_pool(student, subject).order_by("pk"))
+    if len(pool) < PRACTICE_MIN:
+        raise GamificationError(t("practice.not_enough", lang), 409, "not_enough")
+    seed = seed or random.SystemRandom().randrange(1, 2**31)
+    picks = random.Random(seed).sample(pool, min(PACK_MAX_QUESTIONS, len(pool)))
+    chunk = picks if limit is None else picks[offset: offset + max(0, min(limit, PACK_BATCH_MAX))]
+    return {
+        "subject_id": subject.pk, "subject": subject.name, "seed": seed, "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=PACK_VALID_DAYS)).isoformat(), "count": len(picks), "offset": offset,
+        "questions": [{"id": q.pk, "type": q.qtype, "prompt": q.prompt, "marks": q.marks, "content": q.content,
+                       "answer": q.answer, "explanation": q.explanation, "topic": q.topic} for q in chunk]}
 
 
 def _practice_payload(q):

@@ -26,7 +26,7 @@ Question types: multiple choice (one answer), multiple choice (several answers),
 Choose questions by hand, or set **random rules** (for example 10 easy, 20 medium and 10 hard from chosen topics). An admin sets the date, times, classes, pass mark and rules text and schedules the exam. A live exam cannot be edited.
 
 ## 3. Practice mode
-Tick **practice eligible** on approved questions you are happy for students to practise (you can do many at once). Questions that sit in any exam whose results are not yet published are **never** offered, so you cannot spoil an upcoming exam. You can switch practice on or off for each of your subjects. Students need at least 5 eligible questions for their form.
+Tick **practice eligible** on approved questions you are happy for students to practise (you can do many at once). Questions that sit in any exam whose results are not yet published are **never** offered, so you cannot spoil an upcoming exam. You can switch practice on or off for each of your subjects. Students need at least 5 eligible questions for their form (if their own form has fewer, questions from lower forms top it up; never from a higher form). In the question bank, choose a subject and use **Allow practice: all approved ...** to open every approved question of that subject at once. New questions are practice eligible by default.
 
 ## 4. After the exam: analytics (only after results are published)
 - **Subject dashboard:** average, highest, lowest, pass rate, grade distribution, trend across exams, comparison of classes and streams.
