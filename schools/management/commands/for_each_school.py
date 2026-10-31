@@ -31,7 +31,9 @@ class Command(BaseCommand):
             self.stdout.write(f"== {s.schema_name}")
             try:
                 with schema_context(s.schema_name):
-                    call_command(command, *opts["args"], stdout=self.stdout, stderr=self.stderr)
+                    # Django strips the "args" positional out of opts and passes it
+                    # in as *args, so read it from there (opts["args"] raises KeyError).
+                    call_command(command, *args, stdout=self.stdout, stderr=self.stderr)
             except Exception as e:  # one broken school must not stop the others
                 failed.append(s.schema_name)
                 self.stderr.write(f"!! {s.schema_name}: {type(e).__name__}: {e}")
