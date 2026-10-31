@@ -14,7 +14,11 @@ HIDDEN = "••• hidden"
 
 
 def all_models():
-    return sorted((m for m in apps.get_models() if not m._meta.proxy), key=lambda m: m._meta.label_lower)
+    from django.db import connection
+    platform = (getattr(connection, "schema_name", None) or "public") == "public"
+    # the list of schools is visible from the platform only, not from inside a school
+    return sorted((m for m in apps.get_models() if not m._meta.proxy and (platform or m._meta.app_label != "schools")),
+                  key=lambda m: m._meta.label_lower)
 
 
 def admin_url(m):

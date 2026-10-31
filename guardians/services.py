@@ -335,9 +335,21 @@ def new_password():
 
 
 DEFAULT_MESSAGES = {  # what the parent receives unless the administrator edits it. {url} = the school web address, {children} = one line per child
-    "sw": "Amani Girls: taarifa za kuingia kwenye mitihani. Fungua {url}\n{children}\nWeka nenosiri jipya ukiingia mara ya kwanza. Usimpe mtu.",
-    "en": "Amani Girls: exam login. Open {url}\n{children}\nSet a new password at first login. Do not share.",
-}
+    "sw": "{school}: taarifa za kuingia kwenye mitihani. Fungua {url}\n{children}\nWeka nenosiri jipya ukiingia mara ya kwanza. Usimpe mtu.",
+    "en": "{school}: exam login. Open {url}\n{children}\nSet a new password at first login. Do not share.",
+}  # {school} = the school's short name (Settings), or the first two words of its name: "Amani Girls"
+
+
+def school_label():
+    from core.models import SchoolSettings
+    s = SchoolSettings.load()
+    return (s.short_name or "").strip() or " ".join((s.school_name or "").split()[:2]) or "School"
+
+
+def default_messages():
+    """The standard wording with this school's name filled in (what the screen shows and what is sent)."""
+    label = school_label()
+    return {k: v.replace("{school}", label) for k, v in DEFAULT_MESSAGES.items()}
 CHILD_LINE = {"sw": "{n}: jina {u}, nenosiri {p}", "en": "{n}: user {u}, password {p}"}
 TEMPLATE_MAX = 300  # the wording around the children's lines
 CUSTOM_MAX = 459  # a message with no login details: up to 3 ordinary SMS
@@ -355,7 +367,7 @@ def check_templates(d):
     out = {}
     for lang in ("sw", "en"):
         text = clean_template(d.get("message_" + lang))
-        if not text or text == clean_template(DEFAULT_MESSAGES[lang]):
+        if not text or text in (clean_template(DEFAULT_MESSAGES[lang]), clean_template(default_messages()[lang])):
             out[lang] = ""
             continue
         if len(text.replace("{children}", "").replace("{url}", "")) > TEMPLATE_MAX:
@@ -372,7 +384,7 @@ def build_body(lang, cfg, pairs, note="", template=""):
     url = (cfg.public_url or "").strip() or "the school website"
     lang = lang if lang in DEFAULT_MESSAGES else "sw"
     kids = "\n".join(CHILD_LINE[lang].format(n=n, u=u, p=p) for n, u, p in pairs)
-    text = (template or DEFAULT_MESSAGES[lang]).replace("{url}", url).replace("{children}", kids)
+    text = (template or DEFAULT_MESSAGES[lang]).replace("{url}", url).replace("{children}", kids).replace("{school}", school_label())
     return text + ("\n" + note if note else "")  # the administrator's own line goes last, after the security reminder
 
 

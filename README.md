@@ -19,10 +19,15 @@ load testing, user guides, training, pilot and go-live tools**.
 Two terminals. Nothing to configure: `runserver` is treated as development automatically (plain http, any origin allowed).
 
 ```
-:: terminal 1 - the API
+:: one time: install PostgreSQL for Windows, then create the database (change 17 to your version)
+"C:\Program Files\PostgreSQL\17\bin\createdb" -U postgres amani_exams
+
+:: terminal 1 - the API  (the app is multi-school and needs PostgreSQL: see docs/MULTI_SCHOOL.md)
 venv\Scripts\activate
-python manage.py migrate
-python manage.py createsuperuser        (or create an admin in the Django admin)
+set DATABASE_URL=postgres://postgres:YOURPASSWORD@localhost:5432/amani_exams
+python manage.py migrate_schemas
+python manage.py createsuperuser        (the platform login)
+python manage.py create_school "Dev School" --domain localhost     (prints the school's logins)
 python manage.py runserver              (http://localhost:8000)
 
 :: terminal 2 - the web app
@@ -40,7 +45,7 @@ tables were created. Every app now has an empty `migrations/` package, so:
 
 ```bash
 pip install -r requirements.txt
-python manage.py migrate            # includes the new gamification app (its migration is included)
+python manage.py migrate_schemas    # builds the platform tables and every school's tables (needs PostgreSQL, see docs/MULTI_SCHOOL.md)
 python manage.py makemigrations --check --dry-run   # should say: No changes detected (type only the command; on Windows do not paste the # comment)
 python manage.py test               # Phase 1 + 2 + 3 tests
 PYTHONPATH=. python -m unittest gamification.test_rules   # pure rules, no Django needed
@@ -137,4 +142,3 @@ Public: `i18n/<lang>/`
 
 ## Still not built
 The **React/Next.js PWA front end** (screens, themes, read-aloud, service worker, installability, offline answer queue). The API stores and serves everything it needs. Also not possible from code: the pilot exam itself, school sign-off of the SRS section 10 questions, and a real load test on your server.
-"# adoresExam" 

@@ -2,8 +2,9 @@
 import time
 
 from django.conf import settings
+from django.db import connection
 
-_CACHE = {"at": 0.0, "val": None}
+_CACHE = {}  # schema name -> (time taken, value): each school has its own switch, and the platform has one for ALL schools
 TTL = 3  # seconds; another worker notices a switch within this time
 
 
@@ -27,20 +28,36 @@ def exempt_prefixes():
     return tuple(base + list(getattr(settings, "CONTROLROOM_EXEMPT_PREFIXES", [])))
 
 
+def schema():
+    return getattr(connection, "schema_name", None) or "public"
+
+
+def _row():
+    from .models import SiteControl
+    row = SiteControl.objects.filter(pk=1).first()
+    return (bool(row and row.maintenance), row.message if row else "", row.back_at if row else "")
+
+
 def current(force=False):
-    """(maintenance: bool, message: str, back_at: str)"""
+    """(maintenance: bool, message: str, back_at: str). On when the PLATFORM switch (all schools) or this school's own switch is on."""
+    key = schema()
     now = time.monotonic()
-    if not force and _CACHE["val"] is not None and now - _CACHE["at"] < TTL:
-        return _CACHE["val"]
+    hit = _CACHE.get(key)
+    if not force and hit and now - hit[0] < TTL:
+        return hit[1]
     try:
-        from .models import SiteControl
-        row = SiteControl.objects.filter(pk=1).first()
-        val = (bool(row and row.maintenance), row.message if row else "", row.back_at if row else "")
+        own = _row()
+        val = own
+        if key != "public" and not own[0]:  # the platform switch (all schools) lives in the public schema
+            from django_tenants.utils import schema_context
+            with schema_context("public"):
+                everyone = _row()
+            val = everyone if everyone[0] else own
     except Exception:  # table missing / DB hiccup: never take the site down because of the switch itself
         val = (False, "", "")
-    _CACHE.update(at=now, val=val)
+    _CACHE[key] = (now, val)
     return val
 
 
 def reset_cache():
-    _CACHE.update(at=0.0, val=None)
+    _CACHE.clear()

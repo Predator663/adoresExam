@@ -1,13 +1,14 @@
 "use client";
 import PublicPage from "@/components/PublicPage";
 import { useSession } from "@/lib/session";
-import { SITE } from "@/lib/site";
+import { useSite } from "@/lib/brand";
 
 export default function Accessibility() {
   const { t } = useSession();
+  const site = useSite();
   return (
     <PublicPage title={t("access_title")} updated>
-      <p>{SITE.school} wants every student to be able to sit exams comfortably, whatever device, eyesight or reading needs she has. This page lists what {SITE.app} offers and where it still falls short.</p>
+      <p>{site.school} wants every student to be able to sit exams comfortably, whatever device, eyesight or reading needs she has. This page lists what {site.app} offers and where it still falls short.</p>
 
       <h2>What you can change</h2>
       <p>Open the <b>Accessibility</b> button (the person icon at the top) at any time, even on the login screen of the app after you sign in.</p>
@@ -41,7 +42,7 @@ export default function Accessibility() {
       <p>If a student needs extra time, a reader or another adjustment, ask your teacher or the administrator before the exam. Administrators can grant extra time, and every change is recorded.</p>
 
       <h2>Tell us about a problem</h2>
-      <p>If something is hard to use, please tell us: <a href={`mailto:${SITE.email}`}>{SITE.email}</a> or {SITE.phone}. Say which page, which device and what happened, and we will work on it.</p>
+      <p>If something is hard to use, please tell us: <a href={`mailto:${site.email}`}>{site.email}</a> or {site.phone}. Say which page, which device and what happened, and we will work on it.</p>
     </PublicPage>
   );
 }

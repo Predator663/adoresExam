@@ -23,19 +23,36 @@ if RUNSERVER and DEBUG:
     ALLOWED_HOSTS = ["*"]  # development only: lets a phone on the same Wi-Fi reach http://<computer-ip>:8000
 CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("DJANGO_CSRF_ORIGINS", "").split(",") if o]
 
-INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
+# MULTI-SCHOOL (django-tenants): every school has its own PostgreSQL schema inside the one database.
+#   SHARED_APPS  = tables that live once, in the platform ("public") schema: the list of schools and their web addresses.
+#   TENANT_APPS  = tables that every school has for itself (users, classes, exams, results ...).
+# accounts, academics, auth ... are in both lists: the platform needs a login for its own owner, and a user points at a class.
+SHARED_APPS = [
+    "django_tenants",  # must be first
+    "schools",
     "django.contrib.contenttypes",
+    "django.contrib.auth",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.admin",
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
-    "core",
     "accounts",
     "academics",
+    "controlroom",
+]
+TENANT_APPS = [
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    "django.contrib.sessions",
+    "django.contrib.admin",
+    "rest_framework.authtoken",
+    "accounts",
+    "academics",
+    "controlroom",
+    "core",
     "questions",
     "exams",
     "notifications",
@@ -43,14 +60,27 @@ INSTALLED_APPS = [
     "gamification",
     "guardians",
     "proctoring",
-    "controlroom",
 ]
+if TESTING:
+    # The test suite runs in the platform schema alone, exactly like before: every table exists there.
+    SHARED_APPS = SHARED_APPS + [a for a in TENANT_APPS if a not in SHARED_APPS]
+INSTALLED_APPS = list(SHARED_APPS) + [a for a in TENANT_APPS if a not in SHARED_APPS]
+
+TENANT_MODEL = "schools.School"
+TENANT_DOMAIN_MODEL = "schools.Domain"
+DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)
+# The platform's own address shows only the school list / platform admin / health check. (Tests use the normal address list.)
+PUBLIC_SCHEMA_URLCONF = "config.urls" if TESTING else "config.public_urls"
+# While old web apps / the paired SMS phone do not yet send a school (X-School header / school-prefixed device token), /api/* without a
+# clue goes to this school. Set it to the schema of your first school right after the move, remove it when every web app is rebuilt.
+LEGACY_SCHOOL_SCHEMA = os.environ.get("LEGACY_SCHOOL_SCHEMA", "")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "core.middleware.SecurityHeadersMiddleware",  # nosniff, CSP for the JSON API, permissions policy
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "schools.middleware.SchoolMiddleware",  # picks the school (schema) of this request; after CORS so its 404/403 reach the web app
     "controlroom.middleware.MaintenanceMiddleware",  # site-wide maintenance switch; after CORS so its 503 reaches the web app
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -79,21 +109,25 @@ TEMPLATES = [
     }
 ]
 
+# PostgreSQL only (one schema per school). Locally (Windows cmd):  set DATABASE_URL=postgres://postgres:YOURPASSWORD@localhost:5432/amani_exams
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}", conn_max_age=60
-    )
+    "default": dj_database_url.config(default="postgres://postgres:postgres@localhost:5432/amani_exams", conn_max_age=60)
 }
+if "postgresql" not in DATABASES["default"].get("ENGINE", ""):
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("DATABASE_URL must point to a PostgreSQL database: every school lives in its own PostgreSQL schema.")
+DATABASES["default"]["ENGINE"] = "django_tenants.postgresql_backend"
 
 if os.environ.get("REDIS_URL"):
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": os.environ["REDIS_URL"],
+            "KEY_FUNCTION": "schools.cache.make_key",  # keys include the school
         }
     }
 else:
-    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "KEY_FUNCTION": "schools.cache.make_key"}}
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -135,7 +169,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": {"BACKEND": "schools.storage.SchoolFileSystemStorage"},  # one folder per school under MEDIA_ROOT
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 MEDIA_URL = "media/"
@@ -185,7 +219,10 @@ VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_CONTACT_EMAIL = os.environ.get("VAPID_CONTACT_EMAIL", "admin@example.com")
 
 # Production: set CORS_ORIGINS to the address of the web app (https://exams.example.com), nothing else is allowed.
+# Every address registered as a school's Domain is allowed too (schools/cors.py), so CORS_ORIGINS can stay empty.
 CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("CORS_ORIGINS", "").split(",") if o]
+from corsheaders.defaults import default_headers  # noqa: E402
+CORS_ALLOW_HEADERS = list(default_headers) + ["x-school"]  # the web app names its school in every request
 if RUNSERVER and DEBUG and not CORS_ALLOWED_ORIGINS:
     CORS_ALLOW_ALL_ORIGINS = True  # development only: the web app on localhost:3000, or on a phone via the computer's IP
 

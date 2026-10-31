@@ -3,6 +3,7 @@ import hashlib
 import secrets
 from datetime import timedelta
 
+from django.db import connection
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -198,7 +199,7 @@ def summary(request):
         "students_waiting_first_login": students.filter(must_change_password=True).count(),
         "without_parent": [{"id": s.pk, "name": f"{s.first_name} {s.last_name}".strip(), "index": s.index_number,
                             "class": str(s.school_class) if s.school_class_id else ""} for s in without[:40]],
-        "default_messages": services.DEFAULT_MESSAGES, "jobs": counts, "phone_online": SmsDevice.objects.filter(active=True, last_seen__gte=cutoff).exists(),
+        "default_messages": services.default_messages(), "jobs": counts, "phone_online": SmsDevice.objects.filter(active=True, last_seen__gte=cutoff).exists(),
     })
 
 
@@ -291,7 +292,8 @@ def _device_row(d):
 def devices(request):
     if request.method == "POST":
         name = services._clean_name(request.data.get("name")) or "School phone"
-        token = secrets.token_urlsafe(32)
+        # "<school>.<secret>": the phone app cannot send an X-School header, so the school travels inside the token (schools/middleware.py)
+        token = f"{connection.schema_name}.{secrets.token_urlsafe(32)}" if getattr(connection, "schema_name", "public") != "public" else secrets.token_urlsafe(32)
         d = SmsDevice.objects.create(name=name, token_hash=hashlib.sha256(token.encode()).hexdigest(), created_by=request.user)
         audit(request.user, "sms.device.create", d.pk)
         return Response({**_device_row(d), "token": token}, status=201)  # the only time the token is shown

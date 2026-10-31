@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
 import { SessionProvider } from "@/lib/session";
+import { BrandProvider } from "@/lib/brand";
 import SwRegister from "@/components/SwRegister";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Amani Exams",
-  description: "Amani Girls Secondary School online examinations",
+  title: "Online Exams",
+  description: "Online examinations",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Amani Exams", statusBarStyle: "default" },
-  icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Exams", statusBarStyle: "default" },  // the school's own name and logo are set by BrandProvider
 };
 export const viewport: Viewport = { themeColor: "#0b6b4f", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider><BrandProvider>{children}</BrandProvider></SessionProvider>
         <MaintenanceGate />
         <SwRegister />
       </body>

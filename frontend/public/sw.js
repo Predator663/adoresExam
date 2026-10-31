@@ -42,8 +42,8 @@ self.addEventListener("fetch", (event) => {
 // NOT-02: Web Push (results ready, exam reminders, announcements).
 self.addEventListener("push", (event) => {
   let d = {};
-  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { title: "Amani Exams", body: event.data ? event.data.text() : "" }; }
-  event.waitUntil(self.registration.showNotification(d.title || "Amani Exams", {
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { title: "Exams", body: event.data ? event.data.text() : "" }; }
+  event.waitUntil(self.registration.showNotification(d.title || "Exams", {
     body: d.body || "", icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", data: { url: d.url || "/notifications/" },
   }));
 });

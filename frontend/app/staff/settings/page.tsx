@@ -38,6 +38,12 @@ function School() {
   return (
     <div className="card">
       <label className="field"><span>School name</span><input className="input" value={v.school_name} onChange={(e) => up({ school_name: e.target.value })} /></label>
+      <label className="field"><span>Short name (the app is called “Short name Exams”; empty = first word of the name)</span><input className="input" maxLength={40} value={v.short_name ?? ""} onChange={(e) => up({ short_name: e.target.value })} /></label>
+      <div className="grid2">
+        <label className="field"><span>Contact e-mail (shown on About, Privacy, Terms)</span><input className="input" type="email" maxLength={120} value={v.contact_email ?? ""} onChange={(e) => up({ contact_email: e.target.value })} /></label>
+        <label className="field"><span>Contact phone</span><input className="input" maxLength={40} value={v.contact_phone ?? ""} onChange={(e) => up({ contact_phone: e.target.value })} /></label>
+      </div>
+      <label className="field"><span>Address</span><input className="input" maxLength={200} value={v.address ?? ""} onChange={(e) => up({ address: e.target.value })} /></label>
       <label className="field"><span>Logo {v.logo_url ? "(uploaded)" : ""}</span><input className="input" type="file" accept="image/*" onChange={(e) => logo(e.target.files?.[0])} /></label>
       <label className="field"><span>Default exam rules (shown when an exam has none of its own)</span><textarea className="input" rows={4} value={v.rules_text} onChange={(e) => up({ rules_text: e.target.value })} /></label>
       <div className="grid2">

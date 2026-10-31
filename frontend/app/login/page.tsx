@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { useSession } from "@/lib/session";
+import { useAppName, useBrand } from "@/lib/brand";
 import { Loading } from "@/components/ui";
 import { diagnose, Diagnosis } from "@/lib/diagnose";
 import Footer from "@/components/Footer";
@@ -9,6 +10,8 @@ import Logo from "@/components/Logo";
 /** AUTH-01, AUTH-10: big inputs, show-password, friendly errors. */
 export default function Login() {
   const { login, user, ready, t, lang, savePrefs } = useSession();
+  const brand = useBrand();
+  const appName = useAppName();
   const [u, setU] = useState(""), [p, setP] = useState(""), [show, setShow] = useState(false);
   const [err, setErr] = useState(""), [busy, setBusy] = useState(false), [note, setNote] = useState(""), [diag, setDiag] = useState<Diagnosis | null>(null), [testing, setTesting] = useState(false);
   useEffect(() => { setNote(sessionStorage.getItem("amani_notice") || ""); sessionStorage.removeItem("amani_notice"); }, []);
@@ -24,10 +27,10 @@ export default function Login() {
   }
   return (
     <div className="login-split">
-      <div className="login-art" aria-hidden="true"><Logo size={150} /><h2>{t("app_name")}</h2><p>Amani Girls Secondary School</p><p>{t("login_sub")}</p></div>
+      <div className="login-art" aria-hidden="true"><Logo size={150} /><h2>{appName}</h2><p>{brand.school}</p><p>{t("login_sub")}</p></div>
       <div className="login-wrap"><div className="login-stack">
       <form className="card login" onSubmit={submit}>
-        <div className="center"><Logo size={96} label="Amani Girls Secondary School" /><h1>{t("app_name")}</h1><p className="muted">{t("login_sub")}</p></div>
+        <div className="center"><Logo size={96} label="logo" /><h1>{appName}</h1><p className="muted">{t("login_sub")}</p></div>
         {note && <p className="hint" role="status">{note}</p>}
         <label className="field"><span>{t("username")}</span>
           <input className="input" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" required /></label>

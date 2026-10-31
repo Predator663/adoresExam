@@ -4,13 +4,15 @@ import Logo from "@/components/Logo";
 import PublicPage from "@/components/PublicPage";
 import { useSession } from "@/lib/session";
 import OperatorCard from "@/components/OperatorCard";
-import { SITE } from "@/lib/site";
+import { useSite } from "@/lib/brand";
+import ContactLine from "@/components/ContactLine";
 
 export default function About() {
   const { t } = useSession();
+  const site = useSite();
   return (
     <PublicPage title={t("about_title")}>
-      <div className="about-hero"><Logo size={120} label="Amani Girls Secondary School crest" /><p className="lead">{SITE.app} is the online examination system of {SITE.school}. Girls sit their school exams on a phone, tablet or computer, the computer marks every answer, and results arrive on time and fairly.</p></div>
+      <div className="about-hero"><Logo size={120} label="logo" /><p className="lead">{site.app} is the online examination system of {site.school}. Girls sit their school exams on a phone, tablet or computer, the computer marks every answer, and results arrive on time and fairly.</p></div>
 
       <h2>What it does</h2>
       <div className="feat-grid">
@@ -32,8 +34,7 @@ export default function About() {
 
       <h2 id="contact">Contact</h2>
       <div className="card">
-        <p><b>{SITE.school}</b><br />{SITE.address}</p>
-        <p>E-mail: <a href={`mailto:${SITE.email}`}>{SITE.email}</a><br />Phone: <a href={`tel:${SITE.phone.replace(/\s/g, "")}`}>{SITE.phone}</a></p>
+        <ContactLine />
         <p className="muted small">Forgotten password? Ask your teacher or the school administrator to reset it. Staff cannot see your password.</p>
       </div>
 
@@ -41,7 +42,7 @@ export default function About() {
       <OperatorCard />
 
       <h2>Version and credits</h2>
-      <p>Version {SITE.version}, {SITE.year}. Developed for {SITE.school}{SITE.developer !== SITE.school ? ` by ${SITE.developer}` : ""}. Built with Django, Next.js and React.</p>
+      <p>Version {site.version}, {site.year}. Developed for {site.school}{site.developer !== site.school ? ` by ${site.developer}` : ""}. Built with Django, Next.js and React.</p>
       <p><Link href="/terms/">Terms of use</Link> · <Link href="/privacy/">Privacy policy</Link> · <Link href="/accessibility/">Accessibility</Link></p>
     </PublicPage>
   );

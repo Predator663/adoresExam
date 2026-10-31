@@ -14,6 +14,10 @@ class SchoolSettings(models.Model):
     """Singleton row (pk=1) holding admin-editable settings (ADM-09)."""
 
     school_name = models.CharField(max_length=200, default="Amani Girls Secondary School")
+    short_name = models.CharField(max_length=40, blank=True, default="")  # "Amani": the app is then "Amani Exams". Blank = first word of the name
+    contact_email = models.CharField(max_length=120, blank=True, default="")  # shown on the About, Privacy and Terms pages
+    contact_phone = models.CharField(max_length=40, blank=True, default="")
+    address = models.CharField(max_length=200, blank=True, default="")
     result_delay_minutes = models.PositiveIntegerField(default=5)  # BR-06
     late_entry_minutes = models.PositiveIntegerField(default=10)  # EXM-04
     question_approval_required = models.BooleanField(default=True)  # QB-09

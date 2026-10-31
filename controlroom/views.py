@@ -66,7 +66,8 @@ def home(request):
     ctl = SiteControl.get()
     return render(request, "controlroom/home.html", {
         "ctl": ctl, "phrase": _phrase(request), "events": ControlEvent.objects.all()[:15],
-        "title": "Control room", "owners": sorted(state.owners()) or ["any superuser"],
+        "title": "Control room: ALL schools" if state.schema() == "public" else f"Control room: {getattr(request.tenant, 'name', '') or state.schema()}",
+        "owners": sorted(state.owners()) or ["any superuser"],
         "events_url": eye.admin_url(ControlEvent),
     })
 

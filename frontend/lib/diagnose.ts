@@ -1,4 +1,4 @@
-import { API, apiBase } from "./api";
+import { API, apiBase, schoolHost } from "./api";
 
 export type Diagnosis = { ok: boolean; lines: string[] };
 
@@ -9,7 +9,8 @@ export async function diagnose(): Promise<Diagnosis> {
     return { ok: false, lines: [...lines, "✗ This page is secure (https) but the server address is plain http. Browsers block that. Use an https server address (NEXT_PUBLIC_API_URL)."] };
   }
   try {
-    const r = await fetch(target, { cache: "no-store" });
+    const r = await fetch(target, { cache: "no-store", headers: { "X-School": schoolHost() } });
+    if (r.status === 404) { const d = await r.clone().json().catch(() => null); if (d?.code === "unknown_school") return { ok: false, lines: [...lines, `✗ The server does not know the address ${schoolHost()}. Register it as a school address (Platform admin > Schools > Domains, or manage.py create_school --domain ${schoolHost()}).`] }; }
     if (r.ok) return { ok: true, lines: [...lines, "✓ The server answered. Connection is fine."] };
     if (r.status >= 500 && !API) return { ok: false, lines: [...lines, `✗ The web app is running, but Django did not answer (error ${r.status}). Start it with: python manage.py runserver. If Django uses another port or computer, start the web app with BACKEND_URL=http://127.0.0.1:PORT npm run dev.`] };
     return { ok: false, lines: [...lines, `✗ The server answered with an error (${r.status}). ${r.status === 400 ? "Its allowed-hosts list probably does not include this address (DJANGO_ALLOWED_HOSTS)." : ""}`] };

@@ -57,7 +57,7 @@ def presence(request):
 
 
 SETTINGS_FIELDS = [
-    "school_name", "result_delay_minutes", "late_entry_minutes", "question_approval_required",
+    "school_name", "short_name", "contact_email", "contact_phone", "address", "result_delay_minutes", "late_entry_minutes", "question_approval_required",
     "show_class_position", "leaderboard_enabled", "grade_scale", "rules_text", "default_theme", "default_language",
     "proximity_alert_meters", "proximity_lock_enabled", "leave_lock_enabled", "leave_lock_limit",
 ]
@@ -123,6 +123,13 @@ def clean_settings(data):
             errors["school_name"] = "Enter the school name (up to 200 characters)."
         else:
             clean["school_name"] = v
+    for name, limit in (("short_name", 40), ("contact_email", 120), ("contact_phone", 40), ("address", 200)):
+        if name in data:
+            v = str(data[name] or "").strip()
+            if len(v) > limit:
+                errors[name] = f"Up to {limit} characters."
+            else:
+                clean[name] = v
     if "rules_text" in data:
         clean["rules_text"] = str(data["rules_text"])[:5000]
     if "default_theme" in data:
@@ -142,6 +149,25 @@ def clean_settings(data):
         else:
             clean["grade_scale"] = grading.normalize_scale(data["grade_scale"])  # GRD-04 / RES-07
     return clean, errors
+
+
+def brand_of(s):
+    """What the web app shows as the school's identity. Used before login too (see `branding`)."""
+    name = s.school_name.strip()
+    short = (s.short_name or "").strip() or (name.split() or [""])[0]
+    return {
+        "school_name": name, "short_name": short, "contact_email": s.contact_email, "contact_phone": s.contact_phone,
+        "address": s.address, "logo_url": s.logo.url if s.logo else None,
+        "default_theme": s.default_theme, "default_language": s.default_language,
+    }
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def branding(request):
+    """Public (the login page needs it): the name, logo and contact details of the school this web address belongs to."""
+    return Response(brand_of(SchoolSettings.load()))
 
 
 @api_view(["GET", "PATCH"])

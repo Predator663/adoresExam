@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { useSession } from "@/lib/session";
+import { useAppName } from "@/lib/brand";
 import { SITE } from "@/lib/site";
 import Footer from "./Footer";
 import Logo from "./Logo";
@@ -11,6 +12,7 @@ import { Loading } from "./ui";
 /** About and legal pages: open to everyone. Signed-in people keep their side menu; visitors get a simple header. */
 export default function PublicPage({ title, updated, children }: { title: string; updated?: boolean; children: ReactNode }) {
   const { user, ready, t } = useSession();
+  const appName = useAppName();
   if (!ready) return <Loading />;
   const body = (
     <article className="doc">
@@ -22,7 +24,7 @@ export default function PublicPage({ title, updated, children }: { title: string
   return (
     <div className="app focus public">
       <header className="top">
-        <Link href="/login/" className="brand" aria-label={t("app_name")}><Logo size={38} /><span className="brand-name">{t("app_name")}</span></Link>
+        <Link href="/login/" className="brand" aria-label={appName}><Logo size={38} /><span className="brand-name">{appName}</span></Link>
         <div className="top-right"><Link href="/login/" className="btn primary">{t("log_in")}</Link></div>
       </header>
       <main id="main" className="page" tabIndex={-1}><h1 className="page-title">{title}</h1>{body}</main>

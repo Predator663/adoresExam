@@ -5,6 +5,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useMessages } from "@/lib/messages";
 import { useSession } from "@/lib/session";
+import { useAppName } from "@/lib/brand";
 import type { ExamCard } from "@/lib/types";
 import A11yPanel from "./A11yPanel";
 import Footer from "./Footer";
@@ -56,6 +57,7 @@ type Group = { title?: string; items: Item[] };
 
 export default function Shell({ children, bare, title }: { children: ReactNode; bare?: boolean; title?: string }) {
   const { user, ready, t, lang, logout, savePrefs } = useSession();
+  const appName = useAppName();
   const path = usePathname() || "/";
   const [panel, setPanel] = useState(false), [drawer, setDrawer] = useState(false);
   const isStudent = user?.role === "student";
@@ -138,7 +140,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
         <>
           <aside className={`side ${drawer ? "open" : ""}`} aria-label={t("main_menu")}>
             <div className="side-head">
-              <Link href={isStudent ? "/" : "/staff/"} className="brand" aria-label={t("app_name")}><Logo size={38} /><span className="brand-name">{t("app_name")}</span></Link>
+              <Link href={isStudent ? "/" : "/staff/"} className="brand" aria-label={appName}><Logo size={38} /><span className="brand-name">{appName}</span></Link>
               <button type="button" className="side-close" onClick={() => setDrawer(false)} aria-label={t("close")}><Icon n="x" /></button>
             </div>
             <nav className="side-nav">
@@ -163,7 +165,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
       <div className="main-col">
         <header className="top">
           {side && <button type="button" className="btn icon menu-btn" onClick={() => setDrawer(true)} aria-label={t("open_menu")} aria-expanded={drawer}><Icon n="menu" /></button>}
-          <Link href="/" className={`brand ${side ? "top-brand" : ""}`} aria-label={t("app_name")}><Logo size={38} /><span className="brand-name">{t("app_name")}</span></Link>
+          <Link href="/" className={`brand ${side ? "top-brand" : ""}`} aria-label={appName}><Logo size={38} /><span className="brand-name">{appName}</span></Link>
           <div className="top-right">
             {online !== null && <span className="pill live" role="status" aria-label={t("online_n", { n: online })}>● {t("online_n", { n: online })}</span>}
             <button type="button" className="btn icon ghost" onClick={() => setPanel(true)} aria-label={t("accessibility")} title={t("accessibility")}><Icon n="access" /></button>

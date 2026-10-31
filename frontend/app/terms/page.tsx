@@ -1,15 +1,17 @@
 "use client";
 import PublicPage from "@/components/PublicPage";
 import { useSession } from "@/lib/session";
-import { SITE } from "@/lib/site";
+import { useSite } from "@/lib/brand";
+import ContactLine from "@/components/ContactLine";
 
 export default function Terms() {
   const { t } = useSession();
+  const site = useSite();
   return (
     <PublicPage title={t("terms_title")} updated>
       <div className="hint"><b>Muhtasari kwa Kiswahili.</b> Tumia akaunti yako mwenyewe, usimpe mtu nenosiri lako, na ufanye mtihani kwa uaminifu. Usijaribu kuingia kwenye akaunti za wengine. Wakati wa mtihani lazima uwashe Eneo (GPS), Wi-Fi na Bluetooth, na ukubali masharti na sera ya faragha kabla ya kuanza. Wanafunzi wawili wakikaa chini ya mita 20 kutoka kwa kila mmoja, utawala hupata taarifa. Shule inaweza kusimamisha akaunti inayotumiwa vibaya. Kwa kutumia mfumo huu unakubali masharti haya.</div>
 
-      <p>These terms apply when you use {SITE.app}, the online examination system of {SITE.school}. By logging in you agree to them. If you are under 18, your parent or guardian’s agreement with the school’s rules also applies.</p>
+      <p>These terms apply when you use {site.app}, the online examination system of {site.school}. By logging in you agree to them. If you are under 18, your parent or guardian’s agreement with the school’s rules also applies.</p>
 
       <h2>1. Your account</h2>
       <ul>
@@ -44,7 +46,7 @@ export default function Terms() {
       <p>We work to keep the system running during exams, and the app is designed to cope with short connection losses. GPS can be slow or inaccurate indoors; if your position cannot be found, move near a window or outside. We cannot promise it will always be available or error-free, for example if your phone, network or electricity fails. If something goes wrong during an exam, tell your teacher straight away.</p>
 
       <h2>5. Content</h2>
-      <p>Questions, papers, explanations and results belong to {SITE.school} and its teachers. You may use them for your own study but not copy, publish or sell them. Your own answers remain yours, and the school may use them to mark, report and improve teaching.</p>
+      <p>Questions, papers, explanations and results belong to {site.school} and its teachers. You may use them for your own study but not copy, publish or sell them. Your own answers remain yours, and the school may use them to mark, report and improve teaching.</p>
 
       <h2>6. Misuse</h2>
       <p>The school may suspend or close an account, void an exam attempt, or apply its normal discipline rules if these terms are broken. Serious misuse may be reported to the proper authorities.</p>
@@ -56,7 +58,7 @@ export default function Terms() {
       <p>The school may update these terms and will show the new date here. These terms are governed by the laws of the United Republic of Tanzania. Your personal information is handled as described in the <a href="/privacy/">privacy policy</a>.</p>
 
       <h2>9. Contact</h2>
-      <p>{SITE.school}, {SITE.address}<br />E-mail: <a href={`mailto:${SITE.email}`}>{SITE.email}</a> · Phone: {SITE.phone}</p>
+      <ContactLine />
     </PublicPage>
   );
 }

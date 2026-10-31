@@ -4,7 +4,7 @@ Open **`/controlroom/`** on the Django server (also listed as *Control room* in 
 
 ## Set up once
 On Render set the environment variable **`CONTROLROOM_OWNERS`** to your own user name (for example `goose`). Only that account counts as the owner.
-If it is empty, any superuser is treated as an owner. Then run `python manage.py migrate`.
+If it is empty, any superuser is treated as an owner. Then run `python manage.py migrate_schemas`.
 
 ## Turn the whole site off (maintenance mode)
 1. Open the Control room. Optionally write a message and a "back at" time. Tick *sign out everyone* to end every current login.

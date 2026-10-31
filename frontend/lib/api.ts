@@ -3,6 +3,10 @@ export const API = (process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV ===
 export const apiBase = () => API || (typeof location !== "undefined" ? location.origin : "");
 const TOKEN_KEY = "amani_token";
 
+/** Which school this web app belongs to: its own address. One build of the web app serves every school; the API picks the school's data
+ *  from this header (it must be registered as the school's address). NEXT_PUBLIC_SCHOOL_HOST forces another one, e.g. to test a school locally. */
+export const schoolHost = () => process.env.NEXT_PUBLIC_SCHOOL_HOST || (typeof location !== "undefined" ? location.hostname : "");
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -32,7 +36,7 @@ function firstMessage(data: any, status: number): string {
 }
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: any; auth?: boolean; keepalive?: boolean } = {}): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { "X-School": schoolHost() };
   const token = getToken();
   if (token && opts.auth !== false) headers.Authorization = `Token ${token}`;
   const isForm = typeof FormData !== "undefined" && opts.body instanceof FormData;
@@ -64,7 +68,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 
 /** Download a file (PDF slip) with the login token, then hand it to the browser. */
 export async function downloadFile(path: string, filename: string) {
-  const res = await fetch(`${API}/api${path}`, { headers: { Authorization: `Token ${getToken()}` } });
+  const res = await fetch(`${API}/api${path}`, { headers: { Authorization: `Token ${getToken()}`, "X-School": schoolHost() } });
   if (!res.ok) throw new ApiError("The file is not available yet.", res.status);
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");

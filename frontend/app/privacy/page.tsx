@@ -1,15 +1,17 @@
 "use client";
 import PublicPage from "@/components/PublicPage";
 import { useSession } from "@/lib/session";
-import { SITE } from "@/lib/site";
+import { useSite } from "@/lib/brand";
+import ContactLine from "@/components/ContactLine";
 
 export default function Privacy() {
   const { t } = useSession();
+  const site = useSite();
   return (
     <PublicPage title={t("privacy_title")} updated>
       <div className="hint"><b>Muhtasari kwa Kiswahili.</b> Tunakusanya jina, namba ya mtihani, darasa, majibu na matokeo yako ili kuendesha mitihani ya shule. Hatuuzi taarifa zako, hatuna matangazo, na hatutumii wafuatiliaji wa nje. Wakati wa mtihani, simu yako hutuma eneo lake (GPS, Wi-Fi) ili shule ijue kama wanafunzi wawili wanakaa karibu zaidi ya mita 20; eneo hili hutumika wakati wa mtihani tu. Matokeo yako huonekana kwako, kwa walimu wa masomo yako na kwa utawala wa shule tu. Mzazi au mlezi anaweza kuomba kuona au kurekebisha taarifa kupitia shule.</div>
 
-      <p>This policy explains what {SITE.app} collects, why, who can see it and how it is protected. {SITE.app} is run by {SITE.school} (“the school”), which is responsible for the information in it. Most students are under 18, so the school handles their information on the basis of its duty to educate and assess them, and with care for parents and guardians.</p>
+      <p>This policy explains what {site.app} collects, why, who can see it and how it is protected. {site.app} is run by {site.school} (“the school”), which is responsible for the information in it. Most students are under 18, so the school handles their information on the basis of its duty to educate and assess them, and with care for parents and guardians.</p>
 
       <h2>1. What we collect</h2>
       <ul>
@@ -46,7 +48,7 @@ export default function Privacy() {
         <li><b>Messages from the school:</b> an administrator can send a message to your account, for example to ask you to move away from another student during an exam. It shows at the top of your screen until you close it, and then stays in your Messages tab until an administrator deletes it. Only you and the administrators can read it.</li>
         <li><b>An alert is not proof:</b> a position can be inaccurate, and brothers, sisters and neighbours can live close together. An administrator looks at the alert and decides what, if anything, to do, and may speak with you and your parent or guardian first. Marks are never changed automatically because of an alert.</li>
         <li><b>You must keep Location, Wi-Fi and Bluetooth on</b> during the exam, and allow Location for this app. If Location is switched off, the questions are hidden until it is back on, and the exam timer keeps running. Tell your teacher beforehand if your phone cannot do this.</li>
-        <li><b>How long it is kept:</b> only your latest position is stored, and each new position replaces the last, so the system does not keep a trail of where you have been. Stored positions of finished exams are deleted within 24 hours. If an alert was raised, a record of it (the two names, the closest distance and time, and the two positions at that moment) is kept with the school’s exam integrity records {SITE.retention}.</li>
+        <li><b>How long it is kept:</b> only your latest position is stored, and each new position replaces the last, so the system does not keep a trail of where you have been. Stored positions of finished exams are deleted within 24 hours. If an alert was raised, a record of it (the two names, the closest distance and time, and the two positions at that moment) is kept with the school’s exam integrity records {site.retention}.</li>
         <li><b>Your agreement:</b> you must accept this policy and the Terms of use before you begin each exam. Because most students are under 18, we ask your parent or guardian to be aware of this check. If you or your parent or guardian do not accept it, speak to the school about another way of sitting the exam.</li>
       </ul>
 
@@ -63,7 +65,7 @@ export default function Privacy() {
       <p>To work properly the app keeps a few things in your browser: a login token, your display choices, answers waiting to sync if you go offline, and cached copies of the app’s own files so it opens quickly. Exam questions and results are always loaded fresh from the server and are not cached. Logging out removes the login token. You can clear the rest in your browser settings. There are no advertising or tracking cookies.</p>
 
       <h2>5. How long we keep it</h2>
-      <p>Records are kept {SITE.retention}. “Deleting” a student archives the account, which can be restored. Permanent deletion is done by a Super Admin.</p>
+      <p>Records are kept {site.retention}. “Deleting” a student archives the account, which can be restored. Permanent deletion is done by a Super Admin.</p>
 
       <h2>6. How we protect it</h2>
       <ul>
@@ -83,7 +85,7 @@ export default function Privacy() {
       <p>If this policy changes, the new version appears here with a new date. Each exam asks you to accept the current version.</p>
 
       <h2>9. Contact</h2>
-      <p>{SITE.school}, {SITE.address}<br />E-mail: <a href={`mailto:${SITE.email}`}>{SITE.email}</a> · Phone: {SITE.phone}</p>
+      <ContactLine />
     </PublicPage>
   );
 }
