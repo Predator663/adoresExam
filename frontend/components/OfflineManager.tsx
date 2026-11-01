@@ -1,6 +1,6 @@
 "use client";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api, friendly } from "@/lib/api";
 import { Cancelled, Progress, downloadExams, downloadFiles, downloadPractice, downloadResults, formatBytes, listPacks, removeKind, storageUsage } from "@/lib/offline";
 import { Entry, Index, clearOfflineData, readIndex, supported } from "@/lib/offlineStore";
 import { useSession } from "@/lib/session";
@@ -69,7 +69,7 @@ export default function OfflineManager() {
       await fn((p) => setJob(key, { running: true, p }), ac.signal);
       setJob(key, { msg: t("off_done"), ok: true });
     } catch (e: any) {
-      setJob(key, { msg: e instanceof Cancelled ? t("off_cancelled") : t("off_failed", { m: e?.message || "" }) });
+      setJob(key, { msg: e instanceof Cancelled ? t("off_cancelled") : t("off_failed", { m: friendly(e) }) });
     } finally { delete ctl.current[key]; refresh(); }
   }
   const when = (e: Entry) => new Date(e.at).toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", { day: "numeric", month: "short" });

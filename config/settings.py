@@ -190,6 +190,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     # Load testing from ONE computer needs a higher limit: set LOGIN_THROTTLE_RATE=100000/min on the test server only.
     "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("LOGIN_THROTTLE_RATE", "20/min")},
+    "EXCEPTION_HANDLER": "core.exceptions.friendly_exception_handler",  # crashes become a plain JSON answer; details only in the server log
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     # PDF / Excel / CSV downloads must not be refused because of a browser's Accept header.
     "DEFAULT_CONTENT_NEGOTIATION_CLASS": "core.negotiation.IgnoreAcceptNegotiation",

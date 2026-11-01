@@ -1,5 +1,7 @@
 # Amani Girls Exam System: backend (Phases 1, 2 and 3)
 
+> **Full technical documentation (architecture, flow diagrams, data model, API, deployment):** [`docs/TECHNICAL_DOCUMENTATION.md`](docs/TECHNICAL_DOCUMENTATION.md)
+
 Django REST Framework API for SRS v1.1. Phase 1 core exams, Phase 2 teacher/admin portals and analytics, and
 **Phase 3: gamification (XP, levels, streaks, badges, leaderboard, practice mode), Swahili, exam-finish tips,
 load testing, user guides, training, pilot and go-live tools**.

@@ -4,6 +4,7 @@ import Logo from "@/components/Logo";
 import PublicPage from "@/components/PublicPage";
 import { useSession } from "@/lib/session";
 import OperatorCard from "@/components/OperatorCard";
+import { PARTNER } from "@/lib/site";
 import { useSite } from "@/lib/brand";
 import ContactLine from "@/components/ContactLine";
 
@@ -40,6 +41,7 @@ export default function About() {
 
       <h2>Operator</h2>
       <OperatorCard />
+      <OperatorCard who={PARTNER} tag="Partner" />
 
       <h2>Version and credits</h2>
       <p>Version {site.version}, {site.year}. Developed for {site.school}{site.developer !== site.school ? ` by ${site.developer}` : ""}. Built with Django, Next.js and React.</p>

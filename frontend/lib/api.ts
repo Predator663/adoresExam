@@ -25,15 +25,38 @@ export class ApiError extends Error {
 export const getToken = () => (typeof window === "undefined" ? null : localStorage.getItem(TOKEN_KEY));
 export const setToken = (t: string | null) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
 
+/** What people read when something goes wrong. Never a server address, a status code, a file name or a stack trace.
+ *  The details go to the browser console (F12) for the developer. */
+const WORDS = {
+  en: { network: "Cannot connect right now. Check your internet and try again.", server: "Something went wrong on our side. Please try again in a moment.",
+    generic: "Something went wrong. Please try again.", many: "Too many tries. Please wait a moment.", file: "The file is not available yet." },
+  sw: { network: "Imeshindwa kuunganisha sasa. Angalia intaneti yako kisha jaribu tena.", server: "Hitilafu imetokea upande wetu. Tafadhali jaribu tena baada ya muda mfupi.",
+    generic: "Hitilafu imetokea. Tafadhali jaribu tena.", many: "Umejaribu mara nyingi. Subiri kidogo.", file: "Faili bado haipatikani." },
+};
+export const words = () => {
+  let l = "en";
+  try { l = JSON.parse(localStorage.getItem("amani_prefs") || "{}").language || (navigator.language?.startsWith("sw") ? "sw" : "en"); } catch { /* English */ }
+  return WORDS[l === "sw" ? "sw" : "en"];
+};
+/** A sentence meant for people, not a leaked technical message. */
+const readable = (m: string) => m.length <= 300 && !/traceback|exception|error at|\.py\b|\.tsx?\b|<\/?[a-z][\s\S]*>|\bat 0x|django|psycopg|sql|undefined|\[object|stack/i.test(m);
+
 function firstMessage(data: any, status: number): string {
+  const w = words();
+  if (status >= 500) return w.server;
+  if (status === 429) return w.many;
   if (data && typeof data === "object") {
-    if (typeof data.detail === "string") return data.detail;
-    for (const v of Object.values(data)) {
-      if (typeof v === "string") return v;
-      if (Array.isArray(v) && typeof v[0] === "string") return v[0];
-    }
+    const found = typeof data.detail === "string" ? data.detail : Object.values(data).map((v) => (typeof v === "string" ? v : Array.isArray(v) && typeof v[0] === "string" ? v[0] : "")).find(Boolean);
+    if (found && readable(found)) return found;
   }
-  return status === 429 ? "Too many tries. Please wait a moment." : "Something went wrong. Please try again.";
+  return w.generic;
+}
+
+/** The message to show for ANY caught error, even one that is not an ApiError (a failed fetch, a bug in a script, ...). */
+export function friendly(e: unknown): string {
+  if (e instanceof ApiError) return e.message;
+  if (typeof console !== "undefined") console.warn("[app]", e);
+  return !navigator.onLine ? words().network : words().generic;
 }
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: any; auth?: boolean; keepalive?: boolean } = {}): Promise<T> {
@@ -51,7 +74,8 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   } catch {
     // No signal: a copy the person downloaded in Settings > Offline use is shown instead (reading only, her own data only).
     if (!opts.method || opts.method === "GET") { const saved = await offlineGet(path); if (saved !== undefined) return saved as T; }
-    throw new ApiError(`Cannot reach the server (${apiBase()}). Check your internet. If you run it yourself, make sure the Django server is running.`, 0, "network");
+    console.warn(`[app] cannot reach ${apiBase()}`);
+    throw new ApiError(words().network, 0, "network");
   }
   let data: any = null;
   const text = await res.text();
@@ -59,7 +83,8 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   if (!res.ok && data === null && res.status >= 500) {
     // Not JSON from our API: a proxy or gateway answered because Django behind it is down or crashed.
     if (!opts.method || opts.method === "GET") { const saved = await offlineGet(path); if (saved !== undefined) return saved as T; }
-    throw new ApiError(`Cannot reach the server (${apiBase()}). Check your internet. If you run it yourself, make sure the Django server is running.`, 0, "network");
+    console.warn(`[app] cannot reach ${apiBase()}`);
+    throw new ApiError(words().network, 0, "network");
   }
   if (!res.ok) {
     if (res.status === 503 && data?.code === "maintenance") window.dispatchEvent(new CustomEvent("amani:maintenance", { detail: data }));
@@ -73,7 +98,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 /** Download a file (PDF slip) with the login token, then hand it to the browser. */
 export async function downloadFile(path: string, filename: string) {
   const res = await fetch(`${API}/api${path}`, { headers: { Authorization: `Token ${getToken()}`, "X-School": schoolHost() } });
-  if (!res.ok) throw new ApiError("The file is not available yet.", res.status);
+  if (!res.ok) throw new ApiError(words().file, res.status);
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();

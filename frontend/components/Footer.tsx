@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useSession } from "@/lib/session";
 import Logo from "./Logo";
-import { OPERATOR } from "@/lib/site";
+import { OPERATORS } from "@/lib/site";
 import { useSite } from "@/lib/brand";
 
 export default function Footer({ compact }: { compact?: boolean }) {
@@ -16,11 +16,17 @@ export default function Footer({ compact }: { compact?: boolean }) {
           <div className="foot-brand"><Logo size={48} /><div><b>{site.app}</b><small>{site.school}</small></div></div>
         )}
         <nav className="foot-links" aria-label={t("foot_links")}>{links.map(([h, l]) => <Link key={h} href={h}>{l}</Link>)}</nav>
-        <Link href="/about/#operator" className="foot-op">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={OPERATOR.avatar} alt="" width={28} height={28} aria-hidden loading="lazy" />
-          <span>{OPERATOR.name} · <b>{OPERATOR.callsign.toUpperCase()}</b></span>
-        </Link>
+        <div className="foot-ops">
+          {OPERATORS.map((o) => (
+            <Link key={o.id} href={`/about/#${o.id}`} className="foot-op">
+              {o.avatar
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={o.avatar} alt="" width={28} height={28} aria-hidden loading="lazy" />
+                : <span className="foot-ini" aria-hidden>{o.name.replace(/^Mr\.?\s*/, "").charAt(0)}</span>}
+              <span>{o.name} · <b>{o.callsign.toUpperCase()}</b></span>
+            </Link>
+          ))}
+        </div>
         <div className="foot-bar">
           <p className="foot-copy">© {site.year} {site.school}. {t("foot_rights")}</p>
           <span className="foot-ver">v{site.version}</span>
