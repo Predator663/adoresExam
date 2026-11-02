@@ -180,7 +180,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
       {similar.length > 0 && <div className="hint" role="status">⚠ Similar questions already exist: {similar.map((q) => <div key={q.id}>#{q.id} {plain(q.prompt).slice(0, 80)}</div>)}</div>}
 
       <h2>Answer</h2>
-      {(s.qtype === "mcq_single" || s.qtype === "mcq_multi") && <><p className="muted small">{s.qtype === "mcq_single" ? "Tick the one correct option (2 to 6 options)." : "Tick every correct option (2 to 6 options)."}</p>{listEditor("options", 2, 6, "Option", true)}</>}
+      {(s.qtype === "mcq_single" || s.qtype === "mcq_multi") && <><p className="muted small">{s.qtype === "mcq_single" ? "Tick the one correct option (2 or more options)." : "Tick every correct option (2 or more options)."}</p>{listEditor("options", 2, Infinity, "Option", true)}</>}
       {s.qtype === "true_false" && <div className="row2" role="radiogroup" aria-label="Correct answer">{[true, false].map((b) => <label key={String(b)} className={`opt center-text ${s.tf === b ? "on" : ""}`}><input type="radio" name="tf" checked={s.tf === b} onChange={() => up({ tf: b })} />{b ? "The statement is TRUE" : "The statement is FALSE"}</label>)}</div>}
       {s.qtype === "fill_blank" && (
         <div className="card">
@@ -189,12 +189,12 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
             <label className="field"><span>Allowed difference (±)</span><input className="input" inputMode="decimal" value={s.numTol} onChange={(e) => up({ numTol: e.target.value })} /></label></div>
         </div>
       )}
-      {s.qtype === "ordering" && <><p className="muted small">Write the items in the CORRECT order. Students see them shuffled. (2 to 10 items)</p>{listEditor("items", 2, 10, "Item")}</>}
+      {s.qtype === "ordering" && <><p className="muted small">Write the items in the CORRECT order. Students see them shuffled. (2 or more items)</p>{listEditor("items", 2, Infinity, "Item")}</>}
       {s.qtype === "matching" && (
         <>
           <p className="muted small">Left items and the right items they match with. Pick the right match for each left item.</p>
-          <h3>Left side</h3>{listEditor("left", 2, 8, "Left item")}
-          <h3>Right side</h3>{listEditor("right", 2, 8, "Right item")}
+          <h3>Left side</h3>{listEditor("left", 2, Infinity, "Left item")}
+          <h3>Right side</h3>{listEditor("right", 2, Infinity, "Right item")}
           <h3>Correct matches</h3>
           {s.left.map((l, i) => (
             <div key={l.id} className="match-row"><span>{l.text || l.alt_text || `Left ${i + 1}`}</span>

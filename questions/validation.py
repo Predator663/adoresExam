@@ -35,7 +35,7 @@ def validate_question(qtype, content, answer):
     content, answer = content or {}, answer or {}
 
     if qtype in ("mcq_single", "mcq_multi"):
-        opts = _items(content, "options", 2, 6)
+        opts = _items(content, "options", 2)
         ids = {o["id"] for o in opts}
         if qtype == "mcq_single":
             c = answer.get("correct")
@@ -73,7 +73,7 @@ def validate_question(qtype, content, answer):
         return {}, {"accepted": accepted, "numeric": numeric}
 
     if qtype == "ordering":
-        items = _items(content, "items", 2, 10)  # authored in the correct order
+        items = _items(content, "items", 2)  # authored in the correct order
         return {"items": items}, {"order": [i["id"] for i in items]}
 
     raise ValidationError({"qtype": "Unknown question type."})
