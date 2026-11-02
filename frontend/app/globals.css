@@ -780,3 +780,49 @@ select.input.sm{padding:.25rem .4rem;font-size:.85rem;width:auto;min-height:0}
 .off-foot{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border)}
 .off-bar{position:sticky;top:0;z-index:60;background:var(--soft);color:var(--text);border-bottom:2px solid var(--warn);text-align:center;font-size:.88rem;font-weight:600;padding:calc(.4rem + env(safe-area-inset-top)) .8rem .4rem}
 @media print{.off-bar{display:none}}
+
+/* ---- exam save / submit / schedule flow (SubmitFlow.tsx) ---- */
+.fx-toast{position:fixed;left:50%;bottom:calc(1.2rem + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;display:flex;gap:.7rem;align-items:flex-start;width:min(440px,calc(100vw - 1.5rem));padding:.75rem .9rem;border-radius:14px;background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--good);box-shadow:0 10px 30px rgba(0,0,0,.2);animation:fx-up .32s cubic-bezier(.2,.9,.3,1.2) both}
+.fx-toast.err{border-left-color:var(--bad)}
+.fx-toast b{display:block}.fx-toast p{margin:.15rem 0 0;font-size:.9rem;color:var(--muted)}
+.fx-toast-ico{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--good);color:var(--on-primary)}
+.fx-toast.err .fx-toast-ico{background:var(--bad);color:var(--surface)}
+.fx-x{flex:none;border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;min-width:32px;min-height:32px;border-radius:8px}.fx-x:hover{background:var(--soft)}
+@media(max-width:699.98px){.fx-toast{bottom:calc(72px + env(safe-area-inset-bottom))}}
+.fx-card{border-top:3px solid var(--primary)}
+.fx-checks li{animation:fx-in .3s ease both;display:flex;gap:.4rem}.fx-ci{display:inline-block;width:1.1em}.fx-checks li.ok .fx-ci{animation:fx-pop .35s ease both}
+.fx-note{margin:0 0 .6rem;padding:.4rem .6rem;border-radius:10px;background:var(--soft);font-size:.9rem;animation:fx-in .25s ease both}
+.fx-actions{margin-top:.2rem}.fx-go:not(:disabled){animation:fx-nudge 2.4s ease-in-out 1s 2}
+.fx-track{list-style:none;display:flex;margin:1rem 0 .6rem;padding:0}
+.fx-node{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:.35rem;text-align:center;font-size:.82rem;font-weight:600;color:var(--muted)}
+.fx-node+.fx-node::before,.fx-node+.fx-node::after{content:"";position:absolute;top:17px;left:-50%;width:100%;height:3px;border-radius:3px}
+.fx-node+.fx-node::before{background:var(--border)}
+.fx-node+.fx-node::after{background:var(--primary);transform:scaleX(0);transform-origin:left;transition:transform .5s ease}
+.fx-node.done+.fx-node::after,.fx-node+.fx-node.done::after{transform:scaleX(1)}
+.fx-node+.fx-node.active::after{transform:scaleX(.5)}
+.fx-dot{position:relative;z-index:1;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--border);transition:background .25s,border-color .25s,color .25s}
+.fx-node.active{color:var(--text)}.fx-node.active .fx-dot{border-color:var(--primary);animation:fx-pulse 1.4s ease-out infinite}
+.fx-node.done{color:var(--text)}.fx-node.done .fx-dot{background:var(--primary);border-color:var(--primary);color:var(--on-primary);animation:fx-pop .4s ease both}
+.fx-node.bad{color:var(--bad)}.fx-node.bad .fx-dot{border-color:var(--bad);color:var(--bad);animation:fx-shake .45s ease both}
+.fx-spin{width:16px;height:16px;border-radius:50%;border:3px solid var(--soft);border-top-color:var(--primary);animation:fx-rot .7s linear infinite}
+.fx-tick{stroke-dasharray:24;stroke-dashoffset:24;animation:fx-draw .35s ease .1s forwards}
+.fx-result{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;margin-top:.6rem;padding:.8rem;border-radius:12px;border:1px solid var(--border);animation:fx-up .35s ease both}
+.fx-result p{margin:.2rem 0 0;font-size:.92rem}
+.fx-result.good{border-color:var(--good);background:var(--soft)}.fx-result.bad{border-color:var(--bad);color:var(--bad)}
+.fx-result.bad p{color:var(--bad)}.fx-result.bad .btn.ghost{color:var(--text)}
+.fx-ring{flex:none;width:52px;height:52px;color:var(--good)}
+.fx-ring circle{stroke-dasharray:145;stroke-dashoffset:145;animation:fx-draw .6s ease forwards}
+.fx-ring path{stroke-dasharray:40;stroke-dashoffset:40;animation:fx-draw .4s ease .5s forwards}
+.fx-badge{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--bad);animation:fx-shake .45s ease both}
+.fx-btns{display:flex;gap:.5rem;flex-wrap:wrap}.fx-saved{margin:.4rem 0 0;animation:fx-in .3s ease both}
+.bld[data-w=xs] .fx-btns,.bld[data-w=xs] .fx-btns .btn{width:100%}
+@keyframes fx-up{from{opacity:0;transform:translate(var(--fx-x,0),14px) scale(.97)}to{opacity:1;transform:translate(var(--fx-x,0),0) scale(1)}}
+.fx-toast{--fx-x:-50%}
+@keyframes fx-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes fx-pop{0%{transform:scale(.5)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes fx-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+@keyframes fx-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 45%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+@keyframes fx-rot{to{transform:rotate(360deg)}}
+@keyframes fx-draw{to{stroke-dashoffset:0}}
+@keyframes fx-nudge{0%,88%,100%{transform:none}92%{transform:translateY(-3px)}96%{transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.fx-toast,.fx-checks li,.fx-note,.fx-result,.fx-badge,.fx-go,.fx-dot,.fx-saved,.fx-ci{animation:none!important}.fx-node::after{transition:none}.fx-tick,.fx-ring circle,.fx-ring path{animation:none;stroke-dashoffset:0}.fx-spin{animation-duration:3s}}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import ExamBuilder from "./ExamBuilder";
+import { useToast } from "./SubmitFlow";
 import { ErrorNote, Loading, useLoad } from "./ui";
 import { api, downloadFile } from "@/lib/api";
 import { DATETIME, eatDate } from "@/lib/clock";
@@ -22,7 +23,6 @@ function Admin({ exam, reload }: { exam: any; reload: () => void }) {
     <div className="card">
       <h2>Admin actions</h2>
       <div className="row">
-        {st === "draft" && <button className="btn primary" onClick={() => run(() => api(`/exams/${exam.id}/schedule/`, { body: {} }), "Exam scheduled. Students can now see it.")}>Schedule exam</button>}
         {st === "scheduled" && <button className="btn" onClick={() => run(() => api(`/exams/${exam.id}/unschedule/`, { body: {} }), "Back to draft.")}>Unschedule</button>}
         {st === "live" && <button className="btn danger" onClick={() => { const r = window.prompt("Close this live exam NOW? Give a reason:"); if (r) run(() => api(`/exams/${exam.id}/close/`, { body: { confirm: true, reason: r } }), "Exam closed."); }}>Close exam now</button>}
         {(st === "closed" || st === "published") && <button className="btn" onClick={() => downloadFile(`/exports/exams/${exam.id}/results/`, `results-${exam.id}.xlsx`).catch((e) => setErrs([e.message]))}>⬇ Results (Excel)</button>}
@@ -61,30 +61,31 @@ export default function ExamForm({ id, onClose }: { id: number | null; onClose: 
   const subjects = useLoad(() => api<any[]>("/subjects/")), classes = useLoad(() => api<any[]>("/classes/")), terms = useLoad(() => api<any[]>("/terms/"));
   const [cid, setCid] = useState<number | null>(id);
   const exam = useLoad(() => (cid ? api<any>(`/exams/${cid}/`) : Promise.resolve(null)), [cid]);
-  const [f, setF] = useState<F>(blank), [errs, setErrs] = useState<string[]>([]), [msg, setMsg] = useState(""), [busy, setBusy] = useState(false);
+  const [f, setF] = useState<F>(blank), [errs, setErrs] = useState<string[]>([]), [busy, setBusy] = useState(false), { toast, show } = useToast();
   const up = (p: Partial<F>) => setF((x) => ({ ...x, ...p }));
   useEffect(() => { const e = exam.data; if (e) setF({ title: e.title, subject: String(e.subject), term: e.term ? String(e.term) : "", classes: e.classes, start: fromIso(e.start_at), end: fromIso(e.end_at), duration: e.duration_minutes, pass: e.pass_mark_percent, rules: e.rules_text,
     shuffleQ: e.shuffle_questions, shuffleO: e.shuffle_options, skip: e.allow_skip, late: e.late_entry_minutes ?? "", warnings: (e.time_warnings || []).join(", "), partial: e.partial_marks, neg: e.negative_marking, negFrac: e.negative_fraction }); }, [exam.data]);
 
   async function save() {
-    setBusy(true); setErrs([]); setMsg("");
+    setBusy(true); setErrs([]);
     const body: any = { title: f.title, subject: Number(f.subject), duration_minutes: f.duration, shuffle_questions: f.shuffleQ, shuffle_options: f.shuffleO, allow_skip: f.skip,
       partial_marks: f.partial, negative_marking: f.neg, negative_fraction: f.negFrac };
     if (admin) Object.assign(body, { term: f.term ? Number(f.term) : null, classes: f.classes, start_at: toIso(f.start), end_at: toIso(f.end), pass_mark_percent: f.pass, rules_text: f.rules,
       late_entry_minutes: f.late === "" ? null : Number(f.late), time_warnings: f.warnings.split(",").map((x) => parseInt(x.trim())).filter((x) => x > 0) });
-    try { const e = cid ? await api<any>(`/exams/${cid}/`, { method: "PATCH", body }) : await api<any>("/exams/", { body }); setCid(e.id); setMsg("Saved."); exam.reload(); }
-    catch (e: any) { setErrs(errorLines(e.data, e.message)); }
+    try { const e = cid ? await api<any>(`/exams/${cid}/`, { method: "PATCH", body }) : await api<any>("/exams/", { body }); setCid(e.id); show("ok", cid ? "Details saved" : "Exam created", cid ? undefined : "Now choose the questions below."); exam.reload(); }
+    catch (e: any) { const l = errorLines(e.data, e.message); setErrs(l); show("err", "Could not save the details", l[0]); }
     setBusy(false);
   }
   async function del() { if (!confirm("Delete this draft exam?")) return; try { await api(`/exams/${cid}/`, { method: "DELETE" }); onClose(); } catch (e: any) { setErrs(errorLines(e.data, e.message)); } }
 
-  if (subjects.loading || classes.loading || terms.loading || exam.loading) return <Loading />;
+  if (subjects.loading || classes.loading || terms.loading || (exam.loading && !exam.data && !!cid)) return <Loading />;
   if (subjects.error || exam.error) return <ErrorNote error={subjects.error || exam.error} />;
   const e = exam.data, status = e?.status || "draft", editable = status === "draft" || (status === "scheduled" && admin);
   const num = (k: keyof F, label: string, props: any = {}) => <label className="field"><span>{label}</span><input className="input" type="number" value={f[k] as any} onChange={(ev) => up({ [k]: Number(ev.target.value) } as any)} disabled={!editable} {...props} /></label>;
   const chk = (k: keyof F, label: string) => <label className="switch"><input type="checkbox" checked={f[k] as boolean} disabled={!editable} onChange={(ev) => up({ [k]: ev.target.checked } as any)} /> {label}</label>;
   return (
     <div className="examform">
+      {toast}
       <div className="row"><button className="btn" onClick={onClose}>← Back to list</button><span className="pill">{cid ? `#${cid}` : "New"} · {status}</span></div>
       {!editable && <p className="hint">A live or finished exam cannot be edited.</p>}
       {e?.submitted_at && <p className="hint">📨 Submitted by <b>{e.submitted_by_name || "a teacher"}</b> on {eatDate(e.submitted_at, DATETIME, lang)}{status === "draft" ? " · waiting to be scheduled" : ""}</p>}
@@ -110,12 +111,11 @@ export default function ExamForm({ id, onClose }: { id: number | null; onClose: 
         <div className="grid2">{chk("shuffleQ", "Shuffle questions")}{chk("shuffleO", "Shuffle answer options")}{chk("skip", "Allow skipping (no return)")}{chk("partial", "Partial marks (multi-answer, matching)")}{chk("neg", "Negative marking")}</div>
         {f.neg && num("negFrac", "Share of the marks lost for a wrong answer (0 to 1)", { min: 0, max: 1, step: 0.05 })}
         {errs.length > 0 && <div className="card error" role="alert">{errs.map((x, i) => <p key={i}>⚠ {x}</p>)}</div>}
-        {msg && <p className="ok" role="status">✓ {msg}</p>}
         <div className="row"><button className="btn primary" disabled={busy || !editable || !f.title || !f.subject} onClick={save}>{cid ? "Save changes" : "Create exam"}</button>{cid && status === "draft" && <button className="btn danger" onClick={del}>Delete draft</button>}</div>
         {e?.start_at && <p className="muted small">Window: {eatDate(e.start_at, undefined, lang)} to {eatDate(e.end_at, undefined, lang)}</p>}
       </div>
       {!cid && <div className="hint">Save the exam details first. Then you can pick questions from the question bank, create new ones, and preview the paper.</div>}
-      {cid && e && <ExamBuilder key={e.id} exam={e} reload={exam.reload} editable={editable} admin={admin} subjectName={subjects.data?.find((x) => x.id === e.subject)?.name || ""} />}
+      {cid && e && <ExamBuilder key={e.id} exam={e} reload={exam.reload} editable={editable} admin={admin} onDone={onClose} subjectName={subjects.data?.find((x) => x.id === e.subject)?.name || ""} />}
       {cid && e && admin && <Admin exam={e} reload={exam.reload} />}
     </div>
   );
