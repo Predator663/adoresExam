@@ -17,16 +17,35 @@ from .validation import clean_prompt, validate_question
 
 class QuestionSerializer(serializers.ModelSerializer):
     used_in_exam = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    is_mine = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
         fields = ["id", "subject", "form_level", "topic", "subtopic", "difficulty", "marks", "language", "qtype",
                   "prompt", "content", "answer", "explanation", "status", "practice_eligible", "version",
-                  "created_by", "updated_at", "used_in_exam"]
+                  "created_by", "created_by_name", "is_mine", "can_edit", "updated_at", "used_in_exam"]
         read_only_fields = ["status", "version", "created_by", "updated_at"]
 
     def get_used_in_exam(self, obj):
         return obj.examquestion_set.exists()
+
+    def _user(self):
+        req = self.context.get("request")  # the exam builder's picker serialises without a request
+        return getattr(req, "user", None)
+
+    def get_created_by_name(self, obj):
+        u = obj.created_by
+        return (u.get_full_name() or u.username) if u else ""
+
+    def get_is_mine(self, obj):
+        u = self._user()
+        return bool(u and obj.created_by_id == u.pk)
+
+    def get_can_edit(self, obj):
+        u = self._user()
+        return bool(u and _can_modify(u, obj))
 
     def validate(self, data):
         inst = self.instance
@@ -48,13 +67,33 @@ def _can_write_subject(user, subject_id):
     return TeacherAssignment.objects.filter(teacher=user, subject_id=subject_id).exists()  # QB-10
 
 
+def _can_modify(user, question):
+    """Edit / delete / submit: an admin may touch any question; a teacher only the ones she wrote herself,
+    and only while she is still assigned to the subject."""
+    if user.is_admin_role:
+        return True
+    return question.created_by_id == user.pk and _can_write_subject(user, question.subject_id)
+
+
 class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffUser]
     serializer_class = QuestionSerializer
 
     def get_queryset(self):
-        qs = Question.objects.all()
+        u = self.request.user
         p = self.request.query_params
+        qs = Question.objects.select_related("created_by")
+        if not u.is_admin_role:
+            # A teacher only ever sees the subjects she is assigned to ...
+            qs = qs.filter(subject_id__in=TeacherAssignment.objects.filter(teacher=u).values("subject_id"))
+            # ... and, of her colleagues' questions, only the approved ones (their drafts stay private).
+            # `ids` is the exam builder re-loading its own saved paper, so it is not narrowed further.
+            if not p.get("ids"):
+                qs = qs.filter(Q(created_by=u) | Q(status=Question.APPROVED))
+        if p.get("scope") == "mine":
+            qs = qs.filter(created_by=u)
+        elif p.get("scope") == "others":  # exclude() keeps questions whose author account was deleted
+            qs = qs.exclude(created_by=u)
         for f in ("subject", "topic", "difficulty", "qtype", "status", "form_level"):
             if p.get(f):
                 qs = qs.filter(**{f: p[f]})
@@ -81,14 +120,16 @@ class QuestionViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         q = serializer.instance
         new_subject = serializer.validated_data.get("subject", q.subject)
-        if not (_can_write_subject(self.request.user, q.subject_id) and _can_write_subject(self.request.user, new_subject.pk)):
+        if not _can_modify(self.request.user, q):
+            raise PermissionDenied("You can only edit questions you created yourself.")
+        if not _can_write_subject(self.request.user, new_subject.pk):
             raise PermissionDenied("You can only edit questions for your assigned subjects.")
         q = serializer.save(version=q.version + 1)  # an edited approved question stays approved
         QuestionVersion.objects.create(question=q, version=q.version, snapshot=self._snapshot(q), edited_by=self.request.user)
 
     def perform_destroy(self, instance):
-        if not _can_write_subject(self.request.user, instance.subject_id):
-            raise PermissionDenied("You can only delete questions for your assigned subjects.")
+        if not _can_modify(self.request.user, instance):
+            raise PermissionDenied("You can only delete questions you created yourself.")
         if instance.examquestion_set.exists():  # QB-12: used questions are archived, never deleted
             instance.status = Question.ARCHIVED
             instance.save(update_fields=["status"])
@@ -98,8 +139,8 @@ class QuestionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         q = self.get_object()
-        if not _can_write_subject(request.user, q.subject_id):
-            raise PermissionDenied()
+        if not _can_modify(request.user, q):
+            raise PermissionDenied("You can only submit questions you created yourself.")
         q.status = Question.APPROVED  # no waiting for an administrator: it is visible to the exam builder now
         q.save(update_fields=["status"])
         return Response({"status": q.status})

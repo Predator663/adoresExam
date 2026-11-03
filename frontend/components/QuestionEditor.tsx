@@ -141,7 +141,8 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
 
   if (subjects.loading || existing.loading || assigned.loading) return <Loading />;
   if (subjects.error || existing.error) return <ErrorNote error={subjects.error || existing.error} />;
-  const lock = status === "archived";
+  const notMine = !!existing.data && existing.data.can_edit === false;  // a colleague's question: look, never change
+  const lock = status === "archived" || notMine;
   const listEditor = (key: "options" | "left" | "right" | "items", min: number, max: number, name: string, withCorrect?: boolean) => (
     <>
       {s[key].map((it, i) => (
@@ -159,6 +160,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
   return (
     <div className="qeditor">
       <div className="row"><button className="btn" onClick={onClose}>{backLabel || "← Back to list"}</button><span className="pill">{cid ? `#${cid}` : "New"} · {status}</span></div>
+      {notMine && <div className="hint" role="status">This question was written by {existing.data.created_by_name || "another teacher"}. You can read it but only its author can edit or delete it.</div>}
       {draft && <div className="hint" role="status">An unsaved draft from this device was found. <button className="btn" onClick={() => { setS(draft); setDraft(null); }}>Restore it</button> <button className="btn" onClick={() => { localStorage.removeItem(key); setDraft(null); }}>Discard</button></div>}
       {lock && <p className="hint">This question is archived (it was used in an exam).</p>}
       <div className="card">
