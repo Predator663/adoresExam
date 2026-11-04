@@ -2,7 +2,7 @@
 export const OPERATOR = {
   id: "operator",
   name: "Mr. Mhechela",
-  callsign: "Cratos",
+  callsign: "Kratos",
   email: "predatora186@gmail.com",
   phone: "0693 696 717",
   phoneTel: "+255693696717",              // the same number in international form, for the tap-to-call link
