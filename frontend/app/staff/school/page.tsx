@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Pager, useClientPage } from "@/components/Pager";
 import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
@@ -37,6 +38,7 @@ export default function SchoolAnalytics() {
   return (
     <Shell bare title="School analytics">
       <StaffNav />
+      {admin && <div className="row" style={{ justifyContent: "flex-end" }}><Link className="btn" href="/staff/reports/">⬇ Download full results (PDF or Excel)</Link></div>}
       {!admin ? <p>Only administrators can see school-wide analytics.</p> : a.loading ? <Loading /> : a.error || !d ? <ErrorNote error={a.error} retry={a.reload} /> : (
         <>
           {d.count === 0 ? <div className="card"><p className="muted">No published results yet.</p></div> : (

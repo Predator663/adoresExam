@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import BulkCreate from "./BulkCreate";
 import QuestionEditor from "./QuestionEditor";
 import { Pager } from "./Pager";
 import QuestionView from "./QuestionView";
@@ -196,7 +197,7 @@ function PaperPreview({ exam, subjectName, sel }: { exam: any; subjectName: stri
 /* ------------------------------------------------------------------ the builder */
 export default function ExamBuilder({ exam, reload, editable, admin, subjectName, onDone }: { exam: any; reload: () => void; editable: boolean; admin: boolean; subjectName: string; onDone?: () => void }) {
   const [sel, setSel] = useState<Q[]>([]), [saved, setSaved] = useState<number[]>([]), [ready, setReady] = useState(false), [loadErr, setLoadErr] = useState(""), [orphans, setOrphans] = useState(0);
-  const [step, setStep] = useState<"select" | "preview">(editable ? "select" : "preview"), [tab, setTab] = useState<"bank" | "create" | "random" | "selected">("bank");
+  const [step, setStep] = useState<"select" | "preview">(editable ? "select" : "preview"), [tab, setTab] = useState<"bank" | "bulk" | "create" | "random" | "selected">("bank"), [bulkSeen, setBulkSeen] = useState(false);
   const [run, setRun] = useState<Run | null>(null), [createKey, setCreateKey] = useState(0), { toast, show } = useToast();
   const root = useRef<HTMLDivElement>(null), [w, setW] = useState<"xs" | "narrow" | "wide">("narrow"), wide = w === "wide";
   useEffect(() => {  // lay out by the builder's own width (the sidebar takes space on desktop), not the screen's
@@ -295,9 +296,10 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
         <div className="bld-grid">
           <div>
             <div className="bld-tabs" role="tablist">
-              {([["bank", "📚 Question bank"], ["create", "✏️ Create new"], ["random", "🎲 Random"], ["selected", `✓ Selected (${sel.length})`]] as const).filter(([k]) => !(wide && k === "selected")).map(([k, l]) =>
-                <button key={k} role="tab" aria-selected={tab === k} className={`bld-tab ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>{l}</button>)}
+              {([["bank", "📚 Question bank"], ["bulk", "⚡ Create all"], ["create", "✏️ Create new"], ["random", "🎲 Random"], ["selected", `✓ Selected (${sel.length})`]] as const).filter(([k]) => !(wide && k === "selected")).map(([k, l]) =>
+                <button key={k} role="tab" aria-selected={tab === k} className={`bld-tab ${tab === k ? "on" : ""}`} onClick={() => { setTab(k); if (k === "bulk") setBulkSeen(true); }}>{l}{k === "bulk" && <span className="bk-new" aria-hidden>NEW</span>}</button>)}
             </div>
+            {bulkSeen && <div hidden={tab !== "bulk"} className={tab === "bulk" ? "bk-show" : ""}><BulkCreate exam={exam} onAdd={add} onFinished={(n) => flash(`${n} question${n === 1 ? "" : "s"} created and added to this exam.`)} onReview={() => setStep("preview")} /></div>}
             {tab === "bank" && <Bank exam={exam} selIds={selIds} onToggle={toggle} onAddMany={(qs) => { add(qs); flash(`${qs.length} added.`); }} onCreate={() => setTab("create")} />}
             {tab === "create" && <QuestionEditor key={createKey} id={null} subject={exam.subject} backLabel="← Back to question bank" onClose={() => setTab("bank")}
               onCreated={(q) => { add([q]); setCreateKey((k) => k + 1); setTab("bank"); flash("Question created, approved and added to this exam."); }} />}
@@ -307,7 +309,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
           {wide && <Selected sel={sel} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
         </div>
       )}
-      {step === "select" && editable && !wide && sel.length > 0 && tab !== "selected" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(sel.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
+      {step === "select" && editable && !wide && sel.length > 0 && tab !== "selected" && tab !== "bulk" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(sel.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
 
       {step === "preview" && (
         <>

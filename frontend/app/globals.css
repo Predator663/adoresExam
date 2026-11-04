@@ -826,3 +826,82 @@ select.input.sm{padding:.25rem .4rem;font-size:.85rem;width:auto;min-height:0}
 @keyframes fx-draw{to{stroke-dashoffset:0}}
 @keyframes fx-nudge{0%,88%,100%{transform:none}92%{transform:translateY(-3px)}96%{transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.fx-toast,.fx-checks li,.fx-note,.fx-result,.fx-badge,.fx-go,.fx-dot,.fx-saved,.fx-ci{animation:none!important}.fx-node::after{transition:none}.fx-tick,.fx-ring circle,.fx-ring path{animation:none;stroke-dashoffset:0}.fx-spin{animation-duration:3s}}
+
+/* ---- Download results (staff/reports): filters, live preview, grade bars. The progress track, tick and toast reuse the fx-* rules above. */
+.rr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:0 .9rem}
+.rr-in{animation:fx-in .25s ease both}
+.rr-dir{min-width:46px;padding:.4rem}.rr-dir svg{transition:transform .3s cubic-bezier(.2,.9,.3,1.2)}.rr-dir.flip svg{transform:rotate(180deg)}
+.rr-card h4{margin:.9rem 0 .4rem}
+.rr-sync{display:inline-flex;align-items:center;gap:.4rem}.rr-sync .fx-spin{width:14px;height:14px;border-width:2px}
+.rr-dim{opacity:.55;transition:opacity .2s}
+.rr-empty{margin:.8rem 0;padding:.8rem;border-radius:12px;background:var(--soft);animation:fx-in .3s ease both}
+.rr-hint{animation:fx-in .3s ease both}
+.rr-skels{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.6rem;margin:.8rem 0}
+.rr-skels i{display:block;height:64px;border-radius:12px;background:linear-gradient(90deg,var(--soft) 25%,var(--border) 50%,var(--soft) 75%);background-size:200% 100%;animation:rr-shimmer 1.2s linear infinite}
+@keyframes rr-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.rr-kpis{margin:.7rem 0}.rr-kpis .stat{animation:fx-in .35s ease both}
+.rr-kpis .stat:nth-child(2){animation-delay:.05s}.rr-kpis .stat:nth-child(3){animation-delay:.1s}.rr-kpis .stat:nth-child(4){animation-delay:.15s}.rr-kpis .stat:nth-child(5){animation-delay:.2s}.rr-kpis .stat:nth-child(6){animation-delay:.25s}
+.rr-pane{animation:fx-in .3s ease both}
+.rr-two{display:grid;grid-template-columns:1fr 1fr;gap:1rem 1.6rem}
+@media(max-width:699.98px){.rr-two{grid-template-columns:1fr}}
+.rr-bars{display:grid;gap:.45rem}
+.rr-bar-row{display:grid;grid-template-columns:2.2rem 1fr 5.6rem;gap:.6rem;align-items:center}
+.rr-g{--c:var(--primary)}.rr-g0{--c:#2e9b6b}.rr-g1{--c:#5ba55b}.rr-g2{--c:#3f7fbf}.rr-g3{--c:#e0a100}.rr-g4{--c:#d1495b}.rr-g5{--c:#8a8a8a}
+b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-radius:8px;background:color-mix(in srgb,var(--c) 18%,var(--surface));border:1px solid var(--c);font-size:.8rem;padding:0 .3rem}
+.rr-track{height:14px;border-radius:99px;background:var(--soft);overflow:hidden}
+.rr-fill{display:block;height:100%;border-radius:99px;background:var(--c);transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.rr-n{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}.rr-n small{font-weight:400}
+.rr-row{animation:fx-in .3s ease both}
+.rr-file{word-break:break-all}
+@media(prefers-reduced-motion:reduce){.rr-in,.rr-hint,.rr-empty,.rr-kpis .stat,.rr-pane,.rr-row,.rr-skels i{animation:none!important}.rr-fill,.rr-dir svg,.rr-dim{transition:none}}
+.reduce-motion .rr-in,.reduce-motion .rr-hint,.reduce-motion .rr-empty,.reduce-motion .rr-kpis .stat,.reduce-motion .rr-pane,.reduce-motion .rr-row,.reduce-motion .rr-skels i{animation:none!important}.reduce-motion .rr-fill,.reduce-motion .rr-dir svg,.reduce-motion .rr-dim{transition:none}
+
+/* ---- Create all (exam builder tab): many questions on one page, saved together. Reuses fx-* for the tick, spinner and result panel. */
+.bk-new{margin-left:.4rem;padding:.05rem .4rem;border-radius:99px;background:var(--primary);color:#fff;font-size:.62rem;letter-spacing:.04em;vertical-align:middle;animation:bk-pulse 2s ease-in-out infinite}
+@keyframes bk-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 50%,transparent)}50%{box-shadow:0 0 0 6px transparent}}
+.bk-show{animation:bk-tab .35s cubic-bezier(.2,.8,.2,1) both}
+@keyframes bk-tab{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.bk-in{animation:fx-in .3s ease both}
+.bk-head{animation:fx-in .3s ease both}
+.bk-more{margin:.6rem 0}.bk-more>summary{cursor:pointer;font-weight:700;color:var(--primary);padding:.3rem 0}
+.bk-list{display:grid;gap:.7rem;margin:.8rem 0}
+.bk-card{border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden;animation:bk-card-in .45s cubic-bezier(.2,.9,.3,1.1) both;transition:border-color .25s,box-shadow .25s,opacity .25s,transform .25s}
+@keyframes bk-card-in{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.bk-card.open{border-color:var(--primary)}
+.bk-card.out{opacity:0;transform:translateX(40px) scale(.96);pointer-events:none}
+.bk-card.saving{border-color:var(--primary);animation:bk-pulse-b 1s ease-in-out infinite}
+@keyframes bk-pulse-b{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 25%,transparent)}}
+.bk-card.done{border-color:#2e9b6b;background:color-mix(in srgb,#2e9b6b 9%,var(--surface))}
+.bk-card.err{border-color:#d1495b}
+.bk-top{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem}
+.bk-num{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:50%;background:var(--soft);font-weight:800;transition:background .25s,color .25s,transform .25s}
+.bk-num.ready{background:color-mix(in srgb,#2e9b6b 22%,var(--surface));color:#1f7a52}
+.bk-num.ok{background:#2e9b6b;color:#fff;transform:scale(1.1)}
+.bk-num .fx-spin{width:16px;height:16px}
+.bk-title{flex:1;min-width:0;display:grid;gap:.1rem;text-align:left;background:none;border:0;font:inherit;color:inherit;cursor:pointer;padding:.2rem 0}
+.bk-title b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bk-tools{display:flex;gap:.1rem;flex:none}
+.bk-chev{transition:transform .3s cubic-bezier(.2,.9,.3,1.2)}.bk-chev.up{transform:rotate(180deg)}
+.bk-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .38s cubic-bezier(.2,.8,.2,1)}
+.bk-body.open{grid-template-rows:1fr}
+.bk-clip{overflow:hidden;min-height:0}
+.bk-inner{padding:0 .9rem .9rem}
+.bk-h{margin:.9rem 0 .4rem}
+.bk-err{margin:0 .8rem .6rem}
+.bk-todo{margin:0 .9rem .8rem;padding-left:1.1rem;color:#b3263c;font-size:.88rem;animation:fx-in .25s ease both}
+.bk-add{animation:fx-in .3s ease both}
+.bk-addchip{transition:transform .15s,background .2s}.bk-addchip:hover:not(:disabled){transform:translateY(-2px)}.bk-addchip:active:not(:disabled){transform:scale(.96)}
+.bk-sum{margin:.8rem 0}
+.bk-bar{position:sticky;bottom:.5rem;z-index:5;display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:center;justify-content:space-between;padding:.65rem .9rem;margin-top:.8rem;border:1px solid var(--primary);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+@media(max-width:699.98px){.bk-bar{bottom:calc(60px + env(safe-area-inset-bottom))}.bk-tools .btn:nth-child(-n+2){display:none}}
+.bk-stats{display:flex;gap:.9rem;align-items:center;flex-wrap:wrap}
+.bk-pop{animation:bk-popn .35s cubic-bezier(.2,.9,.3,1.4)}
+@keyframes bk-popn{from{transform:scale(.8)}to{transform:none}}
+.bk-warn{color:#b3263c}
+.bk-prog{position:relative;flex:1;min-width:180px;height:38px;border-radius:99px;background:var(--soft);overflow:hidden;display:grid;place-items:center;font-weight:700;font-size:.9rem}
+.bk-prog i{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--primary) 35%,transparent);transition:width .35s ease}
+.bk-prog span{position:relative}
+.bk-go{transition:transform .15s}.bk-go:not(:disabled):hover{transform:translateY(-1px)}
+@media(prefers-reduced-motion:reduce){.bk-new,.bk-show,.bk-in,.bk-head,.bk-card,.bk-card.saving,.bk-todo,.bk-add,.bk-pop{animation:none!important}.bk-body,.bk-chev,.bk-card,.bk-num,.bk-prog i{transition:none}}
+.reduce-motion .bk-new,.reduce-motion .bk-show,.reduce-motion .bk-in,.reduce-motion .bk-head,.reduce-motion .bk-card,.reduce-motion .bk-card.saving,.reduce-motion .bk-todo,.reduce-motion .bk-add,.reduce-motion .bk-pop{animation:none!important}
+.reduce-motion .bk-body,.reduce-motion .bk-chev,.reduce-motion .bk-card,.reduce-motion .bk-num,.reduce-motion .bk-prog i{transition:none}

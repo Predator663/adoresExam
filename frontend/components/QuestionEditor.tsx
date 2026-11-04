@@ -8,15 +8,15 @@ import { errorLines, esc, plain, QTYPES, uid, unesc } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 import type { Question } from "@/lib/types";
 
-type Item = { id: string; text: string; image: string | null; alt_text: string };
-type S = {
+export type Item = { id: string; text: string; image: string | null; alt_text: string };
+export type S = {
   subject: string; form_level: number; topic: string; subtopic: string; difficulty: string; marks: number; language: string; qtype: string;
   practice_eligible: boolean; prompt: string; explanation: string;
   options: Item[]; correct: string[]; tf: boolean | null; left: Item[]; right: Item[]; pairs: Record<string, string>;
   accepted: string; numValue: string; numTol: string; items: Item[];
 };
-const blank = (n = 4): Item[] => Array.from({ length: n }, () => ({ id: uid(), text: "", image: null, alt_text: "" }));
-const fresh = (): S => ({ subject: "", form_level: 1, topic: "", subtopic: "", difficulty: "medium", marks: 1, language: "en", qtype: "mcq_single", practice_eligible: true, prompt: "", explanation: "",
+export const blank = (n = 4): Item[] => Array.from({ length: n }, () => ({ id: uid(), text: "", image: null, alt_text: "" }));
+export const fresh = (): S => ({ subject: "", form_level: 1, topic: "", subtopic: "", difficulty: "medium", marks: 1, language: "en", qtype: "mcq_single", practice_eligible: true, prompt: "", explanation: "",
   options: blank(4), correct: [], tf: null, left: blank(3), right: blank(3), pairs: {}, accepted: "", numValue: "", numTol: "0", items: blank(3) });
 const fromApi = (q: any): S => {
   const s = fresh();
@@ -32,7 +32,7 @@ const fromApi = (q: any): S => {
 };
 const enc = (l: Item[]) => l.map((o) => ({ id: o.id, text: esc(o.text), image: o.image, alt_text: o.alt_text }));
 
-function build(s: S) {
+export function build(s: S) {
   let content: any = {}, answer: any = {};
   if (s.qtype === "mcq_single" || s.qtype === "mcq_multi") { content = { options: enc(s.options.filter((o) => o.text.trim() || o.image)) }; answer = { correct: s.qtype === "mcq_single" ? s.correct[0] : s.correct }; }
   if (s.qtype === "true_false") answer = { correct: s.tf };
@@ -44,7 +44,7 @@ function build(s: S) {
 }
 
 /** One entry (option, matching item, ordering item): text and/or an image with required description (QB-02, QB-03). */
-function ItemRow({ it, onChange, onRemove, extra, label, canRemove }: { it: Item; onChange: (i: Item) => void; onRemove?: () => void; extra?: React.ReactNode; label: string; canRemove: boolean }) {
+export function ItemRow({ it, onChange, onRemove, extra, label, canRemove }: { it: Item; onChange: (i: Item) => void; onRemove?: () => void; extra?: React.ReactNode; label: string; canRemove: boolean }) {
   const [err, setErr] = useState("");
   async function pick(f?: File) {
     if (!f) return;
@@ -141,8 +141,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
 
   if (subjects.loading || existing.loading || assigned.loading) return <Loading />;
   if (subjects.error || existing.error) return <ErrorNote error={subjects.error || existing.error} />;
-  const notMine = !!existing.data && existing.data.can_edit === false;  // a colleague's question: look, never change
-  const lock = status === "archived" || notMine;
+  const lock = status === "archived";
   const listEditor = (key: "options" | "left" | "right" | "items", min: number, max: number, name: string, withCorrect?: boolean) => (
     <>
       {s[key].map((it, i) => (
@@ -160,7 +159,6 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
   return (
     <div className="qeditor">
       <div className="row"><button className="btn" onClick={onClose}>{backLabel || "← Back to list"}</button><span className="pill">{cid ? `#${cid}` : "New"} · {status}</span></div>
-      {notMine && <div className="hint" role="status">This question was written by {existing.data.created_by_name || "another teacher"}. You can read it but only its author can edit or delete it.</div>}
       {draft && <div className="hint" role="status">An unsaved draft from this device was found. <button className="btn" onClick={() => { setS(draft); setDraft(null); }}>Restore it</button> <button className="btn" onClick={() => { localStorage.removeItem(key); setDraft(null); }}>Discard</button></div>}
       {lock && <p className="hint">This question is archived (it was used in an exam).</p>}
       <div className="card">

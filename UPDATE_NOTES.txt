@@ -1,3 +1,31 @@
+Amani Exams update: "Create all" tab in the exam builder
+
+Exam builder > Select questions > new tab "Create all" (after Question bank). Write every question of the exam on one page:
+animated cards for all six question types, duplicate / move / remove, collapse and expand, live "ready / needs attention" count,
+"Settings for new questions" (form, topic, difficulty, marks) applied to new cards. "Save N questions and add to exam" creates the
+approved questions one by one with a progress bar, ticks each card, adds them to the exam, and keeps any card with a problem open
+with the reason (the others are still saved). Then "Review & preview paper" and the usual Save / Submit. A half-written batch is kept
+on the device and offered back if the tab is closed. Works for a new exam (after "Create exam") and for an existing one you open.
+No backend change, no migration. New: frontend/components/BulkCreate.tsx.
+Changed: frontend/components/ExamBuilder.tsx (tab), frontend/components/QuestionEditor.tsx (only "export" added to 5 helpers),
+frontend/app/globals.css (bk-* styles appended). Rebuild the front end (npm run build).
+
+Amani Exams update: download the school's full results (PDF and Excel)
+
+Admins: Staff > Download results (also a button on School analytics). Filters: whole school / one form / one class, term, subject,
+exam, sort column + direction, size of the top/bottom lists, which parts to include, students with no results. The figures preview
+on screen, then the file is built with the school name, logo, address and headings from Staff > Settings.
+Contents: counts of A, B, C, D, F; divisions; top N and bottom N students; GPA; by subject; by class; full student list.
+No migrations. New API (admin only, audited as export.full_results):
+  GET /api/exports/results-report/options/   /preview/   and   /?file=pdf|xlsx  (same filters on all three)
+GPA: the system had points only (A=1 ... F=5), so GPA is read from the school's own grade scale: A=5 ... F=1, averaged over the
+best N subjects (N = subjects counted for the division). Change fullreport.grade_points_map() if the school wants another GPA.
+New:     analytics/fullreport.py  analytics/test_results_report.py  core/results_report.py
+         frontend/components/ResultsReport.tsx  frontend/app/staff/reports/page.tsx
+Changed: analytics/views.py  analytics/urls.py  frontend/components/Shell.tsx  frontend/app/staff/school/page.tsx  frontend/app/globals.css
+Tests:   python manage.py test analytics.test_results_report   (18 tests; analytics core exams: 95 pass)
+Rebuild the front end (npm run build); frontend/out is the old build.
+
 Amani Exams update: live monitor + student "waiting for results"
 
 Copy these files over your project (same paths):

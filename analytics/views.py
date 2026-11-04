@@ -12,21 +12,22 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.text import slugify
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
-from academics.models import Subject, Term, TeacherAssignment
+from academics.models import SchoolClass, Subject, Term, TeacherAssignment
 from accounts.models import User
 from accounts.permissions import IsAdminRole, IsStaffUser, IsStudent
-from core import grading, reports
+from core import grading, reports, results_report
 from core.models import SchoolSettings, audit
 from core.pagination import paginate
 from exams import services
 from exams.models import Answer, Attempt, AttemptEvent, Exam, Result
 from exams.views import _result_payload, _visible_result_or_404
 from gamification import services as gamification
-from . import calc
+from . import calc, fullreport
 
 
 # ---------------------------------------------------------------- scope and data access
@@ -463,3 +464,168 @@ def students_export(request):
                                    [{"heading": "Students", "headers": headers, "rows": data}], wide=False)
         return _download(pdf, "application/pdf", "students.pdf")
     return _download(reports.sheets_xlsx([("Students", headers, data)]), XLSX, "students.xlsx")
+
+
+# ---------------------------------------------------------------- full school results report (admins)
+#
+# One report, three calls, all admin-only and all with the same filters:
+#   GET /api/exports/results-report/options/   what the filter boxes can offer
+#   GET /api/exports/results-report/preview/   the figures as JSON (shown on screen before the file is made)
+#   GET /api/exports/results-report/          the PDF or Excel file (?file=pdf|xlsx)
+# Filters: class=<id> | form=<1-4>, term=<id>, subject=<id>, exam=<id>, sort=<key>, dir=asc|desc, top=<1-50>,
+#          sections=summary,top_worst,subjects,classes,students, empty=1 (also list students with no results).
+# The school is the one this request belongs to (every school has its own database schema), so an administrator can
+# only ever download her own school's results. Only published results are counted.
+
+REPORT_SORT_DEFAULT_DIR = {"rank": "asc", "name": "asc", "class": "asc", "average": "desc", "gpa": "desc", "points": "asc", "division": "asc"}
+
+
+def _int_param(request, name):
+    v = request.query_params.get(name)
+    if v in (None, ""):
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        raise ValidationError({"detail": f"The filter '{name}' must be a number."})
+
+
+def _logo_bytes(settings_row):
+    try:
+        if settings_row.logo:
+            with settings_row.logo.open("rb") as f:
+                return f.read()
+    except Exception:  # a missing or unreadable logo must never stop a report
+        pass
+    return None
+
+
+def _report_request(request):
+    """Read and check the filters; return everything the report needs."""
+    p = request.query_params
+    class_id, form, term_id, subject_id, exam_id = (_int_param(request, k) for k in ("class", "form", "term", "subject", "exam"))
+    sort = p.get("sort", "rank")
+    if sort not in fullreport.SORTS:
+        raise ValidationError({"detail": "Choose one of the listed ways to sort."})
+    direction = p.get("dir") or REPORT_SORT_DEFAULT_DIR[sort]
+    if direction not in ("asc", "desc"):
+        raise ValidationError({"detail": "Sort direction must be asc or desc."})
+    top = _int_param(request, "top")
+    top = 10 if top is None else top
+    if not 1 <= top <= 50:
+        raise ValidationError({"detail": "Top and bottom lists can show 1 to 50 students."})
+    wanted = [x for x in (p.get("sections") or ",".join(fullreport.SECTIONS)).split(",") if x]
+    if any(x not in fullreport.SECTIONS for x in wanted):
+        raise ValidationError({"detail": "Unknown report section."})
+    sections = [x for x in fullreport.SECTIONS if x in wanted] or list(fullreport.SECTIONS)
+    include_empty = p.get("empty") in ("1", "true", "yes")
+
+    school = SchoolSettings.load()
+    qs = visible_results(request.user)
+    roster = User.objects.filter(role=User.Role.STUDENT, is_archived=False, graduated=False).select_related("school_class")
+    filters = [("School", school.school_name)]
+
+    if class_id:
+        klass = get_object_or_404(SchoolClass, pk=class_id)
+        qs, roster = qs.filter(student__school_class_id=klass.pk), roster.filter(school_class_id=klass.pk)
+        filters.append(("Class", str(klass)))
+    elif form:
+        qs, roster = qs.filter(student__school_class__form_level=form), roster.filter(school_class__form_level=form)
+        filters.append(("Class", f"Form {form} (all streams)"))
+    else:
+        filters.append(("Class", "All classes (whole school)"))
+    if term_id:
+        term = get_object_or_404(Term.objects.select_related("year"), pk=term_id)
+        qs = qs.filter(exam__term_id=term.pk)
+        filters.append(("Term", str(term)))
+    else:
+        filters.append(("Term", "All terms"))
+    if subject_id:
+        subject = get_object_or_404(Subject, pk=subject_id)
+        qs = qs.filter(exam__subject_id=subject.pk)
+        filters.append(("Subject", subject.name))
+    else:
+        filters.append(("Subject", "All subjects"))
+    if exam_id:
+        exam = get_object_or_404(Exam, pk=exam_id)
+        qs = qs.filter(exam_id=exam.pk)
+        filters.append(("Exam", exam.title))
+    else:
+        filters.append(("Exam", "All published exams"))
+
+    rows = to_rows(qs)
+    people = {u.pk: u for u in roster}
+    missing = {r["student_id"] for r in rows} - set(people)
+    if missing:  # a student who has results but has since graduated or been archived is still reported
+        people.update({u.pk: u for u in User.objects.filter(pk__in=missing).select_related("school_class")})
+    students = {}
+    for u in people.values():
+        c = u.school_class
+        students[u.pk] = {"name": _full_name(u), "index_number": u.index_number, "class_id": c.pk if c else None,
+                          "class_label": str(c) if c else "-", "form_level": c.form_level if c else 0, "stream": c.stream if c else ""}
+    scale = fullreport.pick_scale(rows, school.grade_scale)
+    report = fullreport.build(rows, students, scale, top_n=top, include_empty=include_empty)
+    report["students_sorted"] = fullreport.sort_students(report["students"], sort, direction)
+    sort_text = f"{fullreport.SORTS[sort]} ({'low to high' if direction == 'asc' else 'high to low'})" if sort != "rank" else (
+        "Rank (best first)" if direction == "asc" else "Rank (last first)")
+    return {"school": school, "filters": filters, "report": report, "sections": sections, "sort": sort, "dir": direction,
+            "sort_text": sort_text, "top": top, "include_empty": include_empty}
+
+
+def _slim(p):
+    return {k: p[k] for k in ("rank", "name", "class_label", "average", "gpa", "total_points", "division", "overall_grade")}
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def results_report_options(request):
+    """What the download screen can filter by."""
+    _sync_due_exams()
+    classes = list(SchoolClass.objects.all())
+    return Response({
+        "school": SchoolSettings.load().school_name,
+        "classes": [{"id": c.pk, "label": str(c), "form_level": c.form_level} for c in classes],
+        "forms": sorted({c.form_level for c in classes}),
+        "terms": [{"id": t.pk, "label": str(t)} for t in Term.objects.select_related("year")],
+        "subjects": [{"id": s.pk, "name": s.name} for s in Subject.objects.all()],
+        "exams": [{"id": e.pk, "title": e.title, "subject": e.subject_id, "term": e.term_id}
+                  for e in Exam.objects.filter(status=Exam.PUBLISHED).order_by("-start_at", "title")],
+        "sorts": [{"key": k, "label": v, "dir": REPORT_SORT_DEFAULT_DIR[k]} for k, v in fullreport.SORTS.items()],
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def results_report_preview(request):
+    """The report's figures, so the screen can show them before the file is built."""
+    ctx = _report_request(request)
+    rep = ctx["report"]
+    return Response({
+        "school": ctx["school"].school_name, "filters": [{"label": k, "value": v} for k, v in ctx["filters"]],
+        "sort_text": ctx["sort_text"], "summary": rep["summary"], "grade_counts": rep["grade_counts"],
+        "division_counts": rep["division_counts"], "subjects": rep["subjects"], "classes": rep["classes"],
+        "top": [_slim(x) for x in rep["top"]], "worst": [_slim(x) for x in rep["worst"]], "top_n": rep["top_n"],
+        "students_listed": len(rep["students_sorted"]), "scale": rep["scale"],
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def results_report_export(request):
+    """The full results report as PDF or Excel for the chosen school, class, term, subject or exam."""
+    kind = request.query_params.get("file", "pdf")
+    if kind not in ("pdf", "xlsx"):
+        raise ValidationError({"detail": "Choose PDF or Excel."})
+    ctx = _report_request(request)
+    school = ctx["school"]
+    meta = {"school": school.school_name, "address": school.address,
+            "contact": " | ".join(x for x in (school.contact_email, school.contact_phone) if x),
+            "logo": _logo_bytes(school), "title": "Examination results report", "filters": ctx["filters"],
+            "sort": ctx["sort_text"], "generated": timezone.localtime().strftime("%d %b %Y, %H:%M")}
+    audit(request.user, "export.full_results", "", file=kind, filters={k: v for k, v in ctx["filters"]},
+          sections=ctx["sections"], students=len(ctx["report"]["students_sorted"]))
+    scope = slugify(next(v for k, v in ctx["filters"] if k == "Class").replace("(", "").replace(")", "")) or "school"
+    name = f"{slugify(school.school_name) or 'school'}_results_{scope}_{timezone.localdate():%Y-%m-%d}"
+    if kind == "pdf":
+        return _download(results_report.results_pdf(meta, ctx["report"], ctx["sections"]), "application/pdf", f"{name}.pdf")
+    return _download(results_report.results_xlsx(meta, ctx["report"], ctx["sections"]), XLSX, f"{name}.xlsx")
