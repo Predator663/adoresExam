@@ -447,7 +447,7 @@ def _xl_header(ws, meta, widths, title, width_cols=None):
 
 
 def _xl_filters(ws, row, meta, cols):
-    for k, v in list(meta["filters"]) + [("Sorted by", meta["sort"])]:
+    for k, v in list(meta["filters"]) + ([("Sorted by", meta["sort"])] if meta.get("sort") else []):
         _text(ws.cell(row, 1), k).font = Font(bold=True, color="5C6B67", size=9)
         ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=max(cols, 3))
         _text(ws.cell(row, 2), v).font = Font(size=10)

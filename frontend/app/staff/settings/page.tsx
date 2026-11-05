@@ -137,19 +137,21 @@ function Gamification() {
 function Setup() {
   const classes = useLoad(() => api<any[]>("/classes/")), subjects = useLoad(() => api<any[]>("/subjects/")), terms = useLoad(() => api<any[]>("/terms/")), years = useLoad(() => api<any[]>("/academic-years/"));
   const [c, setC] = useState({ name: "", form_level: 1, stream: "" }), [sub, setSub] = useState({ name: "", language: "en" }), [yr, setYr] = useState(""), [tm, setTm] = useState({ year: "", name: "", start_date: "", end_date: "" });
-  const [errs, setErrs] = useState<string[]>([]);
+  const [errs, setErrs] = useState<string[]>([]), [needle, setNeedle] = useState("");
+  const hit = (text: string) => !needle.trim() || needle.trim().toLowerCase().split(/\s+/).every((w) => text.toLowerCase().includes(w));
   const run = async (fn: () => Promise<any>, after: () => void) => { setErrs([]); try { await fn(); after(); } catch (e: any) { setErrs(errorLines(e.data, e.message)); } };
   return (
     <>
       <Msg errs={errs} ok="" />
+      <div className="card" role="search"><label className="field"><span>Search classes and subjects</span><input className="input" type="search" placeholder="e.g. Form 2, stream A, Physics" autoComplete="off" value={needle} onChange={(e) => setNeedle(e.target.value)} /></label></div>
       <div className="card"><h3>Classes</h3>
-        <PagedList as="div" className="" items={classes.data || []} size={10} render={(x: any) => <div key={x.id} className="row"><span className="grow">{x.name} (Form {x.form_level}{x.stream ? `, stream ${x.stream}` : ""})</span><button className="btn danger" onClick={() => confirm(`Delete ${x.name}?`) && run(() => api(`/classes/${x.id}/`, { method: "DELETE" }), classes.reload)}>Delete</button></div>} />
+        <PagedList as="div" className="" items={(classes.data || []).filter((x: any) => hit(`${x.name} form ${x.form_level} ${x.stream || ""}`))} size={10} render={(x: any) => <div key={x.id} className="row"><span className="grow">{x.name} (Form {x.form_level}{x.stream ? `, stream ${x.stream}` : ""})</span><button className="btn danger" onClick={() => confirm(`Delete ${x.name}?`) && run(() => api(`/classes/${x.id}/`, { method: "DELETE" }), classes.reload)}>Delete</button></div>} />
         <div className="row" style={{ marginTop: ".6rem" }}><input className="input grow" placeholder="Name, e.g. Form 1A" aria-label="Class name" value={c.name} onChange={(e) => setC({ ...c, name: e.target.value })} />
           <select className="input" style={{ width: 100 }} aria-label="Form" value={c.form_level} onChange={(e) => setC({ ...c, form_level: Number(e.target.value) })}>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>Form {n}</option>)}</select>
           <input className="input" style={{ width: 90 }} placeholder="Stream" aria-label="Stream" value={c.stream} onChange={(e) => setC({ ...c, stream: e.target.value })} />
           <button className="btn primary" disabled={!c.name} onClick={() => run(() => api("/classes/", { body: c }), () => { setC({ name: "", form_level: 1, stream: "" }); classes.reload(); })}>Add</button></div></div>
       <div className="card"><h3>Subjects and practice mode</h3>
-        <PagedList as="div" className="" items={subjects.data || []} size={10} render={(x: any) => <div key={x.id} className="row"><span className="grow">{x.name} <span className="muted small">({x.language === "sw" ? "Kiswahili" : "English"})</span></span>
+        <PagedList as="div" className="" items={(subjects.data || []).filter((x: any) => hit(`${x.name} ${x.language === "sw" ? "kiswahili" : "english"}`))} size={10} render={(x: any) => <div key={x.id} className="row"><span className="grow">{x.name} <span className="muted small">({x.language === "sw" ? "Kiswahili" : "English"})</span></span>
           <label className="switch"><input type="checkbox" checked={x.practice_enabled} onChange={(e) => run(() => api(`/practice/subjects/${x.id}/toggle/`, { body: { enabled: e.target.checked } }), subjects.reload)} /> Practice</label></div>} />
         <div className="row" style={{ marginTop: ".6rem" }}><input className="input grow" placeholder="New subject" aria-label="Subject name" value={sub.name} onChange={(e) => setSub({ ...sub, name: e.target.value })} />
           <select className="input" style={{ width: 130 }} aria-label="Examined language" value={sub.language} onChange={(e) => setSub({ ...sub, language: e.target.value })}><option value="en">English</option><option value="sw">Kiswahili</option></select>

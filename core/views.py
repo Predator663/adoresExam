@@ -2,6 +2,7 @@ import io
 
 from django.core.cache import cache
 from django.core.files.base import ContentFile
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework.decorators import api_view, authentication_classes, parser_classes, permission_classes
@@ -223,6 +224,9 @@ def audit_log(request):
         qs = qs.filter(actor__username__iexact=p["actor"])
     if p.get("action"):
         qs = qs.filter(action__startswith=p["action"])
+    for word in (p.get("q") or "").split():  # every word must appear in the person, the action, the target or the details
+        qs = qs.filter(Q(actor__username__icontains=word) | Q(actor__first_name__icontains=word) | Q(actor__last_name__icontains=word)
+                       | Q(action__icontains=word) | Q(target__icontains=word) | Q(detail__icontains=word))
     for key, lookup in (("from", "created_at__date__gte"), ("to", "created_at__date__lte")):
         try:
             d = parse_date(p.get(key, ""))

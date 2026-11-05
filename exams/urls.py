@@ -1,13 +1,16 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from . import views
+from . import notsubmitted, views
 
 router = DefaultRouter()
 router.register("exams", views.ExamViewSet, basename="exam")
 
 urlpatterns = [
     path("overview/", views.staff_overview),
+    path("exams/not-submitted/options/", notsubmitted.not_submitted_options),
+    path("exams/not-submitted/export/", notsubmitted.not_submitted_export),
+    path("exams/not-submitted/", notsubmitted.not_submitted),
     path("student/exams/", views.student_exams),
     path("student/exams/<int:exam_id>/start/", views.student_start),
     path("attempts/<int:attempt_id>/", views.attempt_current),

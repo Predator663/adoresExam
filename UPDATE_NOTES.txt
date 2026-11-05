@@ -1,3 +1,20 @@
+Amani Exams update: admin search everywhere + "Not submitted" panel with printing
+
+SEARCH (admins): Staff > People > Teachers and Admins now have a search box (name, username, email; every word must match),
+a Status filter, and for teachers "Teaches subject" and "Teaches class". Audit log has a free-text Search (person, action,
+target, details). Settings > classes and subjects have a search box. Students, Parents, Questions, Exams, Messages already had one.
+NOT SUBMITTED (admins): Administration > Not submitted. Pick an exam (running or finished); see who did not sit, who is still
+writing (updates every 15 s while the exam is live) and optionally who was auto-submitted when time ran out. Filter by class
+(click a class bar), search by name / username / index number, sort, and Print (landscape, school header, blank Remarks column),
+PDF or Excel. "Include parent contacts" shows the parents' phone numbers; that is written to the audit log
+(export.not_submitted_parents). Downloads are logged as export.not_submitted.
+No migrations. API (admin only):  GET /api/exams/not-submitted/options/  /  and  /export/?file=pdf|xlsx
+New:     exams/notsubmitted.py  exams/test_not_submitted.py  core/notsubmitted_report.py
+         frontend/components/NotSubmitted.tsx  frontend/app/staff/not-submitted/page.tsx
+Changed: exams/urls.py  accounts/views.py (teacher/admin search)  core/views.py (audit search)  core/results_report.py (small)
+         frontend/app/staff/people/page.tsx  audit/page.tsx  settings/page.tsx  frontend/components/Shell.tsx  frontend/app/globals.css
+Tests:   python manage.py test   (368 pass).  Rebuild the front end (npm run build).
+
 Amani Exams update: "Create all" tab in the exam builder
 
 Exam builder > Select questions > new tab "Create all" (after Question bank). Write every question of the exam on one page:

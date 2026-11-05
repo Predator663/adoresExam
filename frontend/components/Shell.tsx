@@ -122,7 +122,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
       { href: "/staff/monitor/", icon: "activity", label: "Live monitor" }, { href: "/staff/analytics/", icon: "chart", label: "Analytics" },
       ...(admin ? [] : [{ href: "/messages/", icon: "mail", label: "Messages" }]) ] },
     ...(admin ? [{ title: "Administration", items: [
-      { href: "/staff/people/", icon: "users", label: "People" }, { href: "/staff/guardians/", icon: "phone", label: "Parents" }, { href: "/staff/messages/", icon: "mail", label: "Messages" }, { href: "/staff/school/", icon: "building", label: "School analytics" }, { href: "/staff/reports/", icon: "download", label: "Download results" },
+      { href: "/staff/people/", icon: "users", label: "People" }, { href: "/staff/guardians/", icon: "phone", label: "Parents" }, { href: "/staff/messages/", icon: "mail", label: "Messages" }, { href: "/staff/school/", icon: "building", label: "School analytics" }, { href: "/staff/reports/", icon: "download", label: "Download results" }, { href: "/staff/not-submitted/", icon: "file", label: "Not submitted" },
       { href: "/staff/audit/", icon: "shield", label: "Audit log" }, { href: "/staff/settings/", icon: "sliders", label: "Settings" } ] }] : []),
   ];
   const groups = isStudent ? student : staff;

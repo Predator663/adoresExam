@@ -11,7 +11,7 @@ import { useSession } from "@/lib/session";
 export default function Audit() {
   const { user, lang } = useSession();
   const admin = user?.role === "admin" || user?.role === "super_admin";
-  const [f, setF] = useState({ actor: "", action: "", from: "", to: "" });
+  const [f, setF] = useState({ q: "", actor: "", action: "", from: "", to: "" });
   const log = usePaged<any>(admin ? "/audit-log/" : null, f, { size: 25 });
   const set = (k: string, v: string) => setF({ ...f, [k]: v });
   return (
@@ -19,7 +19,8 @@ export default function Audit() {
       <StaffNav />
       {!admin ? <p>Only administrators can read the audit log.</p> : (
         <>
-          <div className="card"><div className="grid2">
+          <div className="card" role="search"><div className="grid2">
+            <label className="field"><span>Search</span><input className="input" type="search" placeholder="Any word: person, action, exam, detail" autoComplete="off" value={f.q} onChange={(e) => set("q", e.target.value)} /></label>
             <label className="field"><span>Who (username)</span><input className="input" value={f.actor} onChange={(e) => set("actor", e.target.value)} /></label>
             <label className="field"><span>Action starts with</span><input className="input" list="actions" placeholder="e.g. exam. or password." value={f.action} onChange={(e) => set("action", e.target.value)} /><datalist id="actions">{["exam.", "question.", "password.", "student.", "teacher.", "settings.", "login", "exam.grant"].map((a) => <option key={a} value={a} />)}</datalist></label>
             <label className="field"><span>From</span><input className="input" type="date" value={f.from} onChange={(e) => set("from", e.target.value)} /></label>

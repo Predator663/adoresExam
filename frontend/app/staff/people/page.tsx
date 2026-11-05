@@ -14,7 +14,10 @@ function Errs({ errs, ok }: { errs: string[]; ok?: string }) {
 
 /** ADM-03: create, edit and deactivate teacher accounts; assign subjects and classes. (Super Admin: same for Admin accounts, ADM section 2.) */
 function Staff({ kind }: { kind: "teachers" | "admins" }) {
-  const list = usePaged<any>(`/${kind}/`, {}, { size: 10 });
+  const [flt, setFlt] = useState({ q: "", active: "", subject: "", class: "" }), [qBox, setQBox] = useState("");
+  useEffect(() => { const t = setTimeout(() => setFlt((x) => (x.q === qBox.trim() ? x : { ...x, q: qBox.trim() })), 300); return () => clearTimeout(t); }, [qBox]);
+  const filtered = !!(flt.q || flt.active || flt.subject || flt.class) || !!qBox.trim();
+  const list = usePaged<any>(`/${kind}/`, flt, { size: 10 });
   const subjects = useLoad(() => api<any[]>("/subjects/")), classes = useLoad(() => api<any[]>("/classes/"));
   const [f, setF] = useState({ username: "", first_name: "", last_name: "", email: "", password: "" });
   const [errs, setErrs] = useState<string[]>([]), [ok, setOk] = useState(""), [open, setOpen] = useState<number | null>(null);
@@ -34,7 +37,19 @@ function Staff({ kind }: { kind: "teachers" | "admins" }) {
         <Errs errs={errs} ok={ok} />
         <button className="btn primary" disabled={!f.username || !f.first_name || !f.password} onClick={() => run(() => api(`/${kind}/`, { body: f }), `${label} account created.`, () => setF({ username: "", first_name: "", last_name: "", email: "", password: "" }))}>Create account</button>
       </div>
-      {list.loading ? <Loading /> : list.error ? <ErrorNote error={list.error} retry={list.reload} /> : <><div ref={list.top} className="paged" aria-busy={list.busy || undefined}>{list.rows.map((t) => (
+      <div className="card" role="search" aria-label={`Search ${kind}`}>
+        <div className="grid2">
+          <label className="field"><span>Search {kind}</span><input className="input" type="search" placeholder="Name, username or email" autoComplete="off" value={qBox} onChange={(e) => setQBox(e.target.value)} /></label>
+          <label className="field"><span>Status</span><select className="input" value={flt.active} onChange={(e) => setFlt({ ...flt, active: e.target.value })}><option value="">All</option><option value="1">Active</option><option value="0">Inactive</option></select></label>
+          {kind === "teachers" && <>
+            <label className="field"><span>Teaches subject</span><select className="input" value={flt.subject} onChange={(e) => setFlt({ ...flt, subject: e.target.value })}><option value="">Any subject</option>{subjects.data?.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+            <label className="field"><span>Teaches class</span><select className="input" value={flt.class} onChange={(e) => setFlt({ ...flt, class: e.target.value })}><option value="">Any class</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          </>}
+        </div>
+        <div className="row"><span className="grow muted small" aria-live="polite">{list.loading ? "Searching…" : `${list.count} ${label}${list.count === 1 ? "" : "s"}${filtered ? " found" : ""}`}</span>
+          {filtered && <button className="btn" onClick={() => { setQBox(""); setFlt({ q: "", active: "", subject: "", class: "" }); }}>Clear search</button>}</div>
+      </div>
+      {list.loading ? <Loading /> : list.error ? <ErrorNote error={list.error} retry={list.reload} /> : <>{list.rows.length === 0 && <div className="card"><p className="muted">{filtered ? `No ${kind} match this search. Try fewer words, or press Clear search.` : `No ${kind} yet.`}</p></div>}<div ref={list.top} className="paged" aria-busy={list.busy || undefined}>{list.rows.map((t) => (
         <div key={t.id} className={`card ${t.is_active ? "" : "unread"}`}>
           <div className="row"><span className="grow"><b>{t.first_name} {t.last_name}</b> <span className="muted small">@{t.username}</span>{!t.is_active && <span className="pill">inactive</span>}</span>
             {kind === "teachers" && <button className="btn" onClick={() => setOpen(open === t.id ? null : t.id)}>{open === t.id ? "Close" : "Subjects & classes"}</button>}</div>

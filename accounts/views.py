@@ -6,7 +6,7 @@ from django.contrib.auth import authenticate
 from django.core.cache import cache
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.contrib.auth.hashers import make_password
 from django.http import HttpResponse
 from django.utils import timezone
@@ -18,7 +18,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from academics.models import SchoolClass
+from academics.models import SchoolClass, TeacherAssignment
 from core import reports
 from core.models import SchoolSettings, audit
 from notifications.services import notify_password_changed
@@ -455,10 +455,20 @@ class StaffAccountViewSet(viewsets.ModelViewSet):
     label = "teacher"
 
     def get_queryset(self):
+        p = self.request.query_params
         qs = User.objects.filter(role=self.role).prefetch_related("assignments__subject").order_by("last_name", "username")
-        if self.request.query_params.get("q"):
-            q = self.request.query_params["q"]
-            qs = qs.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(username__icontains=q))
+        for word in (p.get("q") or "").split():  # every word must match: "mary k" finds Mary Kimaro
+            qs = qs.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word) | Q(username__icontains=word) | Q(email__icontains=word))
+        if p.get("active") in ("0", "1"):
+            qs = qs.filter(is_active=p["active"] == "1")
+        if self.role == User.Role.TEACHER and (p.get("subject", "").isdigit() or p.get("class", "").isdigit()):
+            # one assignment must satisfy both: "English in Form 1 B", not English somewhere and Form 1 B for another subject
+            a = TeacherAssignment.objects.filter(teacher=OuterRef("pk"))
+            if p.get("subject", "").isdigit():
+                a = a.filter(subject_id=int(p["subject"]))
+            if p.get("class", "").isdigit():  # teaches that class, or teaches the subject in every class
+                a = a.filter(Q(school_class_id=int(p["class"])) | Q(school_class__isnull=True))
+            qs = qs.filter(Exists(a))
         return qs
 
     def create(self, request, *args, **kwargs):
