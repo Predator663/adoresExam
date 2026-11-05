@@ -37,8 +37,10 @@ class Api(private val server: String, private val token: String) {
     private fun call(method: String, path: String, body: String?): String {
         val conn = (URL(server + path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
-            connectTimeout = 20_000
-            readTimeout = 30_000
+            connectTimeout = 25_000
+            readTimeout = 60_000  // a sleeping free-hosting server needs up to a minute to wake
+            useCaches = false
+            setRequestProperty("Connection", "close")  // never reuse an old connection: after a Wi-Fi or mobile-data switch it is dead and fails with "unexpected end of stream"
             setRequestProperty("X-Device-Token", token)
             setRequestProperty("Accept", "application/json")
             if (body != null) {
@@ -50,9 +52,10 @@ class Api(private val server: String, private val token: String) {
         try {
             val code = conn.responseCode
             if (code == 401) throw AuthException()
+            if (code == 429) throw IOException("The server asked the phone to slow down (429)")
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-            if (code !in 200..299) throw IOException("Server answered $code")
+            if (code !in 200..299) throw IOException(if (code >= 500) "The server has a problem right now ($code)" else "Server answered $code")
             return text
         } finally {
             conn.disconnect()

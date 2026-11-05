@@ -35,11 +35,15 @@ class SenderService : Service() {
         private const val ACTION_DELIVERED = "tz.ac.amani.smssender.DELIVERED"
         private const val EXTRA_JOB = "job"
         private const val CHANNEL = "sender"
+        private const val ALERT_CHANNEL = "problems"
         private val NUMBER = Regex("^\\+255[67]\\d{8}$")
 
         @Volatile
         var running = false
     }
+
+    /** Android took the SMS permission away while we were running. Not the message's fault, so nothing is reported as failed. */
+    private class PermissionLost : Exception()
 
     private class JobState(var sentLeft: Int, var deliveredLeft: Int, var failure: String? = null)
 
@@ -62,19 +66,19 @@ class SenderService : Service() {
                 if (st.sentLeft == 0) {
                     val failure = st.failure
                     if (failure != null) {
-                        AppLog.add("FAILED (job $id): $failure")
+                        AppLog.add("FAILED (job $id): $failure", "Job: $id\nReason: $failure\nThe website is being told this message failed.")
                         report(id, "failed", failure)
                         states.remove(id)
                     } else {
                         Store.markSent(this@SenderService, id)
-                        AppLog.add("Sent (job $id)")
+                        AppLog.add("Sent (job $id)", "Job: $id\nAll parts of the message were accepted by the SIM card. The website is being told.")
                         report(id, "sent")
                     }
                 }
             } else if (intent.action == ACTION_DELIVERED && ok) {
                 st.deliveredLeft -= 1
                 if (st.deliveredLeft == 0 && st.failure == null) {
-                    AppLog.add("Delivered (job $id)")
+                    AppLog.add("Delivered (job $id)", "Job: $id\nThe parent's phone confirmed it received the message.")
                     report(id, "delivered")
                     states.remove(id)
                 }
@@ -89,16 +93,28 @@ class SenderService : Service() {
             stopWork()
             return START_NOT_STICKY
         }
+        // Always become a foreground service first: Android requires it within seconds of startForegroundService(), even if we then stop.
+        try {
+            startAsForeground()
+        } catch (e: Exception) {  // e.g. Android 12+ refuses to restart a service from the background
+            AppLog.add("Could not start in the background (${e.javaClass.simpleName}). Open the app and press Start sending.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (running) return START_STICKY
         val server = Store.serverUrl(this)
         val token = Store.token(this)
         if (server.isEmpty() || token.isEmpty()) {
             AppLog.add("Enter the server address and the pairing code first.")
-            stopSelf()
+            stopWork()
+            return START_NOT_STICKY
+        }
+        if (!Readiness.smsGranted(this)) {  // also the case when Android restarts us after the permission was removed
+            alertUser("The SMS permission is missing. Open the app and press \"Fix the first problem\".")
+            stopWork()
             return START_NOT_STICKY
         }
         api = Api(server, token)
-        startAsForeground()
         val filter = IntentFilter().apply {
             addAction(ACTION_SENT)
             addAction(ACTION_DELIVERED)
@@ -115,10 +131,28 @@ class SenderService : Service() {
 
     private fun loop() {
         var sinceRest = 0
+        Net.reset()
+        Net.state = "Connecting..."
         AppLog.add("Started. Asking the website for messages...")
         while (running) {
             try {
+                if (!Readiness.smsGranted(this)) throw PermissionLost()
+                if (Readiness.sim(this) == Readiness.Sim.ABSENT) {  // nothing is pulled, so nothing is lost or marked failed
+                    AppLog.add("No SIM card found. Waiting...")
+                    nap(30)
+                    continue
+                }
+                if (!Net.online(this)) {  // no internet: wait quietly (one log line), and carry on the moment it is back
+                    if (Net.state != "No internet on this phone") {
+                        Net.state = "No internet on this phone"
+                        AppLog.add("No internet on this phone. Waiting for it to come back...", "Sending is paused. Waiting messages stay safe on the website. Check mobile data or Wi-Fi.")
+                    }
+                    nap(3)
+                    continue
+                }
+                flushReports()
                 val (jobs, pacing) = api.pull(10)
+                markOnline()
                 if (jobs.isEmpty()) {
                     nap(10)
                     continue
@@ -141,11 +175,19 @@ class SenderService : Service() {
                     }
                 }
             } catch (e: AuthException) {
-                AppLog.add(e.message ?: "The pairing code was rejected.")
+                alertUser(e.message ?: "The pairing code was rejected.")
+                break
+            } catch (e: PermissionLost) {
+                alertUser("Sending stopped: Android removed the SMS permission. Open the app and press \"Fix the first problem\". Waiting messages are safe in the queue.")
                 break
             } catch (e: IOException) {
-                AppLog.add("No connection (${e.message}). Trying again in 30 s.")
-                nap(30)
+                Net.failures++
+                val wait = Net.backoffSeconds(Net.failures)
+                Net.state = "Server not reachable, retrying in $wait s"
+                if (Net.failures == 1 || Net.failures % 5 == 0) {  // not every try, so the log is not flooded
+                    AppLog.add("No connection (${Net.explain(e)}). Trying again in $wait s.", "Attempt ${Net.failures} in a row.\nTechnical reason: ${e.javaClass.simpleName}: ${e.message}\nThe wait grows from 5 s up to 2 minutes and starts again after one success.")
+                }
+                nap(wait, wakeWhenOnline = true)
             } catch (e: Exception) {
                 AppLog.add("Problem: ${e.javaClass.simpleName} ${e.message}")
                 nap(30)
@@ -160,6 +202,7 @@ class SenderService : Service() {
             report(job.id, "failed", "Bad phone number")
             return
         }
+        if (!Readiness.smsGranted(this)) throw PermissionLost()  // before anything is reported, so the website just asks again later
         try {
             val sms = smsManager()
             val parts = sms.divideMessage(job.body)
@@ -171,7 +214,10 @@ class SenderService : Service() {
             }
             states[job.id] = JobState(parts.size, parts.size)
             sms.sendMultipartTextMessage(job.to, null, parts, sent, delivered)
-            AppLog.add("Sending to ${job.to.take(4)}*****${job.to.takeLast(3)} (${parts.size} part(s))")
+            AppLog.add("Sending to ${job.to.take(4)}*****${job.to.takeLast(3)} (${parts.size} part(s))", "Job: ${job.id}\nParts: ${parts.size}\nLength: ${job.body.length} characters\n(The number and the text are not stored in the log.)")
+        } catch (e: SecurityException) {  // permission removed between the check and the call
+            states.remove(job.id)
+            throw PermissionLost()
         } catch (e: Exception) {
             val why = "${e.javaClass.simpleName}: ${e.message ?: ""}"
             AppLog.add("FAILED: $why")
@@ -199,23 +245,73 @@ class SenderService : Service() {
         else -> "Android error $code"
     }
 
-    /** Tell the website. Runs off the main thread; if it fails the website simply asks for the message again later. */
+    private var reportWarned = false
+
+    /** Tell the website. The result is saved on the phone first and removed only when the website confirms, so a dropped connection loses nothing. */
     private fun report(id: Long, status: String, error: String = "") {
-        net.execute {
+        Store.pendingAdd(this, id, status, error)
+        net.execute { flushReports() }
+    }
+
+    /** Sends every saved result, oldest first. Stops at the first failure and keeps the rest for the next round. */
+    @Synchronized
+    private fun flushReports() {
+        for ((id, status, error) in Store.pendingAll(this)) {
             try {
                 api.report(id, status, error)
+                Store.pendingRemove(this, id, status)
+                reportWarned = false
+            } catch (e: AuthException) {
+                return  // the main loop sees the same rejection on its next pull and stops with a clear message
             } catch (e: Exception) {
-                AppLog.add("Could not tell the website ($status): ${e.message}")
+                if (!reportWarned) {
+                    reportWarned = true
+                    AppLog.add("Could not tell the website yet (${if (e is IOException) Net.explain(e) else e.message}). The result is saved and will be sent when the connection works.",
+                        "Job: $id\nResult waiting: $status")
+                }
+                return
             }
         }
     }
 
-    private fun nap(seconds: Int) {
+    /** Waits, in half-second steps so Stop works at once. With `wakeWhenOnline` it also ends early when the internet comes back. */
+    private fun nap(seconds: Int, wakeWhenOnline: Boolean = false) {
         var left = seconds * 1000L
+        val wasOnline = !wakeWhenOnline || Net.online(this)
+        var step = 0
         while (running && left > 0) {
             Thread.sleep(500)
             left -= 500
+            if (!wasOnline && ++step % 4 == 0 && Net.online(this)) break
         }
+    }
+
+    /** Called after a successful answer from the website. */
+    private fun markOnline() {
+        if (Net.failures > 0 || Net.state == "No internet on this phone") {
+            AppLog.add("Connected again to the website.", if (Net.failures > 0) "The connection came back after ${Net.failures} failed attempt(s)." else "The phone's internet came back.")
+        }
+        Net.failures = 0
+        Net.state = "Online"
+        Net.lastOkMillis = System.currentTimeMillis()
+    }
+
+    /** Writes to the log and, if notifications are allowed, shows a notification, so a stopped phone is noticed. */
+    private fun alertUser(text: String) {
+        AppLog.add(text)
+        try {
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(NotificationChannel(ALERT_CHANNEL, "Problems", NotificationManager.IMPORTANCE_HIGH))
+            val open = PendingIntent.getActivity(this, 2, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+            nm.notify(2, NotificationCompat.Builder(this, ALERT_CHANNEL)
+                .setSmallIcon(android.R.drawable.stat_notify_error)
+                .setContentTitle("Amani SMS Sender stopped")
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .build())
+        } catch (ignored: Exception) { }
     }
 
     private fun startAsForeground() {
@@ -250,6 +346,7 @@ class SenderService : Service() {
             receiverOn = false
         }
         try { wake?.takeIf { it.isHeld }?.release() } catch (ignored: Exception) { }
+        Net.reset()
         AppLog.add("Stopped.")
         super.onDestroy()
     }
