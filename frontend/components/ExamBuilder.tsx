@@ -197,6 +197,8 @@ function PaperPreview({ exam, subjectName, sel }: { exam: any; subjectName: stri
 /* ------------------------------------------------------------------ the builder */
 export default function ExamBuilder({ exam, reload, editable, admin, subjectName, onDone }: { exam: any; reload: () => void; editable: boolean; admin: boolean; subjectName: string; onDone?: () => void }) {
   const [sel, setSel] = useState<Q[]>([]), [saved, setSaved] = useState<number[]>([]), [ready, setReady] = useState(false), [loadErr, setLoadErr] = useState(""), [orphans, setOrphans] = useState(0);
+  // The marks stored on the exam's own copy of each question (source id -> marks; 0 if voided). The exam list adds these up, so the builder must too.
+  const [savedMarks, setSavedMarks] = useState<Record<number, number>>({});
   const [step, setStep] = useState<"select" | "preview">(editable ? "select" : "preview"), [tab, setTab] = useState<"bank" | "bulk" | "create" | "random" | "selected">("bank"), [bulkSeen, setBulkSeen] = useState(false);
   const [run, setRun] = useState<Run | null>(null), [createKey, setCreateKey] = useState(0), { toast, show } = useToast();
   const root = useRef<HTMLDivElement>(null), [w, setW] = useState<"xs" | "narrow" | "wide">("narrow"), wide = w === "wide";
@@ -216,7 +218,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
       try {
         const paper = await api<any[]>(`/exams/${exam.id}/questions/`);
         const ids: number[] = paper.map((p) => p.source).filter(Boolean);
-        if (live) { setSaved(ids); setOrphans(paper.length - ids.length); }
+        if (live) { setSaved(ids); setOrphans(paper.length - ids.length); setSavedMarks(Object.fromEntries(paper.filter((p) => p.source).map((p) => [p.source, p.voided ? 0 : Number(p.marks) || 0]))); }
         if (ids.length) {
           const qs = await api<Q[]>(`/questions/?ids=${ids.join(",")}`), by = new Map(qs.map((q) => [q.id, q]));
           if (live) setSel(ids.map((i) => by.get(i)).filter(Boolean) as Q[]);
@@ -229,6 +231,9 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
 
   const selIds = useMemo(() => new Set(sel.map((q) => q.id)), [sel]);
   const dirty = ready && JSON.stringify(canonicalOrder(sel).map((q) => q.id)) !== JSON.stringify(saved);
+  // Unsaved: show what saving will store (the question bank's current marks). Saved: show exactly what is stored, which is what the exam list shows.
+  const shown = useMemo(() => sel.map((q) => (!dirty && q.id in savedMarks ? { ...q, marks: savedMarks[q.id] } : q)), [sel, dirty, savedMarks]);
+  const drift = useMemo(() => sel.filter((q) => q.id in savedMarks && savedMarks[q.id] !== Number(q.marks)).length, [sel, savedMarks]);
   useEffect(() => { if (!dirty) return; const h = (e: BeforeUnloadEvent) => { e.preventDefault(); }; window.addEventListener("beforeunload", h); return () => window.removeEventListener("beforeunload", h); }, [dirty]);
 
   const add = (qs: Q[]) => setSel((s) => [...s, ...qs.filter((q) => !s.some((x) => x.id === q.id))]);
@@ -253,7 +258,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
       if (dirty || orphans > 0 || action === "save") {
         const ids = canonicalOrder(sel).map((q) => q.id);
         const r = await api<any>(`/exams/${exam.id}/paper/`, { body: { question_ids: ids, rules: [] } });
-        setSaved(ids); setOrphans(0); detail = `Paper saved: ${r.questions} questions, ${r.total_marks} marks.`;
+        setSaved(ids); setOrphans(0); setSavedMarks(Object.fromEntries(sel.map((q) => [q.id, Number(q.marks)]))); detail = `Paper saved: ${r.questions} questions, ${r.total_marks} marks.`;
       }
       await pause(350);
       if (action !== "save") {
@@ -273,7 +278,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
 
   if (!ready) return <div className="card"><Loading /></div>;
   if (loadErr) return <div className="card error" role="alert"><p>⚠ {loadErr}</p></div>;
-  const marksTotal = Math.round(sel.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100;
+  const marksTotal = Math.round(shown.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100;
   const checks = [
     { ok: sel.length > 0, label: `${sel.length} question${sel.length === 1 ? "" : "s"} selected` },
     ...(admin ? [
@@ -289,6 +294,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
         <button role="tab" aria-selected={step === "preview"} className={`bld-step ${step === "preview" ? "on" : ""}`} disabled={!sel.length} onClick={() => setStep("preview")}><i>{editable ? 2 : "•"}</i> Preview paper</button>
         <span className="grow" />{dirty && editable && <span className="pill warn">Unsaved changes</span>}
       </div>
+      {drift > 0 && editable && <p className="hint">{drift} question{drift === 1 ? "" : "s"} now {drift === 1 ? "has" : "have"} different marks in the question bank than in the saved paper. The totals shown are the saved ones; saving the paper again updates it to the bank's marks.</p>}
       {orphans > 0 && editable && <p className="hint">{orphans} question(s) in the saved paper no longer exist in the question bank and will be dropped when you save.</p>}
       {toast}
 
@@ -304,16 +310,16 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
             {tab === "create" && <QuestionEditor key={createKey} id={null} subject={exam.subject} backLabel="← Back to question bank" onClose={() => setTab("bank")}
               onCreated={(q) => { add([q]); setCreateKey((k) => k + 1); setTab("bank"); flash("Question created, approved and added to this exam."); }} />}
             {tab === "random" && <Random exam={exam} selIds={selIds} onAdded={(qs) => { add(qs); flash(`${qs.length} random question${qs.length === 1 ? "" : "s"} added.`); setTab("selected"); }} />}
-            {tab === "selected" && <Selected narrow sel={sel} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
+            {tab === "selected" && <Selected narrow sel={shown} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
           </div>
-          {wide && <Selected sel={sel} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
+          {wide && <Selected sel={shown} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
         </div>
       )}
-      {step === "select" && editable && !wide && sel.length > 0 && tab !== "selected" && tab !== "bulk" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(sel.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
+      {step === "select" && editable && !wide && sel.length > 0 && tab !== "selected" && tab !== "bulk" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(shown.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
 
       {step === "preview" && (
         <>
-          <PaperPreview exam={exam} subjectName={subjectName} sel={sel} />
+          <PaperPreview exam={exam} subjectName={subjectName} sel={shown} />
           <PaperActions admin={admin} status={exam.status} editable={editable} dirty={dirty} count={sel.length} marks={marksTotal} checks={checks} run={run}
             submittedAt={exam.submitted_at} submittedLabel={exam.submitted_at ? `Submitted on ${eatDate(exam.submitted_at, DATETIME)}. An administrator sets the date and classes and schedules the exam.` : ""}
             onRun={perform} onBack={() => setStep("select")} onDismiss={() => setRun(null)} onDone={onDone} />

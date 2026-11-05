@@ -4,6 +4,8 @@ import Listen from "@/components/Listen";
 import OfflinePlay from "@/components/OfflinePractice";
 import QuestionView, { hasAnswer, initialValue } from "@/components/QuestionView";
 import Shell from "@/components/Shell";
+import Icon from "@/components/Icon";
+import { Monogram, Ring } from "@/components/student";
 import { Bar, ErrorNote, Loading, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
 import { describe } from "@/lib/answers";
@@ -34,8 +36,8 @@ function Play({ initial, onExit }: { initial: PState; onExit: () => void }) {
 
   if (fb && shown) {
     return (
-      <div className="card slide-in">
-        <h2 className={fb.correct ? "ok" : "no"}>{fb.correct ? "✓" : fb.fraction > 0 ? "◐" : "✗"} {fb.message}</h2>
+      <div className={`card slide-in sx-fb ${fb.correct ? "right" : fb.fraction > 0 ? "part" : "wrong"}`}>
+        <h2 className={fb.correct ? "ok" : "no"}><span className="sx-fb-ico" aria-hidden>{fb.correct ? "✓" : fb.fraction > 0 ? "◐" : "✗"}</span> {fb.message}</h2>
         {!fb.correct && <p><b>{t("correct_answer")}:</b> {describe(shown.type, shown.content, fb.correct_answer, t)}</p>}
         {fb.explanation && <div className="hint"><b>{t("explanation")}:</b> {fb.explanation}</div>}
         <button className="btn primary big" style={{ marginTop: "1rem" }} onClick={next}>{s.finished ? t("see_summary") : t("next_question")}</button>
@@ -45,10 +47,11 @@ function Play({ initial, onExit }: { initial: PState; onExit: () => void }) {
   if (s.finished) {
     const m = s.summary!;
     return (
-      <div className="card hero center pop">
-        <span className="big-num" aria-hidden>🌟</span><h1>{t("practice_done")}</h1>
-        <p>{t("practice_score", { a: m.fully_correct, b: m.questions })} · {m.score_percent}%</p>
-        <p><b>+{m.xp_earned} XP</b></p>
+      <div className="card hero center pop sx-done">
+        <Ring value={m.score_percent} size={116} stroke={8} className="sx-rhero-ring" label={`${m.score_percent}%`}><span className="sx-rhero-pct">{Math.round(m.score_percent)}%</span></Ring>
+        <h1>{t("practice_done")}</h1>
+        <p>{t("practice_score", { a: m.fully_correct, b: m.questions })}</p>
+        <p className="sx-xpchip"><Icon n="zap" size={16} /> <b>+{m.xp_earned} XP</b></p>
         <button className="btn big" style={{ color: "var(--text)" }} onClick={onExit}>{t("back")}</button>
       </div>
     );
@@ -90,7 +93,8 @@ export default function Practice() {
       {offline ? <OfflinePlay packId={offline} count={count} onExit={() => setOffline(null)} /> : game ? <Play initial={game} onExit={() => { setGame(null); subs.reload(); }} /> : (
         <>
           <p className="muted">{t("practice_intro")}</p>
-          <label className="field"><span>{t("how_many")}: {count}</span><input type="range" min={5} max={20} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label>
+          {!noSignal && <h2 className="sx-pick">{t("practice_pick")}</h2>}
+          <label className="field card sx-count"><span>{t("how_many")}: <b className="sx-count-badge">{count}</b></span><input type="range" min={5} max={20} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label>
           {err && <p className="no" role="alert">⚠ {err}</p>}
           {noSignal && (
             <div className="card">
@@ -110,7 +114,8 @@ export default function Practice() {
           )}
           {subs.loading ? <Loading /> : subs.error ? (off ? null : <ErrorNote error={subs.error} retry={subs.reload} />) : !subs.data?.length ? <div className="card"><p className="muted">{t("practice_none")}</p></div> :
             subs.data.map((s) => (
-              <div key={s.id} className="card row">
+              <div key={s.id} className="card row sx-subjcard">
+                <Monogram name={s.name} size={46} />
                 <span className="grow">
                   <b>{s.name}</b><br />
                   <span className="muted small">{t("n_questions_available", { n: s.available_questions })}</span>

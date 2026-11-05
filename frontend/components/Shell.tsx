@@ -30,7 +30,7 @@ function useOnline(enabled: boolean) {
     };
     const beat = async () => {
       if (!live || stop) return;
-      try { setOnline((await api<{ online: number }>("/presence/", { method: "POST", body: {} })).online); } catch { /* ignore */ }
+      try { const r = await api<{ online: number }>("/presence/", { method: "POST", body: {} }); if (typeof r?.online === "number") setOnline(r.online); } catch { /* ignore */ }
     };
     check().then(beat);
     const a = setInterval(check, 60_000), b = setInterval(beat, 30_000);
@@ -167,8 +167,8 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
           {side && <button type="button" className="btn icon menu-btn" onClick={() => setDrawer(true)} aria-label={t("open_menu")} aria-expanded={drawer}><Icon n="menu" /></button>}
           <Link href="/" className={`brand ${side ? "top-brand" : ""}`} aria-label={appName}><Logo size={38} /><span className="brand-name">{appName}</span></Link>
           <div className="top-right">
-            {online !== null && <span className="pill live" role="status" aria-label={t("online_n", { n: online })}>● {t("online_n", { n: online })}</span>}
-            <button type="button" className="btn icon ghost" onClick={() => setPanel(true)} aria-label={t("accessibility")} title={t("accessibility")}><Icon n="access" /></button>
+            {online !== null && <span className="pill live" role="status" aria-label={t("online_n", { n: online })}><i className="live-dot" aria-hidden />{online}<span className="live-label"> {t("online_n", { n: online }).replace(String(online), "").trim()}</span></span>}
+            <button type="button" className="btn icon ghost a11y-btn" onClick={() => setPanel(true)} aria-label={t("accessibility")} title={t("accessibility")}><Icon n="access" /></button>
             <Link href="/notifications/" className="btn icon ghost bell" aria-label={`${t("notifications")}${unread ? `: ${unread}` : ""}`}><Icon n="bell" />{unread > 0 && <b className="badge-dot">{unread > 9 ? "9+" : unread}</b>}</Link>
             {side && (
               <Dropdown label={name} button={<><span className="avatar sm">{initials}</span><span className="dd-name">{name}</span><Icon n="chevron" size={16} /></>}>

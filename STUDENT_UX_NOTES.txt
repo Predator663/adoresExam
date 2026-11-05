@@ -1,0 +1,26 @@
+STUDENT UI/UX UPGRADE - copy these files over the same paths in your project, then: cd frontend && npm run dev (or npm run build).
+No backend changes. No new packages.
+
+NEW: lib/student.ts, components/student.tsx (Ring, GradeMedal, Monogram, Skeleton, Spark)
+
+BETTER + PERSONAL
+- Home: greeting by time of day (EAT) + your avatar and display name, XP ring, streak/level/XP chips, one personal line
+  (exam live / exam today / streak at risk / close to next level), big "Next up" exam card with countdown,
+  quick links, "Revise next" topics from your analytics, results with grade medals, skeleton loading, 2 columns on desktop.
+- Results / result detail: grade medals, subject colours, score ring, class comparison sentence, strong / needs-work topics.
+- Badges (filters, profile ring), Leaderboard (podium, highlighted "You" row), Progress (trend lines, subject rows),
+  Practice, Settings (avatar grid), Notifications (icons, New tag). Exam: A/B/C/D answer keys, clearer timer.
+- English + Kiswahili for every new text.
+
+BUGS FIXED
+1. Top bar overflowed 10px on 375px phones on every screen (sideways scroll, clipped menu).
+2. "undefined students online" could show when presence returned no number.
+3. Card hover lift never worked (entrance animation froze its end state).
+4. Badge emoji sat on the same line as the badge name.
+5. Leaderboard rank column ignored its width (inline element) so rows misaligned.
+6. Goal bar showed NaN% when a target was 0.
+7. Locked badges were 65% opacity (hard to read); now only the icon is dimmed.
+8. Dialogs let the page scroll behind, had no focus trap and lost focus on close.
+9. 100vh layouts jumped on phone address bars (now dvh).
+10. Sticky hover colours on touch screens; progress-bar shine ran forever; bottom-nav labels could overflow.
+11. Messages empty state used an undefined colour variable.

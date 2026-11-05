@@ -22,7 +22,7 @@ export default function Messages() {
   return (
     <Shell title={t("messages")}>
       <p className="muted small">{t("msg_note")}</p>
-      {err && !items ? <ErrorNote error={err} retry={load} /> : !items ? <Loading /> : !items.length ? <p className="lb-empty">{t("msg_empty")}</p> : (
+      {err && !items ? <ErrorNote error={err} retry={load} /> : !items ? <Loading /> : !items.length ? <div className="card sx-empty"><span className="sx-empty-ico" aria-hidden>✉️</span><p className="muted">{t("msg_empty")}</p></div> : (
         <ul className="msg-list">
           {items.map((m) => (
             <li key={m.id} className={`card msg-item ${m.dismissed ? "" : "new"}`}>

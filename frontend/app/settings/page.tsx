@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import A11yPanel from "@/components/A11yPanel";
 import OfflineManager from "@/components/OfflineManager";
 import Shell from "@/components/Shell";
+import Icon from "@/components/Icon";
 import { api } from "@/lib/api";
 import { AVATAR_EMOJI } from "@/lib/emoji";
 import { useSession } from "@/lib/session";
@@ -55,7 +56,10 @@ export default function Settings() {
   const patch = async (b: any) => { try { setProf(await api("/gamification/profile/", { method: "PATCH", body: b })); setSaved(t("saved")); setTimeout(() => setSaved(""), 2000); } catch (e: any) { setSaved(e.message); } };
   return (
     <Shell title={t("nav_more")}>
-      <div className="card"><b>{user?.first_name} {user?.last_name}</b><br /><span className="muted">@{user?.username}{user?.class ? ` · ${user.class}` : ""}</span></div>
+      <div className="card sx-profile">
+        <span className="sx-bigavatar" aria-hidden>{prof ? (AVATAR_EMOJI[prof.avatar] || "🦉") : (user?.first_name?.[0] || user?.username?.[0] || "?").toUpperCase()}</span>
+        <div className="grow"><b className="sx-profile-name">{user?.first_name} {user?.last_name}</b><br /><span className="muted">@{user?.username}{user?.class ? ` · ${user.class}` : ""}</span></div>
+      </div>
 
       <div className="card"><h2>{t("language")}</h2>
         <div className="chips">{(["en", "sw"] as const).map((l) => <label key={l} className={`chip ${lang === l ? "on" : ""}`}><input type="radio" name="lang" checked={lang === l} onChange={() => savePrefs({ language: l })} />{lang === l ? "✓ " : ""}{l === "en" ? "English" : "Kiswahili"}</label>)}</div>
@@ -65,8 +69,9 @@ export default function Settings() {
 
       {prof && (
         <div className="card"><h2>{t("my_profile")}</h2>
-          <fieldset><legend>{t("avatar")}</legend>
-            <div className="chips">{prof.avatars.map((a: string) => <label key={a} className={`chip ${prof.avatar === a ? "on" : ""}`}><input type="radio" name="avatar" checked={prof.avatar === a} onChange={() => patch({ avatar: a })} aria-label={a} /><span aria-hidden style={{ fontSize: "1.4rem" }}>{AVATAR_EMOJI[a]}</span></label>)}</div>
+          <p className="muted small">{t("profile_hint")}</p>
+          <fieldset><legend>{t("pick_avatar")}</legend>
+            <div className="sx-avatars">{prof.avatars.map((a: string) => <label key={a} className={`sx-avatar ${prof.avatar === a ? "on" : ""}`}><input type="radio" name="avatar" checked={prof.avatar === a} onChange={() => patch({ avatar: a })} aria-label={a} /><span aria-hidden>{AVATAR_EMOJI[a]}</span>{prof.avatar === a && <i aria-hidden><Icon n="check" size={13} /></i>}</label>)}</div>
           </fieldset>
           <label className="field"><span>{t("display_name")}</span><input className="input" value={name} maxLength={30} onChange={(e) => setName(e.target.value)} onBlur={() => name !== prof.display_name && patch({ display_name: name })} placeholder={t("display_name_hint")} /></label>
           <label className="switch"><input type="checkbox" checked={prof.hide_from_leaderboard} onChange={(e) => patch({ hide_from_leaderboard: e.target.checked })} /> {t("hide_leaderboard")}</label>

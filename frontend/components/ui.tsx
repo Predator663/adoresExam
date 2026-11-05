@@ -17,16 +17,32 @@ export function ErrorNote({ error, retry }: { error: string; retry?: () => void 
   );
 }
 export function Bar({ value, label }: { value: number; label?: string }) {
-  const v = Math.max(0, Math.min(100, value));
+  const v = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;  // a goal with target 0 used to give NaN% and an empty bar
   return <div className="bar" role="progressbar" aria-valuenow={Math.round(v)} aria-valuemin={0} aria-valuemax={100} aria-label={label}><i style={{ width: `${v}%` }} /></div>;
 }
 export function Modal({ children, onClose, label }: { children: ReactNode; onClose?: () => void; label: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { ref.current?.focus(); }, []);
+  useEffect(() => {
+    // The page behind must not scroll while a dialog is open; focus goes into the dialog and comes back to the button that opened it.
+    const opener = document.activeElement as HTMLElement | null;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    ref.current?.focus();
+    return () => { document.body.style.overflow = prev; opener?.focus?.(); };
+  }, []);
+  const key = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") { onClose?.(); return; }
+    if (e.key !== "Tab" || !ref.current) return;  // keep Tab inside the dialog
+    const f = Array.from(ref.current.querySelectorAll<HTMLElement>("a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex='-1'])"));
+    if (!f.length) { e.preventDefault(); return; }
+    const first = f[0], last = f[f.length - 1], at = document.activeElement;
+    if (e.shiftKey && (at === first || at === ref.current)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
+  };
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={ref}
-        onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === "Escape" && onClose?.()}>
+        onClick={(e) => e.stopPropagation()} onKeyDown={key}>
         {children}
       </div>
     </div>

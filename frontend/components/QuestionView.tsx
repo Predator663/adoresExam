@@ -19,6 +19,8 @@ export function hasAnswer(q: Question, v: any): boolean {
   return v !== undefined && v !== null;
 }
 
+const KEYS = "ABCDEFGHIJ";
+
 export default function QuestionView({ q, value, onChange, disabled }: { q: Question; value: any; onChange: (v: any) => void; disabled?: boolean }) {
   const { t } = useSession();
   const c = q.content || {};
@@ -35,9 +37,10 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
 
       {q.type === "mcq_single" && (
         <div role="radiogroup" aria-label={t("choose_one")} className="options">
-          {c.options.map((o: any) => (
-            <label key={o.id} className={`opt ${value === o.id ? "on" : ""}`}>
+          {c.options.map((o: any, i: number) => (
+            <label key={o.id} className={`opt keyed ${value === o.id ? "on" : ""}`}>
               <input type="radio" name={`q${q.id}`} checked={value === o.id} disabled={disabled} onChange={() => onChange(o.id)} />
+              <span className="opt-key" aria-hidden>{KEYS[i] || i + 1}</span>
               <ItemContent item={o} />
             </label>
           ))}
@@ -47,12 +50,13 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
       {q.type === "mcq_multi" && (
         <div role="group" aria-label={t("choose_many")} className="options">
           <p className="muted small">{t("choose_many")}</p>
-          {c.options.map((o: any) => {
+          {c.options.map((o: any, i: number) => {
             const on = (value || []).includes(o.id);
             return (
-              <label key={o.id} className={`opt ${on ? "on" : ""}`}>
+              <label key={o.id} className={`opt keyed ${on ? "on" : ""}`}>
                 <input type="checkbox" checked={on} disabled={disabled}
                   onChange={() => onChange(on ? value.filter((x: string) => x !== o.id) : [...(value || []), o.id])} />
+                <span className="opt-key sq" aria-hidden>{KEYS[i] || i + 1}</span>
                 <ItemContent item={o} />
               </label>
             );

@@ -1,5 +1,7 @@
 "use client";
+import Icon from "@/components/Icon";
 import Shell from "@/components/Shell";
+import { GradeMedal, Monogram, Spark } from "@/components/student";
 import { Bar, ErrorNote, Loading, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -13,28 +15,42 @@ export default function Progress() {
   const d = a.data, p = d.projected;
   return (
     <Shell title={t("my_analytics")}>
-      {d.exams_taken === 0 ? <div className="card"><p className="muted">{t("no_results")}</p></div> : (
+      {d.exams_taken === 0 ? <div className="card sx-empty"><span className="sx-empty-ico" aria-hidden><Icon n="trend" size={26} /></span><p className="muted">{t("no_results")}</p></div> : (
         <>
+          <section className="sx-proj">
+            <p className="sx-eyebrow">{t("projected_division")}</p>
+            {p.division ? <><p className="sx-proj-big">{t("division")} {p.division}</p><p className="sx-proj-sub">{p.meaning} · {p.total_points} {t("points")}</p></>
+              : <p className="sx-proj-sub">{t("need_subjects", { n: p.subjects_needed, have: p.subjects_taken })}</p>}
+            <p className="sx-proj-note"><Icon n="info" size={15} /> {p.note}</p>
+          </section>
           <div className="card">
-            <h2>{t("projected_division")}</h2>
-            {p.division ? <p><span className="big-num">{t("division")} {p.division}</span><br /><span className="muted">{p.meaning} · {p.total_points} {t("points")}</span></p>
-              : <p className="muted">{t("need_subjects", { n: p.subjects_needed, have: p.subjects_taken })}</p>}
-            <p className="hint">ℹ {p.note}</p>
-            <div className="tbl-wrap"><table><thead><tr><th>{t("subject")}</th><th>%</th><th>{t("grade")}</th><th>{t("points")}</th></tr></thead>
-              <tbody>{p.subjects.map((r: any) => <tr key={r.subject}><td>{r.subject}{r.counted ? "" : ` (${t("not_counted")})`}</td><td>{r.average}</td><td>{r.grade}</td><td>{r.points}</td></tr>)}</tbody></table></div>
+            <h2>{t("subjects_label")}</h2>
+            <ul className="list sx-subjrows">
+              {p.subjects.map((r: any) => (
+                <li key={r.subject} className="sx-subjrow">
+                  <Monogram name={r.subject} size={38} />
+                  <span className="grow"><b>{r.subject}</b>{r.counted ? "" : <span className="muted small"> ({t("not_counted")})</span>}<br /><span className="muted small">{r.average}% · {r.points} {t("points")}</span></span>
+                  <GradeMedal grade={r.grade} size={38} />
+                </li>
+              ))}
+            </ul>
           </div>
-          {d.subjects.map((s: any) => (
-            <div key={s.subject} className="card">
-              <h2>{s.subject}</h2>
-              <p>{t("average")}: <b>{s.average}%</b> · {t("latest")}: <b>{s.latest}%</b>{s.change_from_previous !== null && <> · <b className={s.change_from_previous >= 0 ? "ok" : "no"}>{s.change_from_previous >= 0 ? "▲" : "▼"} {Math.abs(s.change_from_previous)}</b></>}</p>
-              <div className="row" role="img" aria-label={t("progress_chart")} style={{ alignItems: "flex-end", height: 90 }}>
-                {s.progress.map((h: any, i: number) => <div key={i} title={`${h.percent}%`} style={{ flex: 1, height: `${Math.max(4, h.percent)}%`, background: "var(--primary)", borderRadius: 4 }} />)}
-              </div>
-              <h3>{t("topics")}</h3>
-              {s.topics.map((x: any) => <div key={x.topic} style={{ margin: ".5rem 0" }}><div className="row"><span className="grow">{x.topic}</span><b>{Math.round(x.percent)}%</b></div><Bar value={x.percent} label={x.topic} /></div>)}
-              {s.revise?.length > 0 && <p className="hint"><b>{t("revise")}:</b> {s.revise.join(", ")}</p>}
-            </div>
-          ))}
+          <div className="sx-subjgrid">
+            {d.subjects.map((s: any) => (
+              <section key={s.subject} className="card sx-subj">
+                <div className="sx-subj-head"><Monogram name={s.subject} size={42} /><h2>{s.subject}</h2></div>
+                <div className="sx-nums">
+                  <div><span className="muted small">{t("avg_short")}</span><b>{s.average}%</b></div>
+                  <div><span className="muted small">{t("latest_short")}</span><b>{s.latest}%</b></div>
+                  {s.change_from_previous !== null && <div><span className="muted small">&nbsp;</span><b className={s.change_from_previous >= 0 ? "ok" : "no"}>{s.change_from_previous >= 0 ? "▲" : "▼"} {Math.abs(s.change_from_previous)}</b></div>}
+                </div>
+                <Spark values={s.progress.map((h: any) => h.percent)} label={t("progress_chart")} />
+                <h3>{t("topics")}</h3>
+                {s.topics.map((x: any) => <div key={x.topic} className={`sx-topic ${x.percent >= 60 ? "strong" : "weak"}`}><div className="row"><span className="grow">{x.topic}</span><b>{Math.round(x.percent)}%</b></div><Bar value={x.percent} label={x.topic} /></div>)}
+                {s.revise?.length > 0 && <p className="hint"><b>{t("revise")}:</b> {s.revise.join(", ")}</p>}
+              </section>
+            ))}
+          </div>
         </>
       )}
     </Shell>
