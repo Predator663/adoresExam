@@ -25,6 +25,8 @@ type PB = { server_time: string; exam: { id: number; title: string; status: stri
 export type AcExam = { exam_id: number; title: string; status: string; in_progress: number };
 
 const MPD = 111_320;
+/** Smallest zoom: 20 km per pixel, so students spread across the whole country (1,500 km+) still fit. It used to stop at 500 m per pixel (about 250 km across), which hid anyone further away. */
+const K_MIN = 0.00005;
 const NICE = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
 const niceStep = (target: number) => NICE.find((n) => n >= target) ?? NICE[NICE.length - 1];
 const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`);
@@ -39,29 +41,89 @@ function beep() {
   } catch { /* no sound */ }
 }
 
-/* Street, district, region, country for a position. Asked from the school server (which may ask a geocoder), cached per ~11 m cell. */
-const placeCache = new Map<string, string | null>();
-function PlaceLine({ lat, lng, prefix }: { lat?: number | null; lng?: number | null; prefix?: string }) {
-  const key = lat == null || lng == null ? "" : `${lat.toFixed(4)},${lng.toFixed(4)}`;
-  const [label, setLabel] = useState<string | null | undefined>(key ? placeCache.get(key) : null);
-  useEffect(() => {
-    if (!key) return;
-    if (placeCache.has(key)) { setLabel(placeCache.get(key)); return; }
-    setLabel(undefined);
-    let live = true, tries = 0, timer: ReturnType<typeof setTimeout>;
-    const go = async () => {
+/* ---- Street, district, region, country for a position ---------------------------------------------------------------------------
+   Asked from the school server (which may ask a geocoder), cached per ~11 m cell. Requests go one at a time, at least 1.1 s apart (the
+   server and the public geocoder allow one per second), the dots on screen first, then the rest. Nothing is asked while "Show streets" is off. */
+type Place = { street: string; area: string; district: string; region: string; country: string; label: string };
+const placeCache = new Map<string, Place | null>();
+const pkey = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
+const queued = new Set<string>(), extra = new Set<string>(), retries = new Map<string, number>(), listeners = new Set<() => void>();
+let visSet = new Set<string>(), allSet = new Set<string>(), running = false, lastCall = 0, geocoderOff = false;
+const notify = () => listeners.forEach((f) => f());
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function wantPlaces(all: string[], visible: string[]) {
+  allSet = new Set(all); visSet = new Set(visible);
+  all.forEach((k) => { if (!placeCache.has(k)) queued.add(k); });
+  void pump();
+}
+function needPlace(key: string) { extra.add(key); if (!placeCache.has(key)) queued.add(key); void pump(); }
+async function pump() {
+  if (running) return;
+  running = true;
+  try {
+    while (queued.size && !geocoderOff) {
+      const ks = [...queued], pick = ks.find((k) => visSet.has(k) || extra.has(k)) ?? ks.find((k) => allSet.has(k));
+      if (!pick) { queued.clear(); break; }  // nobody wants the rest any more (toggle off, other exam)
+      queued.delete(pick);
+      if (placeCache.has(pick)) continue;
+      const wait = lastCall + 1100 - Date.now(); if (wait > 0) await sleep(wait);
+      lastCall = Date.now();
+      const [la, ln] = pick.split(",");
       try {
-        const r = await api<{ label: string | null; enabled: boolean }>(`/proctoring/place/?lat=${key.split(",")[0]}&lng=${key.split(",")[1]}`);
-        if (r.label || !r.enabled) { placeCache.set(key, r.label || null); if (live) setLabel(r.label || null); }
-        else if (++tries < 4) timer = setTimeout(go, 1500);  // rate-limited or the service is slow: try again shortly
-        else if (live) setLabel(null);
-      } catch { if (live) setLabel(null); }
-    };
-    timer = setTimeout(go, 250);  // short delay so quickly passing the mouse over dots does not send requests
-    return () => { live = false; clearTimeout(timer); };
-  }, [key]);
-  if (label === null || !key) return null;
-  return <span className="ac-place">📍 {prefix}{label === undefined ? "Finding place name…" : label}</span>;
+        const r = await api<Place & { enabled: boolean }>(`/proctoring/place/?lat=${la}&lng=${ln}`);
+        if (!r.enabled) { geocoderOff = true; notify(); break; }
+        if (r.label) placeCache.set(pick, r);
+        else { const n = (retries.get(pick) || 0) + 1; retries.set(pick, n); if (n < 3) queued.add(pick); else placeCache.set(pick, null); }  // empty = busy or unknown: ask again a couple of times
+      } catch { placeCache.set(pick, null); }
+      notify();
+    }
+  } finally { running = false; }
+}
+function usePlaceVersion() {
+  const [v, setV] = useState(0);
+  useEffect(() => { const f = () => setV((x) => x + 1); listeners.add(f); return () => { listeners.delete(f); }; }, []);
+  return v;
+}
+const shortPlace = (p?: Place | null) => (p ? p.street || p.area || p.district || "" : "");
+const areaOf = (p?: Place | null) => (p ? [p.district || p.area, p.region].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ") : "");
+
+function PlaceLine({ lat, lng, prefix, on = true }: { lat?: number | null; lng?: number | null; prefix?: string; on?: boolean }) {
+  usePlaceVersion();
+  const key = lat == null || lng == null ? "" : pkey(lat, lng);
+  useEffect(() => { if (key && on) needPlace(key); }, [key, on]);
+  if (!on || !key || geocoderOff) return null;
+  const hit = placeCache.get(key);
+  if (hit === null) return null;
+  return <span className="ac-place">📍 {prefix}{hit === undefined ? "Finding place name…" : hit.label}</span>;
+}
+
+/** Where the students are: area, region and the streets in it, as far as the place names have arrived. Administrators only. */
+function PlaceSummary({ students }: { students: PS[] }) {
+  usePlaceVersion();
+  const live = students.filter((x) => x.fresh);
+  const groups = new Map<string, { n: number; streets: Map<string, number> }>();
+  let known = 0;
+  for (const st of live) {
+    const pl = placeCache.get(pkey(st.lat, st.lng)); if (!pl) continue;
+    known++;
+    const g = groups.get(areaOf(pl) || "Unknown area") || { n: 0, streets: new Map<string, number>() };
+    g.n++; if (pl.street) g.streets.set(pl.street, (g.streets.get(pl.street) || 0) + 1);
+    groups.set(areaOf(pl) || "Unknown area", g);
+  }
+  if (!live.length) return null;
+  const rows = [...groups.entries()].sort((a, b) => b[1].n - a[1].n);
+  return (
+    <details className="card ac-places" open={live.length <= 200}>
+      <summary><b>Where students are</b> <span className="muted small">· {known} of {live.length} named{known < live.length ? ", more arriving (about one per second)" : ""}</span></summary>
+      <ul className="list">
+        {rows.slice(0, 12).map(([area, g]) => (
+          <li key={area}><div className="row"><span className="grow">{area}</span><b>{g.n}</b></div>
+            {g.streets.size > 0 && <span className="muted small">{[...g.streets.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, c]) => `${n}${c > 1 ? ` ×${c}` : ""}`).join(" · ")}</span>}</li>
+        ))}
+      </ul>
+      {rows.length > 12 && <p className="muted small">+{rows.length - 12} more areas</p>}
+    </details>
+  );
 }
 
 const checkText = (c: Checks) => {
@@ -73,7 +135,7 @@ const checkText = (c: Checks) => {
 };
 
 /* ------------------------------------------------------------------ the plan view */
-function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { students: PS[]; alerts: PA[]; links: PL[]; threshold: number; labels: boolean; focusReq: { ids: number[]; n: number } | null }) {
+function ProxMap({ students, alerts, links, threshold, labels, streets, focusReq }: { students: PS[]; alerts: PA[]; links: PL[]; threshold: number; labels: boolean; streets: boolean; focusReq: { ids: number[]; n: number } | null }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 640, h: 440 });
   const [view, setView] = useState({ cx: 0, cy: 0, k: 1 });
@@ -107,7 +169,7 @@ function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { stu
     const minX = Math.min(...ps.map((p) => p.x)), maxX = Math.max(...ps.map((p) => p.x));
     const minY = Math.min(...ps.map((p) => p.y)), maxY = Math.max(...ps.map((p) => p.y));
     const k = Math.min((size.w * 0.78) / Math.max(maxX - minX, 60), (size.h * 0.78) / Math.max(maxY - minY, 60));
-    setView({ cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, k: Math.min(60, Math.max(0.002, k)) });
+    setView({ cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, k: Math.min(60, Math.max(K_MIN, k)) });
   }, [students, world, size]);
   useEffect(() => { if (auto) fit(); }, [auto, fit]);
 
@@ -123,7 +185,7 @@ function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { stu
   const zoom = useCallback((f: number, at?: { x: number; y: number }) => {
     setAuto(false);
     setView((v) => {
-      const k = Math.min(60, Math.max(0.002, v.k * f));
+      const k = Math.min(60, Math.max(K_MIN, v.k * f));
       if (!at) return { ...v, k };
       const wx = v.cx + (at.x - size.w / 2) / v.k, wy = v.cy + (at.y - size.h / 2) / v.k;  // keep the point under the cursor fixed
       return { cx: wx - (at.x - size.w / 2) / k, cy: wy - (at.y - size.h / 2) / k, k };
@@ -153,7 +215,7 @@ function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { stu
     const pn = pinch.current, dg = drag.current;
     if (pts.current.size === 2 && pn) {
       const [a, b] = [...pts.current.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
-      setAuto(false); setView((v) => ({ ...v, k: Math.min(60, Math.max(0.002, pn.k * (d / pn.d))) }));
+      setAuto(false); setView((v) => ({ ...v, k: Math.min(60, Math.max(K_MIN, pn.k * (d / pn.d))) }));
     } else if (dg) {
       const dx = e.clientX - dg.x, dy = e.clientY - dg.y;
       if (Math.abs(dx) + Math.abs(dy) > 3) { setAuto(false); setView((v) => ({ ...v, cx: dg.cx - dx / v.k, cy: dg.cy - dy / v.k })); }
@@ -177,6 +239,27 @@ function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { stu
   const tipPos = tipS ? { x: sx(world.get(tipS.id)!.x), y: sy(world.get(tipS.id)!.y) } : null;
   const tipAlert = tipS ? inAlert.get(tipS.id) : undefined;
   const cls = (s: PS) => (inAlert.has(s.id) ? "al" : !s.fresh ? "st" : s.poor ? "po" : s.moving ? "mv" : "ok");
+  const clusters = (() => {
+    const cell = 26, bins = new Map<string, { members: PS[]; sx: number; sy: number }>(), singles: PS[] = [];
+    for (const st of students) {
+      const w = world.get(st.id); if (!w) continue;
+      const X = sx(w.x), Y = sy(w.y);
+      if (X < -60 || Y < -60 || X > size.w + 60 || Y > size.h + 60) continue;
+      if (inAlert.has(st.id) || tip === st.id) { singles.push(st); continue; }
+      const key = `${Math.floor(X / cell)}:${Math.floor(Y / cell)}`, b = bins.get(key) || { members: [], sx: 0, sy: 0 };
+      b.members.push(st); b.sx += X; b.sy += Y; bins.set(key, b);
+    }
+    const groups: { key: string; x: number; y: number; members: PS[] }[] = [];
+    bins.forEach((b, key) => { if (b.members.length === 1) singles.push(b.members[0]); else groups.push({ key, x: b.sx / b.members.length, y: b.sy / b.members.length, members: b.members }); });
+    return { groups, singles };
+  })();
+  usePlaceVersion();
+  const sig = streets ? clusters.singles.map((x) => x.id).join(",") + "|" + clusters.groups.map((g) => g.key).join(",") : "";
+  useEffect(() => {  // ask for street names: what is on screen first, then everyone else
+    if (!streets) { allSet = new Set(); visSet = new Set(); return; }
+    const pos = (x: PS) => pkey(x.lat, x.lng);
+    wantPlaces(students.filter((x) => x.fresh).map(pos), [...clusters.singles, ...clusters.groups.flatMap((g) => g.members.slice(0, 3))].map(pos));
+  }, [streets, sig, students.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="ac-map" ref={box}>
@@ -213,9 +296,26 @@ function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { stu
             </g>
           );
         })}
-        {students.map((s) => {
+        {clusters.groups.map((g) => {
+          // Students whose dots would overlap at this zoom become one bubble with a count; click it to zoom in. Alerts are never merged.
+          const cs = g.members.map(cls), c = cs.includes("po") ? "po" : cs.includes("mv") ? "mv" : cs.every((x) => x === "st") ? "st" : "ok";
+          const names = g.members.map((m) => m.name).slice(0, 8).join(", ") + (g.members.length > 8 ? ` +${g.members.length - 8} more` : "");
+          const zoomTo = () => {
+            const ws = g.members.map((m) => world.get(m.id)!), span = Math.max(Math.max(...ws.map((q) => q.x)) - Math.min(...ws.map((q) => q.x)), Math.max(...ws.map((q) => q.y)) - Math.min(...ws.map((q) => q.y)), 20);
+            setAuto(false); setView({ cx: ws.reduce((a, q) => a + q.x, 0) / ws.length, cy: ws.reduce((a, q) => a + q.y, 0) / ws.length, k: Math.min(60, Math.max(view.k * 1.8, (Math.min(size.w, size.h) * 0.55) / span)) });
+          };
+          return (
+            <g key={"c" + g.key} className={`ac-pt cl ${c}`} transform={`translate(${g.x} ${g.y})`} tabIndex={0} role="button" aria-label={`${g.members.length} students close together on the map: ${names}. Press to zoom in.`}
+              onPointerDown={(e) => e.stopPropagation()} onClick={zoomTo} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && zoomTo()}>
+              <title>{names}</title>
+              <circle className="ac-dot" r={Math.min(22, 12 + g.members.length / 2)} />
+              <text className="ac-ini" textAnchor="middle" dy=".35em">{g.members.length}</text>
+              {streets && (() => { const t = g.members.map((m) => placeCache.get(pkey(m.lat, m.lng))).map((pl) => (g.members.length > 4 ? (pl?.district || pl?.area || "") : shortPlace(pl))).find(Boolean); return t ? <text className="ac-name ac-street" y={Math.min(22, 12 + g.members.length / 2) + 14} textAnchor="middle">{t}</text> : null; })()}
+            </g>
+          );
+        })}
+        {clusters.singles.map((s) => {
           const w = world.get(s.id)!, X = sx(w.x), Y = sy(w.y);
-          if (X < -60 || Y < -60 || X > size.w + 60 || Y > size.h + 60) return null;
           const c = cls(s), moving = s.moving && s.fresh;
           return (
             <g key={s.id} className={`ac-pt ${c}`} transform={`translate(${X} ${Y})`} tabIndex={0} role="button"
@@ -230,6 +330,7 @@ function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { stu
               <circle className="ac-dot" r={9} />
               <text className="ac-ini" textAnchor="middle" dy=".35em">{s.name.trim().charAt(0).toUpperCase()}</text>
               {labels && <text className="ac-name" y={24} textAnchor="middle">{s.name}</text>}
+              {streets && shortPlace(placeCache.get(pkey(s.lat, s.lng))) && <text className="ac-name ac-street" y={labels ? 37 : 24} textAnchor="middle">{shortPlace(placeCache.get(pkey(s.lat, s.lng)))}</text>}
             </g>
           );
         })}
@@ -258,7 +359,7 @@ function ProxMap({ students, alerts, links, threshold, labels, focusReq }: { stu
             {other && <span className="al">⚠ {fmtDist(tipAlert!.distance_m)} from {other.name}</span>}
             {relOf.get(tipS.id) && <span className="rel">👥 {relOf.get(tipS.id)!.label}: {fmtDist(relOf.get(tipS.id)!.distance_m)} from {students.find((x) => x.id === (relOf.get(tipS.id)!.a === tipS.id ? relOf.get(tipS.id)!.b : relOf.get(tipS.id)!.a))?.name ?? "a relative"}, not locked</span>}
             <span className={c.bad ? "al" : "dim"}>{c.loc} · {c.ble} · {c.net} · {c.mo}</span>
-            <PlaceLine lat={tipS.lat} lng={tipS.lng} prefix="Near " />
+            <PlaceLine lat={tipS.lat} lng={tipS.lng} prefix="Near " on={streets} />
             <span className="dim">Updated {tipS.age_s}s ago</span>
           </div>
         );
@@ -274,6 +375,10 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
   const [data, setData] = useState<PB | null>(null);
   const [err, setErr] = useState("");
   const [labels, setLabels] = useState(true);
+  const [streets, setStreets] = useState(true);
+  useEffect(() => { try { const v = localStorage.getItem("ac_streets"); if (v !== null) setStreets(v === "1"); } catch { /* ignore */ } }, []);
+  const toggleStreets = (on: boolean) => { setStreets(on); try { localStorage.setItem("ac_streets", on ? "1" : "0"); } catch { /* ignore */ } };
+  usePlaceVersion();
   const [focus, setFocus] = useState<{ ids: number[]; n: number } | null>(null);
   const seen = useRef<Set<number> | null>(null);
   const busy = useRef(false);
@@ -339,6 +444,7 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
           {data?.lock_enabled && <span className={locked.length ? "ac-bad" : ""}><b>{data ? locked.length * 2 : "–"}</b><small>locked</small></span>}
         </div>
         <label className="ac-chk"><input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} /> Show names</label>
+        <label className="ac-chk" title={geocoderOff ? "Place names are switched off on the server (GEOCODER_URL is empty)." : "Street, area and region names next to each student. While this is on, rounded positions (no names) are sent to the geocoder; off sends nothing."}><input type="checkbox" checked={streets && !geocoderOff} disabled={geocoderOff} onChange={(e) => toggleStreets(e.target.checked)} /> Show streets</label>
       </div>
       {err && <p className="lb-alert" role="alert">{err} Retrying…</p>}
       {data && !data.enabled && <p className="lb-alert">Location monitoring is switched off on the server (PROCTORING_ENABLED=0).</p>}
@@ -352,7 +458,8 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
       )}
       <div className="ac-grid2">
         <div>
-          <ProxMap students={data?.students ?? []} alerts={data?.alerts ?? []} links={data?.links ?? []} threshold={data?.alert_meters ?? 20} labels={labels} focusReq={focus} />
+          <ProxMap students={data?.students ?? []} alerts={data?.alerts ?? []} links={data?.links ?? []} threshold={data?.alert_meters ?? 20} labels={labels} streets={streets && !geocoderOff} focusReq={focus} />
+          {streets && !geocoderOff && <PlaceSummary students={data?.students ?? []} />}
           <p className="ac-legend" aria-hidden="true">
             <span><i className="d ok" />still</span><span><i className="d mv" />moving</span><span><i className="d al" />too close</span><span><i className="d po" />rough position</span><span><i className="d st" />no recent update</span>
           </p>
@@ -365,7 +472,7 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
                 <li key={a.id} className={a.active ? "on" : "off"}>
                   <div><b>{a.a.name}</b> &amp; <b>{a.b.name}</b>{a.locked && <span className="ac-lock-tag"> 🔒 locked</span>}</div>
                   <small>{a.active ? `${fmtDist(a.distance_m)} apart now` : `ended · closest ${fmtDist(a.min_distance_m)}`} · since {hhmm(a.first_seen)} · {a.confidence === "confirmed" ? "precise" : "rough position, check"}</small>
-                  {a.active && <PlaceLine lat={a.lat} lng={a.lng} prefix="Near " />}
+                  {a.active && <PlaceLine lat={a.lat} lng={a.lng} prefix="Near " on={streets} />}
                   <div className="ac-act">
                     {a.active && <button className="btn" onClick={() => setFocus({ ids: [a.a.id, a.b.id], n: Date.now() })}>Locate</button>}
                     {a.locked && <button className="btn primary" onClick={() => unlock(a.id)}>{a.active ? "Unlock (still close)" : "Unlock"}</button>}
