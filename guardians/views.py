@@ -97,6 +97,7 @@ def guardian_detail(request, pk):
         audit(request.user, "guardian.delete", pk)
         return Response(status=204)
     d = request.data
+    phone_changed = False
     if "name" in d:
         name = services._clean_name(d["name"])
         if not name:
@@ -109,7 +110,11 @@ def guardian_detail(request, pk):
         other = Guardian.objects.filter(phone_idx=crypto.blind_index(phone)).exclude(pk=g.pk).exists()
         if other:
             return _err("Another parent already has this phone number.", 409)
+        phone_changed = crypto.blind_index(phone) != g.phone_idx
         g.set_phone(phone)
+        if phone_changed:
+            # a message still waiting must go to the corrected number, not the old one (one already being sent cannot be called back)
+            SmsJob.objects.filter(guardian=g, status=SmsJob.QUEUED).update(to_enc=g.phone_enc)
     if "relationship" in d:
         g.relationship = services._clean_name(d["relationship"])[:30]
     if "has_whatsapp" in d:
@@ -117,8 +122,8 @@ def guardian_detail(request, pk):
     if d.get("language") in ("sw", "en"):
         g.language = d["language"]
     g.save()
-    audit(request.user, "guardian.edit", pk)
-    return Response(_row(g, g.jobs.order_by("-id").first()))
+    audit(request.user, "guardian.edit", pk, phone_changed=phone_changed)
+    return Response({**_row(g, g.jobs.order_by("-id").first()), "phone_changed": phone_changed})
 
 
 @api_view(["GET"])
@@ -214,6 +219,9 @@ def send(request):
     if scope == "class" and not d.get("class_id"):
         return _err("Choose a class.")
     resend = d.get("resend") is True
+    include_sent = d.get("include_sent") is True  # "the message never arrived": send again to children who have NOT logged in yet
+    if scope == "selected" and not d.get("guardian_ids"):
+        return _err("Choose at least one parent.")
     login = d.get("include_login") is not False  # unticked in the app = a custom message only
     note = services.clean_note(d.get("note"))
     limit = services.NOTE_MAX if login else services.CUSTOM_MAX
@@ -225,7 +233,7 @@ def send(request):
             templates = services.check_templates(d)
         except ValueError as e:
             return _err(str(e))
-        items, skipped = services.plan_send(scope, d.get("class_id"), d.get("guardian_ids"), resend)
+        items, skipped = services.plan_send(scope, d.get("class_id"), d.get("guardian_ids"), resend, include_sent)
     else:
         if not note:
             return _err("Write the message to send. With 'include login details' unticked, only your own text is sent.")
@@ -238,8 +246,8 @@ def send(request):
         return Response({"dry_run": True, **info})
     if login and not cfg.public_url.strip():
         return _err("First write the school's web address in the Phone tab. It goes into every message.")
-    n = services.queue_send(items, request.user, note, templates) if login else services.queue_custom(items, request.user, note)
-    audit(request.user, "sms.queue", n, scope=scope, resend=resend, students=info["students"], custom_note=bool(note),
+    n = services.queue_send(items, request.user, note, templates, supersede=resend or include_sent) if login else services.queue_custom(items, request.user, note)
+    audit(request.user, "sms.queue", n, scope=scope, resend=resend, include_sent=include_sent, students=info["students"], custom_note=bool(note),
           login=login, edited_wording=any(templates.values()))
     return Response({"dry_run": False, "queued": n, **info}, status=201)
 
@@ -252,7 +260,11 @@ def jobs(request):
     if p.get("status"):
         qs = qs.filter(status=p["status"])
     def row(j):
-        return {"id": j.pk, "parent": j.guardian.name if j.guardian else "(deleted)", "phone": mask(crypto.decrypt(j.to_enc)),
+        sent_raw = crypto.decrypt(j.to_enc)
+        sent_to, now_raw = mask(sent_raw), (j.guardian.phone if j.guardian else "")
+        now_phone = mask(now_raw) if now_raw else ""
+        return {"id": j.pk, "guardian_id": j.guardian_id, "parent": j.guardian.name if j.guardian else "(deleted)", "phone": sent_to,
+                "current_phone": now_phone, "old_number": bool(now_raw and now_raw != sent_raw),
                 "summary": j.summary, "note": j.note, "login": j.login, "status": j.status, "error": j.error, "attempts": j.attempts,
                 "whatsapp": bool(j.guardian and j.guardian.has_whatsapp), "created_at": j.created_at, "sent_at": j.sent_at,
                 "phone_name": j.device.name if j.device else ""}

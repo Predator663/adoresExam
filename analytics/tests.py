@@ -166,3 +166,81 @@ class StudentAnalyticsTests(AnalyticsBase):
         d = self.client_for(self.amina).get("/api/student/report-card/").json()
         self.assertTrue(d["is_projection"])
         self.assertEqual(d["subjects_needed"], 7)
+
+
+class LoginActivityTests(AnalyticsBase):
+    """Login activity (admin only) is built from the audit log's "login" entries."""
+
+    def setUp(self):
+        super().setUp()
+        from core.models import AuditLog
+        self.AuditLog = AuditLog
+        self.a = self.client_for(self.admin)
+        self.today = timezone.now().astimezone(__import__("zoneinfo").ZoneInfo("Africa/Dar_es_Salaam")).replace(hour=10, minute=0, second=0, microsecond=0)
+
+    def login_at(self, user, days_ago, hour=10, n=1):
+        for _ in range(n):
+            row = self.AuditLog.objects.create(actor=user, action="login", target=str(user.pk))
+            self.AuditLog.objects.filter(pk=row.pk).update(created_at=(self.today - timedelta(days=days_ago)).replace(hour=hour))
+
+    def test_only_admins_can_see_it(self):
+        for who in (self.teacher, self.amina):
+            c = self.client_for(who)
+            for url in ("/api/analytics/logins/", "/api/analytics/logins/students/", f"/api/analytics/logins/students/{self.amina.pk}/"):
+                self.assertIn(c.get(url).status_code, (401, 403), url)
+
+    def test_overview_counts_days_students_hours_and_bands(self):
+        self.login_at(self.amina, 0, hour=8, n=2)   # two logins today count as ONE active day, TWO logins
+        self.login_at(self.amina, 3, hour=8)
+        self.login_at(self.zawadi, 1, hour=15)
+        self.AuditLog.objects.create(actor=self.teacher, action="login")  # staff logins are not student activity
+        d = self.a.get("/api/analytics/logins/?days=7").json()
+        self.assertEqual((d["students"], d["active_students"], d["never"], d["logins"]), (2, 2, 0, 4))
+        self.assertEqual(len(d["daily"]), 7)
+        self.assertEqual((d["daily"][-1]["logins"], d["daily"][-1]["students"]), (2, 1))
+        self.assertEqual((d["hours"][8], d["hours"][15], sum(d["hours"])), (3, 1, 4))
+        self.assertEqual(sum(d["weekdays"]), 4)
+        bands = {b["label"]: b["count"] for b in d["bands"]}
+        self.assertEqual((bands["Never"], bands["1 day"], bands["2 to 3 days"]), (0, 1, 1))  # Zawadi 1 day, Amina 2 days
+
+    def test_old_logins_fall_outside_the_period_and_a_student_with_none_is_listed_as_never(self):
+        self.login_at(self.amina, 40)
+        d = self.a.get("/api/analytics/logins/?days=30").json()
+        self.assertEqual((d["active_students"], d["never"], d["logins"]), (0, 2, 0))
+        self.assertEqual(self.a.get("/api/analytics/logins/?days=90").json()["active_students"], 1)
+
+    def test_class_filter_and_bad_input(self):
+        self.login_at(self.amina, 0)
+        self.login_at(self.zawadi, 0)
+        d = self.a.get(f"/api/analytics/logins/?class={self.cls_a.pk}").json()
+        self.assertEqual((d["students"], d["logins"]), (1, 1))
+        for q in ("days=0", "days=999", "days=abc", "class=x"):
+            self.assertEqual(self.a.get("/api/analytics/logins/?" + q).status_code, 400, q)
+
+    def test_student_list_sorts_searches_and_pages(self):
+        self.login_at(self.amina, 0)
+        self.login_at(self.amina, 2)
+        self.login_at(self.zawadi, 5)
+        rows = self.a.get("/api/analytics/logins/students/?days=30").json()
+        self.assertEqual([r["name"] for r in rows], ["Zawadi Test", "Amina Test"])  # least active first
+        self.assertEqual((rows[1]["active_days"], rows[1]["logins"], rows[1]["days_since"]), (2, 2, 0))
+        self.assertEqual(rows[0]["days_since"], 5)
+        self.assertEqual(self.a.get("/api/analytics/logins/students/?sort=most").json()[0]["name"], "Amina Test")
+        self.assertEqual(self.a.get("/api/analytics/logins/students/?sort=recent").json()[0]["name"], "Amina Test")
+        self.assertEqual(len(self.a.get("/api/analytics/logins/students/?q=zaw").json()), 1)
+        self.assertEqual(self.a.get("/api/analytics/logins/students/?sort=nope").status_code, 400)
+        p = self.a.get("/api/analytics/logins/students/?page=1&page_size=1").json()
+        self.assertEqual((p["count"], len(p["results"])), (2, 1))
+
+    def test_a_student_who_never_logged_in_has_no_last_login(self):
+        rows = {r["name"]: r for r in self.a.get("/api/analytics/logins/students/").json()}
+        self.assertEqual((rows["Amina Test"]["active_days"], rows["Amina Test"]["last_login"], rows["Amina Test"]["days_since"]), (0, None, None))
+
+    def test_one_student_history_and_longest_break(self):
+        self.login_at(self.amina, 0, hour=7)
+        self.login_at(self.amina, 6, hour=7)
+        self.login_at(self.amina, 20)  # before the 10 day window, but it is her last login before that
+        d = self.a.get(f"/api/analytics/logins/students/{self.amina.pk}/?days=10").json()
+        self.assertEqual((len(d["daily"]), d["active_days"], d["logins"], d["longest_gap_days"]), (10, 2, 2, 5))  # days 5..1 ago are empty
+        self.assertEqual((d["daily"][-1]["logins"], d["hours"][7], d["days_since"]), (1, 2, 0))
+        self.assertEqual(self.a.get(f"/api/analytics/logins/students/{self.teacher.pk}/").status_code, 404)  # students only

@@ -412,3 +412,78 @@ class EditableMessageTests(GuardianBase):
         j.refresh_from_db()
         self.assertEqual((j.status, self.body(j)), (SmsJob.QUEUED, "Hello"))
         self.assertFalse(self.a.get("/api/guardians/jobs/").json()[0]["login"])
+
+
+class ResendTests(GuardianBase):
+    """A login SMS that never reached the parent (wrong number, phone off): fix the number and send it again to chosen parents."""
+
+    def setUp(self):
+        super().setUp()
+        self.load()
+        self.a.post("/api/guardians/send/", {"scope": "all", "dry_run": False}, format="json")
+        self.mama = [g for g in Guardian.objects.all() if g.name == "Mama Amina"][0]  # only parent of S100 with this number
+        SmsJob.objects.update(status=SmsJob.SENT, body_enc="", sent_at=timezone.now())  # the phone says "sent", the parent never got it
+
+    def resend(self, ids, **kw):
+        return self.a.post("/api/guardians/send/", {"scope": "selected", "guardian_ids": ids, "include_sent": True, **kw}, format="json")
+
+    def test_without_the_option_an_already_sent_child_is_skipped(self):
+        r = self.a.post("/api/guardians/send/", {"scope": "selected", "guardian_ids": [self.mama.pk]}, format="json").json()
+        self.assertEqual((r["messages"], r["skipped"]["already_sent"]), (0, 1))
+
+    def test_fixing_the_number_then_resending_reaches_the_new_number_with_a_new_working_password(self):
+        r = self.a.patch(f"/api/guardians/{self.mama.pk}/", {"phone": "0699111222"}, format="json")
+        self.assertEqual((r.status_code, r.json()["phone_changed"]), (200, True))
+        self.assertFalse(self.a.patch(f"/api/guardians/{self.mama.pk}/", {"name": "Mama Amina"}, format="json").json()["phone_changed"])
+        old_pw = User.objects.get(pk=self.amina.pk).password
+        d = self.resend([self.mama.pk]).json()
+        self.assertEqual((d["dry_run"], d["messages"], d["students"]), (True, 1, 1))
+        self.assertEqual(User.objects.get(pk=self.amina.pk).password, old_pw)  # checking changes nothing
+        r = self.resend([self.mama.pk], dry_run=False)
+        self.assertEqual((r.status_code, r.json()["queued"]), (201, 1))
+        job = SmsJob.objects.filter(status=SmsJob.QUEUED).get()
+        self.assertEqual(crypto.decrypt(job.to_enc), "+255699111222")
+        pw = [l for l in crypto.decrypt(job.body_enc).split("\n") if self.amina.username in l][0].split("password ")[1].strip().rstrip(",")
+        self.amina.refresh_from_db()
+        self.assertTrue(self.amina.check_password(pw))
+        self.assertTrue(AuditLog.objects.filter(action="sms.queue").exists())
+
+    def test_a_child_who_has_already_logged_in_is_never_given_a_new_password(self):
+        User.objects.filter(pk=self.amina.pk).update(must_change_password=False)
+        before = User.objects.get(pk=self.amina.pk).password
+        d = self.resend([self.mama.pk]).json()
+        self.assertEqual((d["messages"], d["skipped"]["already_logged_in"]), (0, 1))
+        self.resend([self.mama.pk], dry_run=False)
+        self.assertEqual(User.objects.get(pk=self.amina.pk).password, before)
+
+    def test_several_parents_at_once_and_a_parent_with_two_children(self):
+        baba = [g for g in Guardian.objects.all() if g.name == "Baba Zawadi"][0]
+        d = self.resend([self.mama.pk, baba.pk]).json()
+        self.assertEqual((d["messages"], d["students"]), (2, 3))
+
+    def test_choosing_nobody_is_refused(self):
+        self.assertEqual(self.resend([]).status_code, 400)
+
+    def test_a_message_still_waiting_moves_to_the_corrected_number(self):
+        SmsJob.objects.all().update(status=SmsJob.QUEUED)
+        self.a.patch(f"/api/guardians/{self.mama.pk}/", {"phone": "0699111222"}, format="json")
+        j = SmsJob.objects.filter(guardian=self.mama).get()
+        self.assertEqual(crypto.decrypt(j.to_enc), "+255699111222")
+
+    def test_retry_of_a_failed_message_goes_to_the_new_number_not_the_old_one(self):
+        j = SmsJob.objects.filter(guardian=self.mama).get()
+        SmsJob.objects.filter(pk=j.pk).update(status=SmsJob.FAILED, error="x")
+        self.a.patch(f"/api/guardians/{self.mama.pk}/", {"phone": "0699111222"}, format="json")
+        row = [x for x in self.a.get("/api/guardians/jobs/").json() if x["id"] == j.pk][0]
+        self.assertTrue(row["old_number"])
+        self.assertEqual(self.a.post(f"/api/guardians/jobs/{j.pk}/retry/").json()["requeued"], 1)
+        j.refresh_from_db()
+        self.assertEqual(crypto.decrypt(j.to_enc), "+255699111222")
+
+    def test_resend_cancels_the_old_waiting_message_so_it_cannot_reach_the_old_number(self):
+        SmsJob.objects.filter(guardian=self.mama).update(status=SmsJob.QUEUED, body_enc=crypto.encrypt("old text"))
+        old = SmsJob.objects.filter(guardian=self.mama).get()
+        self.resend([self.mama.pk], dry_run=False)
+        old.refresh_from_db()
+        self.assertEqual((old.status, old.body_enc), (SmsJob.CANCELLED, ""))
+        self.assertEqual(SmsJob.objects.filter(guardian=self.mama, status=SmsJob.QUEUED).count(), 1)

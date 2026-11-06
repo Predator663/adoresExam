@@ -405,10 +405,12 @@ def _display(u):
     return f"{u.first_name} {u.last_name}".strip() or u.username
 
 
-def plan_send(scope="all", class_id=None, guardian_ids=None, resend=False):
+def plan_send(scope="all", class_id=None, guardian_ids=None, resend=False, include_sent=False):
     """Decide who gets a message. Returns (items, skipped) and changes nothing.
     items = [(guardian, [students])]. A student gets credentials only while she has not yet changed her password
-    (unless resend), and not if a message for her is already queued or sent (unless resend)."""
+    (unless resend), and not if a message for her is already queued or sent (unless resend).
+    include_sent is the safe "the message never reached the parent" option: children who were already sent a message are included
+    again, but a child who has already logged in is STILL skipped, so nobody is locked out by a new password."""
     gq = Guardian.objects.all().prefetch_related("links__student__school_class")
     if scope == "selected":
         gq = gq.filter(pk__in=guardian_ids or [])
@@ -428,7 +430,7 @@ def plan_send(scope="all", class_id=None, guardian_ids=None, resend=False):
                 continue
             elif not resend and not s.must_change_password:
                 skipped["already_logged_in"] += 1
-            elif not resend and s.pk in busy:
+            elif not resend and not include_sent and s.pk in busy:
                 skipped["already_sent"] += 1
             else:
                 kids.append(s)
@@ -469,12 +471,17 @@ def queue_custom(items, user, text):
 
 
 @transaction.atomic
-def queue_send(items, user, note="", templates=None):
-    """Give each listed student a fresh random password and queue ONE message per parent."""
+def queue_send(items, user, note="", templates=None, supersede=False):
+    """Give each listed student a fresh random password and queue ONE message per parent.
+    supersede=True (a resend): this parent's login messages that are still waiting in the queue are cancelled, because the new
+    password makes the old text useless and it must not reach the old number."""
     templates = templates or {}
     cfg = SmsConfig.load()
     jobs, passwords = 0, {}  # a student with two parents gets ONE password, so both messages work
     for g, kids in items:
+        if supersede:
+            SmsJob.objects.filter(guardian=g, login=True, status=SmsJob.QUEUED).update(
+                status=SmsJob.CANCELLED, body_enc="", error="Replaced by a newer message.")
         pairs = []
         for s in kids:
             if s.pk not in passwords:
@@ -499,6 +506,8 @@ def requeue(job, user=None):
     """Try a failed message again. If its text was already erased (it had been sent), make a new one with new passwords."""
     if job.status not in (SmsJob.FAILED, SmsJob.CANCELLED):
         return False
+    if job.guardian:
+        job.to_enc = job.guardian.phone_enc  # the parent's number may have been corrected since: never retry to the old one
     if not job.login:  # a custom message holds no passwords: simply put the same text back in the queue
         if not job.body_enc:
             job.body_enc = crypto.encrypt(job.template or job.note)

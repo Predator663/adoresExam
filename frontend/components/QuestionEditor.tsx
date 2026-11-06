@@ -2,9 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import QuestionView from "./QuestionView";
 import RichEditor, { uploadImage } from "./RichEditor";
+import SymbolPad from "./SymbolPad";
 import { ErrorNote, Loading, useLoad } from "./ui";
 import { api, mediaUrl } from "@/lib/api";
-import { errorLines, esc, plain, QTYPES, uid, unesc } from "@/lib/staff";
+import { errorLines, plain, QTYPES, uid } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 import type { Question } from "@/lib/types";
 
@@ -21,7 +22,7 @@ export const fresh = (): S => ({ subject: "", form_level: 1, topic: "", subtopic
 const fromApi = (q: any): S => {
   const s = fresh();
   Object.assign(s, { subject: String(q.subject), form_level: q.form_level, topic: q.topic, subtopic: q.subtopic, difficulty: q.difficulty, marks: q.marks, language: q.language, qtype: q.qtype, practice_eligible: q.practice_eligible, prompt: q.prompt, explanation: q.explanation });
-  const dec = (l: any[]) => l.map((o) => ({ id: o.id, text: unesc(o.text || ""), image: o.image || null, alt_text: o.alt_text || "" }));
+  const dec = (l: any[]) => l.map((o) => ({ id: o.id, text: o.text || "", image: o.image || null, alt_text: o.alt_text || "" }));
   if (q.content?.options) s.options = dec(q.content.options);
   if (q.content?.left) { s.left = dec(q.content.left); s.right = dec(q.content.right); s.pairs = q.answer.pairs; }
   if (q.content?.items) s.items = dec(q.content.items);
@@ -30,7 +31,7 @@ const fromApi = (q: any): S => {
   if (q.qtype === "fill_blank") { s.accepted = (q.answer.accepted || []).join("\n"); if (q.answer.numeric) { s.numValue = String(q.answer.numeric.value); s.numTol = String(q.answer.numeric.tolerance); } }
   return s;
 };
-const enc = (l: Item[]) => l.map((o) => ({ id: o.id, text: esc(o.text), image: o.image, alt_text: o.alt_text }));
+const enc = (l: Item[]) => l.map((o) => ({ id: o.id, text: o.text, image: o.image, alt_text: o.alt_text }));
 
 export function build(s: S) {
   let content: any = {}, answer: any = {};
@@ -54,9 +55,10 @@ export function ItemRow({ it, onChange, onRemove, extra, label, canRemove }: { i
   }
   return (
     <div className="card" style={{ padding: ".6rem" }}>
-      <div className="row">
+      <div className="row" style={{ alignItems: "flex-start" }}>
         {extra}
-        <input className="input grow" aria-label={label} value={it.text} onChange={(e) => onChange({ ...it, text: e.target.value })} />
+        {/* answers can hold symbols, powers, subscripts, fractions, roots and chemical formulas (the server cleans the HTML) */}
+        <RichEditor compact label={label} value={it.text} onChange={(h) => onChange({ ...it, text: h })} />
         {canRemove && <button type="button" className="btn danger icon" aria-label={`Remove ${label}`} onClick={onRemove}>✕</button>}
       </div>
       <div className="row" style={{ marginTop: ".4rem" }}>
@@ -80,7 +82,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
   const existing = useLoad(() => (id ? api<any>(`/questions/${id}/`) : Promise.resolve(null)), [id]);
   const [s, setS] = useState<S>(() => ({ ...fresh(), subject: subject ? String(subject) : "" })), [status, setStatus] = useState("draft"), [errs, setErrs] = useState<string[]>([]), [msg, setMsg] = useState(""), [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<S | null>(null), [similar, setSimilar] = useState<any[]>([]), [cid, setCid] = useState<number | null>(id), [view, setView] = useState<"phone" | "computer">("phone");
-  const key = `amani_qdraft_${id || "new"}`, loaded = useRef(false);
+  const key = `amani_qdraft_${id || "new"}`, loaded = useRef(false), accRef = useRef<HTMLTextAreaElement>(null);
   const up = (p: Partial<S>) => setS((x) => ({ ...x, ...p }));
 
   useEffect(() => {
@@ -184,7 +186,8 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
       {s.qtype === "true_false" && <div className="row2" role="radiogroup" aria-label="Correct answer">{[true, false].map((b) => <label key={String(b)} className={`opt center-text ${s.tf === b ? "on" : ""}`}><input type="radio" name="tf" checked={s.tf === b} onChange={() => up({ tf: b })} />{b ? "The statement is TRUE" : "The statement is FALSE"}</label>)}</div>}
       {s.qtype === "fill_blank" && (
         <div className="card">
-          <label className="field"><span>Accepted answers (one per line; capital letters and extra spaces are ignored)</span><textarea className="input" rows={3} value={s.accepted} onChange={(e) => up({ accepted: e.target.value })} /></label>
+          <label className="field"><span>Accepted answers (one per line; capital letters and extra spaces are ignored)</span><textarea ref={accRef} className="input" rows={3} value={s.accepted} onChange={(e) => up({ accepted: e.target.value })} /></label>
+          <div className="row" style={{ marginBottom: ".5rem" }}><SymbolPad target={accRef} value={s.accepted} onChange={(v) => up({ accepted: v })} /><span className="muted small">Symbols such as π, °, ² are typed as plain characters. Students get a symbols button too.</span></div>
           <div className="grid2"><label className="field"><span>Numeric answer (optional)</span><input className="input" inputMode="decimal" value={s.numValue} onChange={(e) => up({ numValue: e.target.value })} /></label>
             <label className="field"><span>Allowed difference (±)</span><input className="input" inputMode="decimal" value={s.numTol} onChange={(e) => up({ numTol: e.target.value })} /></label></div>
         </div>
@@ -197,9 +200,9 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
           <h3>Right side</h3>{listEditor("right", 2, Infinity, "Right item")}
           <h3>Correct matches</h3>
           {s.left.map((l, i) => (
-            <div key={l.id} className="match-row"><span>{l.text || l.alt_text || `Left ${i + 1}`}</span>
+            <div key={l.id} className="match-row"><span>{plain(l.text) || l.alt_text || `Left ${i + 1}`}</span>
               <select className="input" aria-label={`Match for left item ${i + 1}`} value={s.pairs[l.id] || ""} onChange={(e) => up({ pairs: { ...s.pairs, [l.id]: e.target.value } })}>
-                <option value="">Choose…</option>{s.right.map((r, j) => <option key={r.id} value={r.id}>{r.text || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>))}
+                <option value="">Choose…</option>{s.right.map((r, j) => <option key={r.id} value={r.id}>{plain(r.text) || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>))}
         </>
       )}
 

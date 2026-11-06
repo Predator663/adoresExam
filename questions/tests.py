@@ -22,6 +22,23 @@ class QuestionValidationTests(TestCase):
         c, _ = validate_question("mcq_single", content, {"correct": "a"})
         self.assertNotIn("<script>", c["options"][0]["text"])
 
+    def test_answers_keep_symbols_powers_and_formulas_but_lose_anything_unsafe(self):
+        frac = '<span class="formula" data-formula="1/2"><sup>1</sup>\u2044<sub>2</sub></span>'
+        content = {"options": [{"id": "a", "text": "x<sup>2</sup> + 3\u03c0 \u2264 5\u00b0 " + frac + " H<sub>2</sub>O"},
+                               {"id": "b", "text": "a &lt; b <script>alert(1)</script><span onclick=\"x()\" class=\"formula\">y</span>"}]}
+        c, _ = validate_question("mcq_single", content, {"correct": "a"})
+        a_text, b_text = c["options"][0]["text"], c["options"][1]["text"]
+        for keep in ("<sup>2</sup>", "\u03c0", "\u2264", "\u00b0", 'data-formula="1/2"', "H<sub>2</sub>O"):
+            self.assertIn(keep, a_text)
+        self.assertIn("&lt;", b_text)  # a typed "<" stays text
+        self.assertNotIn("<script>", b_text)
+        self.assertNotIn("onclick", b_text)
+
+    def test_matching_and_ordering_items_keep_formulas_too(self):
+        items = [{"id": "1", "text": "m<sup>2</sup>"}, {"id": "2", "text": "\u221a(x)"}]
+        c, _ = validate_question("ordering", {"items": items}, {})
+        self.assertEqual([i["text"] for i in c["items"]], ["m<sup>2</sup>", "\u221a(x)"])
+
     def test_ordering_answer_derived_from_authored_order(self):
         items = [{"id": "1", "text": "first"}, {"id": "2", "text": "second"}]
         _, a = validate_question("ordering", {"items": items}, {})

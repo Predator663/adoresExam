@@ -2,10 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api, API } from "@/lib/api";
 import { Modal } from "./ui";
+import { SYMBOLS } from "./SymbolPad";
 
 /** QB-05: bold, italic, underline, lists, superscript/subscript, special characters, formulas and chemical formulas, images. */
-const SYMBOLS = "° ± × ÷ = ≠ ≈ ≤ ≥ < > π √ ∞ ∑ ∆ θ α β γ λ μ Ω ² ³ ½ ¼ ¾ → ← ⇌ ↑ ↓ ∠ ⊥ ∥ ∴ ∈ ∪ ∩ ‰ £ €".split(" ");
-
 export async function uploadImage(file: File, alt: string): Promise<{ url: string; alt_text: string }> {
   const fd = new FormData();
   fd.append("image", file); fd.append("alt_text", alt);
@@ -62,12 +61,17 @@ function ImageDialog({ onInsert, onClose }: { onInsert: (html: string) => void; 
   );
 }
 
-export default function RichEditor({ value, onChange, label, minRows = 4 }: { value: string; onChange: (html: string) => void; label: string; minRows?: number }) {
+/** An editor with only "<br>" or empty tags in it has no real content. */
+const isEmptyHtml = (h: string) => !/<(img|sup|sub|span)\b/i.test(h) && h.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
+
+/** `compact` = the small version used for one answer option, matching item or ordering item: one line, only superscript, subscript,
+ *  symbols and formulas (no lists or pictures; a picture has its own button on the answer row). */
+export default function RichEditor({ value, onChange, label, minRows = 4, compact = false }: { value: string; onChange: (html: string) => void; label: string; minRows?: number; compact?: boolean }) {
   const ref = useRef<HTMLDivElement>(null), saved = useRef<Range | null>(null), last = useRef<string>("");
   const [dlg, setDlg] = useState<"" | "formula" | "image" | "symbols">("");
 
   useEffect(() => { if (ref.current && value !== last.current) { ref.current.innerHTML = toEditor(value || ""); last.current = value || ""; } }, [value]);
-  const emit = () => { const h = fromEditor(ref.current?.innerHTML || ""); last.current = h; onChange(h); };
+  const emit = () => { const raw = fromEditor(ref.current?.innerHTML || ""), h = compact && isEmptyHtml(raw) ? "" : raw; last.current = h; onChange(h); };
   const remember = () => { const s = getSelection(); if (s && s.rangeCount && ref.current?.contains(s.anchorNode)) saved.current = s.getRangeAt(0).cloneRange(); };
   const restore = () => { ref.current?.focus(); const s = getSelection(); if (s && saved.current) { s.removeAllRanges(); s.addRange(saved.current); } };
   const cmd = (c: string) => { restore(); document.execCommand(c); emit(); };
@@ -76,17 +80,18 @@ export default function RichEditor({ value, onChange, label, minRows = 4 }: { va
     <button type="button" className="btn icon" title={title} aria-label={title} onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => cmd(c)}>{children}</button>);
 
   return (
-    <div className="card" style={{ padding: ".6rem" }}>
+    <div className={compact ? "grow" : "card"} style={compact ? { minWidth: 0 } : { padding: ".6rem" }}>
       <div className="row" role="toolbar" aria-label={`${label} formatting`}>
-        <Btn c="bold" title="Bold"><b>B</b></Btn><Btn c="italic" title="Italic"><i>I</i></Btn><Btn c="underline" title="Underline"><u>U</u></Btn>
-        <Btn c="insertUnorderedList" title="Bulleted list">•≡</Btn><Btn c="insertOrderedList" title="Numbered list">1≡</Btn>
+        {!compact && <><Btn c="bold" title="Bold"><b>B</b></Btn><Btn c="italic" title="Italic"><i>I</i></Btn><Btn c="underline" title="Underline"><u>U</u></Btn>
+        <Btn c="insertUnorderedList" title="Bulleted list">•≡</Btn><Btn c="insertOrderedList" title="Numbered list">1≡</Btn></>}
         <Btn c="superscript" title="Superscript">x²</Btn><Btn c="subscript" title="Subscript">x₂</Btn>
         <button type="button" className="btn" onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => setDlg("symbols")}>Ω Symbols</button>
         <button type="button" className="btn" onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => setDlg("formula")}>∑ Formula</button>
-        <button type="button" className="btn" onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => setDlg("image")}>🖼 Image</button>
+        {!compact && <button type="button" className="btn" onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => setDlg("image")}>🖼 Image</button>}
       </div>
       <div ref={ref} className="input rich" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label={label}
-        style={{ minHeight: `${minRows * 1.6}rem`, marginTop: ".5rem" }} onInput={emit} onBlur={() => { remember(); emit(); }}
+        style={{ minHeight: `${compact ? 2.4 : minRows * 1.6}rem`, marginTop: ".5rem" }} onInput={emit}
+        onKeyDown={(e) => { if (compact && e.key === "Enter") e.preventDefault(); }} onBlur={() => { remember(); emit(); }}
         onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }} />
       {dlg === "formula" && <FormulaDialog onInsert={insert} onClose={() => setDlg("")} />}
       {dlg === "image" && <ImageDialog onInsert={insert} onClose={() => setDlg("")} />}

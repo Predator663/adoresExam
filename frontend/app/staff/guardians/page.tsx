@@ -15,6 +15,9 @@ const Msg = ({ err, ok }: { err?: string; ok?: string }) => <>{err && <p classNa
 function Parents({ summary, classes, reload }: { summary: any; classes: any[]; reload: () => void }) {
   const [q, setQ] = useState(""), [cls, setCls] = useState("");
   const [edit, setEdit] = useState<any>(null), [add, setAdd] = useState(false), [shown, setShown] = useState<Record<number, string>>({});
+  const [picked, setPicked] = useState<Record<number, any>>({}), [resend, setResend] = useState<any[] | null>(null);  // picked: parents ticked for "send login details again"
+  const tick = (g: any) => setPicked((p) => { const n = { ...p }; if (n[g.id]) delete n[g.id]; else n[g.id] = g; return n; });
+  const pickedList = Object.values(picked);
   const list = usePaged<any>("/guardians/", { q, class: cls }, { size: 20 });
   const [msg, setMsg] = useState({ err: "", ok: "" });
   const done = (ok: string) => { setMsg({ err: "", ok }); list.reload(); reload(); };
@@ -37,15 +40,23 @@ function Parents({ summary, classes, reload }: { summary: any; classes: any[]; r
           <button className="btn primary" onClick={() => setAdd(true)}>+ Add a parent</button>
         </div>
         <Msg {...msg} />
+        {pickedList.length > 0 && (
+          <div className="hint row" style={{ flexWrap: "wrap", gap: ".6rem", marginTop: ".6rem" }}>
+            <span className="grow"><b>{pickedList.length}</b> parent{pickedList.length > 1 ? "s" : ""} selected</span>
+            <button className="btn primary" onClick={() => setResend(pickedList)}>Send login details again</button>
+            <button className="btn" onClick={() => setPicked({})}>Clear</button>
+          </div>
+        )}
       </div>
       {list.loading ? <Loading /> : list.error ? <ErrorNote error={list.error} retry={list.reload} /> : !list.rows.length ? (
         <div className="card"><p className="muted">{d.total || q || cls ? "No parents match." : "No parents yet. Use the Upload tab to add your list, or add one by hand."}</p></div>
       ) : (
         <>
           <div className="tbl-wrap paged" ref={list.top} aria-busy={list.busy || undefined}><table>
-            <thead><tr><th>Parent</th><th>Phone</th><th>Children</th><th>Last message</th><th></th></tr></thead>
+            <thead><tr><th><span className="sr-only">Select</span></th><th>Parent</th><th>Phone</th><th>Children</th><th>Last message</th><th></th></tr></thead>
             <tbody>{list.rows.map((g: any) => (
               <tr key={g.id}>
+                <td><input type="checkbox" aria-label={`Select ${g.name}`} checked={!!picked[g.id]} onChange={() => tick(g)} /></td>
                 <td><b>{g.name}</b><br /><span className="muted small">{g.relationship || "—"}{g.has_whatsapp ? " · WhatsApp" : ""} · {g.language === "en" ? "English" : "Kiswahili"}</span></td>
                 <td><span className="mono">{shown[g.id] || g.phone}</span> {!shown[g.id] && <button className="btn ghost" onClick={() => reveal(g.id)} aria-label={`Show phone of ${g.name}`}>Show</button>}</td>
                 <td>{g.children.map((c: any) => <span key={c.id} className="pill" title={c.class}>{c.name}{c.logged_in ? " ✓" : ""}</span>)} </td>
@@ -53,7 +64,7 @@ function Parents({ summary, classes, reload }: { summary: any; classes: any[]; r
                 <td><button className="btn" onClick={() => setEdit(g)}>Edit</button></td>
               </tr>))}</tbody>
           </table></div>
-          <p className="muted small">✓ = the child has already logged in.</p>
+          <p className="muted small">✓ = the child has already logged in. Tick parents whose message did not arrive (for example a wrong number), then press “Send login details again”.</p>
           <Pager {...list.pager} />
         </>
       )}
@@ -63,7 +74,9 @@ function Parents({ summary, classes, reload }: { summary: any; classes: any[]; r
           <p>{summary.without_parent.map((s: any) => <span key={s.id} className="pill">{s.name} · {s.index} · {s.class}</span>)}</p></details>
       )}
       {add && <AddParent onClose={() => setAdd(false)} onDone={() => { setAdd(false); done("Parent saved."); }} />}
-      {edit && <EditParent g={edit} onClose={() => setEdit(null)} onDone={(m: string) => { setEdit(null); done(m); }} />}
+      {edit && <EditParent g={edit} onClose={() => setEdit(null)} onDone={(m: string, changed?: any) => { setEdit(null); done(m); if (changed) setResend([changed]); }} />}
+      {resend && <ResendModal parents={resend} onClose={() => setResend(null)}
+        onDone={(m: string) => { setResend(null); setPicked({}); done(m); }} />}
     </>
   );
 }
@@ -86,15 +99,15 @@ function AddParent({ onClose, onDone }: { onClose: () => void; onDone: () => voi
   );
 }
 
-function EditParent({ g, onClose, onDone }: { g: any; onClose: () => void; onDone: (m: string) => void }) {
+function EditParent({ g, onClose, onDone }: { g: any; onClose: () => void; onDone: (m: string, changed?: any) => void }) {
   const [f, setF] = useState({ name: g.name, phone: "", relationship: g.relationship, has_whatsapp: g.has_whatsapp, language: g.language }), [err, setErr] = useState(""), [idx, setIdx] = useState("");
   const set = (k: string, v: any) => setF({ ...f, [k]: v });
-  const run = async (fn: () => Promise<any>, ok: string) => { try { await fn(); onDone(ok); } catch (e: any) { setErr(e.message); } };
+  const run = async (fn: () => Promise<any>, ok: string) => { try { const r = await fn(); onDone(ok, r?.phone_changed ? r : undefined); } catch (e: any) { setErr(e.message); } };
   return (
     <Modal label="Edit parent" onClose={onClose}>
       <h2>Edit parent</h2>
       <label className="field"><span>Name</span><input className="input" value={f.name} onChange={(e) => set("name", e.target.value)} /></label>
-      <label className="field"><span>New mobile number (leave empty to keep {g.phone})</span><input className="input" inputMode="tel" value={f.phone} onChange={(e) => set("phone", e.target.value)} /></label>
+      <label className="field"><span>New mobile number (leave empty to keep {g.phone}). After saving you can send the login details to the new number.</span><input className="input" inputMode="tel" value={f.phone} onChange={(e) => set("phone", e.target.value)} /></label>
       <label className="field"><span>Relationship</span><input className="input" value={f.relationship} onChange={(e) => set("relationship", e.target.value)} /></label>
       <label className="field"><span>Message language</span><select className="input" value={f.language} onChange={(e) => set("language", e.target.value)}><option value="sw">Kiswahili</option><option value="en">English</option></select></label>
       <label className="row"><input type="checkbox" checked={f.has_whatsapp} onChange={(e) => set("has_whatsapp", e.target.checked)} /> Uses WhatsApp</label>
@@ -105,6 +118,43 @@ function EditParent({ g, onClose, onDone }: { g: any; onClose: () => void; onDon
       <Msg err={err} />
       <div className="row"><button className="btn primary grow" onClick={() => run(() => api(`/guardians/${g.id}/`, { method: "PATCH", body: { ...f, phone: f.phone || undefined } }), "Saved.")}>Save</button>
         <button className="btn danger" onClick={() => confirm(`Delete ${g.name}? Messages already sent are not affected.`) && run(() => api(`/guardians/${g.id}/`, { method: "DELETE" }), "Parent deleted.")}>Delete</button></div>
+    </Modal>
+  );
+}
+
+function ResendModal({ parents, onClose, onDone }: { parents: any[]; onClose: () => void; onDone: (m: string) => void }) {
+  /* Send the login details again to chosen parents (a wrong number, a phone that was off, a message that never arrived).
+     Only children who have NOT logged in yet get a new password; a child who has already logged in is never touched. */
+  const ids = parents.map((p) => p.id);
+  const body = { scope: "selected", guardian_ids: ids, include_sent: true };
+  const [plan, setPlan] = useState<any>(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
+  useEffect(() => { api("/guardians/send/", { body }).then(setPlan).catch((e: any) => setErr(e.message)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  async function go() {
+    setBusy(true);
+    try { const r = await api<any>("/guardians/send/", { body: { ...body, dry_run: false } }); onDone(`${r.queued} message${r.queued === 1 ? " is" : "s are"} waiting for the phone to send. The children got NEW passwords; any earlier message with a password no longer works.`); }
+    catch (e: any) { setErr(e.message); setBusy(false); }
+  }
+  const sk = plan?.skipped || {};
+  return (
+    <Modal label="Send login details again" onClose={onClose}>
+      <h2>Send login details again</h2>
+      <p className="muted">Use this when a message did not arrive, or after you corrected a phone number. The message goes to the parent’s <b>current</b> number shown below.</p>
+      <ul>{parents.map((p) => <li key={p.id}><b>{p.name}</b> · <span className="mono">{p.phone}</span></li>)}</ul>
+      {!plan && !err && <Loading />}
+      {plan && (
+        <div className="hint">
+          <p><b>{plan.messages}</b> message{plan.messages === 1 ? "" : "s"} for <b>{plan.students}</b> {plan.students === 1 ? "child" : "children"}.</p>
+          {(sk.already_logged_in || 0) > 0 && <p className="small muted">{sk.already_logged_in} child{sk.already_logged_in > 1 ? "ren have" : " has"} already logged in and will <b>not</b> get a new password.</p>}
+          <p className="small muted">Each child listed gets a <b>new password</b>. The old text (including one sent to a wrong number) stops working, and a copy still waiting in the queue is cancelled.</p>
+          {plan.preview?.text && <pre className="sms-preview" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", margin: ".2rem 0 .6rem", padding: ".6rem .8rem", border: "1px solid var(--line,#c9d1de)", borderRadius: 10 }}>{plan.preview.text}</pre>}
+          {plan.preview?.text && <p className="small muted">Example (password hidden). Each parent gets their own children’s details in the language on their record.</p>}
+        </div>
+      )}
+      <Msg err={err} />
+      <div className="row">
+        <button className="btn primary grow" disabled={busy || !plan || !plan.messages} onClick={() => confirm(`Send to ${plan.messages} parent${plan.messages === 1 ? "" : "s"}? ${plan.students} children get new passwords.`) && go()}>Send now</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+      </div>
     </Modal>
   );
 }
@@ -154,6 +204,7 @@ function Upload({ reload, goParents }: { reload: () => void; goParents: () => vo
 
 /* ------------------------------------------------------------------------------------------- Send */
 function Send({ summary, classes, reload }: { summary: any; classes: any[]; reload: () => void }) {
+  const [again, setAgain] = useState<any[] | null>(null);  // a parent chosen from the messages list below
   const [scope, setScope] = useState("all"), [cls, setCls] = useState(""), [resend, setResend] = useState(false), [note, setNote] = useState(""), [plan, setPlan] = useState<any>(null), [msg, setMsg] = useState({ err: "", ok: "" });
   const defaults: Record<string, string> = summary.default_messages || {};
   const [includeLogin, setIncludeLogin] = useState(true), [lang, setLang] = useState<"sw" | "en">("sw");
@@ -238,12 +289,14 @@ function Send({ summary, classes, reload }: { summary: any; classes: any[]; relo
       </div>
       {jobs.loading ? <Loading /> : jobs.error ? <ErrorNote error={jobs.error} retry={jobs.reload} /> : !jobs.rows.length ? <p className="muted">No messages yet.</p> : (
         <><div className="tbl-wrap paged" ref={jobs.top} aria-busy={jobs.busy || undefined}><table><thead><tr><th>Parent</th><th>Children</th><th>Status</th><th>Time</th><th></th></tr></thead><tbody>
-          {jobs.rows.map((j) => (<tr key={j.id}><td><b>{j.parent}</b><br /><span className="mono small">{j.phone}</span></td><td className="small">{j.summary.replace("Login details for ", "")}</td>
+          {jobs.rows.map((j) => (<tr key={j.id}><td><b>{j.parent}</b><br /><span className="mono small">{j.phone}</span>{j.old_number && <div className="warn small">⚠ Number changed since. Now {j.current_phone}</div>}</td><td className="small">{j.summary.replace("Login details for ", "")}</td>
             <td><Status s={j.status} />{j.error && <div className="no small">{j.error}</div>}{j.attempts > 1 && <div className="muted small">tries: {j.attempts}</div>}</td><td className="small">{when(j.sent_at || j.created_at)}</td>
-            <td>{(j.status === "failed" || j.status === "cancelled") && <button className="btn" onClick={() => act(() => api(`/guardians/jobs/${j.id}/retry/`, { body: {} }), () => "Queued again.")}>{j.status === "failed" ? "Retry" : "Send again"}</button>}</td></tr>))}
+            <td>{(j.status === "failed" || j.status === "cancelled") && <button className="btn" onClick={() => act(() => api(`/guardians/jobs/${j.id}/retry/`, { body: {} }), () => "Queued again.")}>{j.status === "failed" ? "Retry" : "Send again"}</button>}
+              {j.login && j.guardian_id && j.status !== "queued" && j.status !== "sending" && j.status !== "cancelled" && <button className="btn" title="Send new login details to the parent’s current number" onClick={() => setAgain([{ id: j.guardian_id, name: j.parent, phone: j.current_phone }])}>Resend login</button>}</td></tr>))}
         </tbody></table></div>
         <Pager {...jobs.pager} /></>
       )}
+      {again && <ResendModal parents={again} onClose={() => setAgain(null)} onDone={(m: string) => { setAgain(null); setMsg({ err: "", ok: m }); jobs.reload(); reload(); }} />}
     </>
   );
 }

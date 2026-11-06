@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { blank, build, fresh, ItemRow, type S } from "./QuestionEditor";
 import RichEditor from "./RichEditor";
+import SymbolPad from "./SymbolPad";
 import { api } from "@/lib/api";
 import { errorLines, plain, qtypeName, QTYPES, uid } from "@/lib/staff";
 
@@ -64,6 +65,7 @@ function Tick() {
 }
 
 function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
+  const accRef = useRef<HTMLTextAreaElement>(null);
   const s = c.s;
   const list = (key: "options" | "left" | "right" | "items", min: number, name: string, withCorrect?: boolean) => (
     <>
@@ -98,7 +100,8 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
       )}
       {s.qtype === "fill_blank" && (
         <div className="card">
-          <label className="field"><span>Accepted answers (one per line; capitals and extra spaces are ignored)</span><textarea className="input" rows={3} value={s.accepted} onChange={(e) => up({ accepted: e.target.value })} /></label>
+          <label className="field"><span>Accepted answers (one per line; capitals and extra spaces are ignored)</span><textarea ref={accRef} className="input" rows={3} value={s.accepted} onChange={(e) => up({ accepted: e.target.value })} /></label>
+          <div className="row" style={{ marginBottom: ".5rem" }}><SymbolPad target={accRef} value={s.accepted} onChange={(v) => up({ accepted: v })} /></div>
           <div className="grid2">
             <label className="field"><span>Numeric answer (optional)</span><input className="input" inputMode="decimal" value={s.numValue} onChange={(e) => up({ numValue: e.target.value })} /></label>
             <label className="field"><span>Allowed difference (±)</span><input className="input" inputMode="decimal" value={s.numTol} onChange={(e) => up({ numTol: e.target.value })} /></label>
@@ -112,9 +115,9 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
           <h4 className="bk-h">Right side</h4>{list("right", 2, "Right item")}
           <h4 className="bk-h">Correct matches</h4>
           {s.left.filter(filled).map((l, i) => (
-            <div key={l.id} className="match-row"><span>{l.text || l.alt_text || `Left ${i + 1}`}</span>
+            <div key={l.id} className="match-row"><span>{plain(l.text) || l.alt_text || `Left ${i + 1}`}</span>
               <select className="input" aria-label={`Match for left item ${i + 1}`} value={s.pairs[l.id] || ""} onChange={(e) => up({ pairs: { ...s.pairs, [l.id]: e.target.value } })}>
-                <option value="">Choose…</option>{s.right.filter(filled).map((r, j) => <option key={r.id} value={r.id}>{r.text || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>
+                <option value="">Choose…</option>{s.right.filter(filled).map((r, j) => <option key={r.id} value={r.id}>{plain(r.text) || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>
           ))}
         </>
       )}

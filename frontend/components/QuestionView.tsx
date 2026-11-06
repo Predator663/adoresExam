@@ -1,5 +1,7 @@
 "use client";
+import { useRef } from "react";
 import { ItemContent, RichHtml } from "./Rich";
+import SymbolPad from "./SymbolPad";
 import { useSession } from "@/lib/session";
 import type { Question } from "@/lib/types";
 
@@ -23,6 +25,7 @@ const KEYS = "ABCDEFGHIJ";
 
 export default function QuestionView({ q, value, onChange, disabled }: { q: Question; value: any; onChange: (v: any) => void; disabled?: boolean }) {
   const { t } = useSession();
+  const answerRef = useRef<HTMLInputElement>(null);
   const c = q.content || {};
   // Ordering: `value` can be undefined (builder preview) or stale (items edited). Always rebuild a valid order.
   const items: any[] = c.items || [];
@@ -76,8 +79,11 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
       )}
 
       {q.type === "fill_blank" && (
-        <input className="input" value={value || ""} disabled={disabled} onChange={(e) => onChange(e.target.value)}
-          aria-label={t("your_answer")} placeholder={t("type_answer")} autoComplete="off" autoCapitalize="off" spellCheck={false} inputMode="text" />
+        <div className="row">
+          <input ref={answerRef} className="input grow" value={value || ""} disabled={disabled} onChange={(e) => onChange(e.target.value)}
+            aria-label={t("your_answer")} placeholder={t("type_answer")} autoComplete="off" autoCapitalize="off" spellCheck={false} inputMode="text" />
+          {!disabled && <SymbolPad target={answerRef} value={value || ""} onChange={onChange} label="Ω" aria="Symbols / Alama" small />}
+        </div>
       )}
 
       {q.type === "matching" && (
