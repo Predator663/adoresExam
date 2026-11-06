@@ -51,10 +51,11 @@ function Staff({ kind }: { kind: "teachers" | "admins" }) {
       </div>
       {list.loading ? <Loading /> : list.error ? <ErrorNote error={list.error} retry={list.reload} /> : <>{list.rows.length === 0 && <div className="card"><p className="muted">{filtered ? `No ${kind} match this search. Try fewer words, or press Clear search.` : `No ${kind} yet.`}</p></div>}<div ref={list.top} className="paged" aria-busy={list.busy || undefined}>{list.rows.map((t) => (
         <div key={t.id} className={`card ${t.is_active ? "" : "unread"}`}>
-          <div className="row"><span className="grow"><b>{t.first_name} {t.last_name}</b> <span className="muted small">@{t.username}</span>{!t.is_active && <span className="pill">inactive</span>}</span>
+          <div className="row"><span className="grow"><b>{t.first_name} {t.last_name}</b> <span className="muted small">@{t.username}</span>{!t.is_active && <span className="pill">inactive</span>}{t.is_locked && <span className="pill">locked</span>}</span>
             {kind === "teachers" && <button className="btn" onClick={() => setOpen(open === t.id ? null : t.id)}>{open === t.id ? "Close" : "Subjects & classes"}</button>}</div>
           {kind === "teachers" && <p className="muted small">{t.assignments.length ? t.assignments.map((a: any) => `${a.subject_name}${a.school_class ? ` (${classes.data?.find((c) => c.id === a.school_class)?.name})` : " (all classes)"}`).join(", ") : "No subjects assigned yet"}</p>}
           <div className="row">
+            {t.is_locked && <button className="btn primary" onClick={() => run(() => api(`/${kind}/${t.id}/unlock/`, { body: {} }), "Unlocked. They can log in again with the same password.")}>Unlock</button>}
             <button className="btn" onClick={() => run(() => api(`/${kind}/${t.id}/reset-password/`, { body: {} }), ((r: any) => `Temporary password (shown once): ${r.temporary_password}`) as any)}>Reset password</button>
             {t.is_active ? <button className="btn danger" onClick={() => confirm(`Deactivate ${t.username}? Their questions and exams stay.`) && run(() => api(`/${kind}/${t.id}/`, { method: "DELETE" }), "Deactivated.")}>Deactivate</button>
               : <button className="btn" onClick={() => run(() => api(`/${kind}/${t.id}/activate/`, { body: {} }), "Activated.")}>Activate</button>}
@@ -84,7 +85,7 @@ function Students() {
   const list = usePaged<any>("/students/", f, { size: 20 });
   const [sel, setSel] = useState<number[]>([]), [edit, setEdit] = useState<any>(null), [add, setAdd] = useState(false), [bulkClass, setBulkClass] = useState("");
   const [errs, setErrs] = useState<string[]>([]), [ok, setOk] = useState("");
-  const run = async (fn: () => Promise<any>, msg: string, after?: () => void) => { setErrs([]); setOk(""); try { await fn(); setOk(msg); list.reload(); setSel([]); after?.(); } catch (e: any) { setErrs(errorLines(e.data, e.message)); } };
+  const run = async (fn: () => Promise<any>, msg: string | ((r: any) => string), after?: () => void) => { setErrs([]); setOk(""); try { const r = await fn(); setOk(typeof msg === "function" ? msg(r) : msg); list.reload(); setSel([]); after?.(); } catch (e: any) { setErrs(errorLines(e.data, e.message)); } };
   const bulk = (action: string, extra: any = {}, msg = "Done.") => run(() => api("/students/bulk-action/", { body: { ids: sel, action, ...extra } }), msg);
   const rows = list.rows;
   const allOnPage = rows.length > 0 && rows.every((r) => sel.includes(r.id));
@@ -107,7 +108,8 @@ function Students() {
           <div className="row" style={{ marginTop: ".4rem" }}>
             <select className="input" style={{ width: 160 }} aria-label="Move to class" value={bulkClass} onChange={(e) => setBulkClass(e.target.value)}><option value="">Class…</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
             <button className="btn" disabled={!bulkClass} onClick={() => bulk("change_class", { school_class: Number(bulkClass) }, "Class changed.")}>Change class</button>
-            <button className="btn" onClick={() => confirm("Reset these passwords to the index numbers?") && bulk("reset_passwords", {}, "Passwords reset.")}>Reset passwords</button>
+            <button className="btn" onClick={() => confirm("Issue new starting passwords to the selected students? Print the username sheet afterwards.") && bulk("reset_passwords", {}, "New starting passwords issued. Download the username sheet to print them.")}>Reset passwords</button>
+            <button className="btn" onClick={() => bulk("unlock", {}, "Unlocked. Their passwords were not changed.")}>Unlock</button>
             <button className="btn" onClick={() => confirm("Deactivate the selected students?") && bulk("deactivate", {}, "Deactivated.")}>Deactivate</button>
             <button className="btn" onClick={() => confirm("Mark the selected students as graduated?") && bulk("graduate", {}, "Graduated.")}>Graduate</button></div></div>
       )}
@@ -115,7 +117,7 @@ function Students() {
         <div className="card"><p className="muted small">{list.count} student(s)</p>
           <div className="tbl-wrap paged" ref={list.top} aria-busy={list.busy || undefined}><table><thead><tr><th>{!archived && <input type="checkbox" aria-label="Select all" checked={allOnPage} onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...rows.map((r) => r.id)])] : sel.filter((id) => !rows.some((r) => r.id === id)))} />}</th><th>Name</th><th>Username</th><th>Index no.</th><th>Class</th><th>Status</th><th /></tr></thead>
             <tbody>{rows.map((s) => <tr key={s.id}><td>{!archived && <input type="checkbox" aria-label={`Select ${s.first_name}`} checked={sel.includes(s.id)} onChange={(e) => setSel(e.target.checked ? [...sel, s.id] : sel.filter((x) => x !== s.id))} />}</td>
-              <td>{s.first_name} {s.last_name}</td><td>{s.username}</td><td>{s.index_number}</td><td>{s.school_class_name || "—"}</td><td>{s.is_archived ? "archived" : s.graduated ? "graduated" : s.is_active ? "active" : "inactive"}</td><td><button className="btn" onClick={() => setEdit(s)}>Open</button></td></tr>)}</tbody></table></div>
+              <td>{s.first_name} {s.last_name}</td><td>{s.username}</td><td>{s.index_number}</td><td>{s.school_class_name || "—"}</td><td>{s.is_archived ? "archived" : s.graduated ? "graduated" : s.is_active ? "active" : "inactive"}{s.is_locked && <span className="pill">locked</span>}</td><td><button className="btn" onClick={() => setEdit(s)}>Open</button></td></tr>)}</tbody></table></div>
           <Pager {...list.pager} /></div>
       )}
       {add && <StudentForm classes={classes.data || []} onClose={() => setAdd(false)} onSaved={(m) => { setAdd(false); setOk(m); list.reload(); }} />}
@@ -124,7 +126,8 @@ function Students() {
           <StudentForm student={edit} classes={classes.data || []} onClose={() => setEdit(null)} onSaved={(m) => { setEdit(null); setOk(m); list.reload(); }} />
           <div className="row" style={{ marginTop: ".6rem" }}>
             {edit.is_archived ? <button className="btn primary" onClick={() => run(() => api(`/students/${edit.id}/restore/`, { body: {} }), "Restored.", () => setEdit(null))}>Restore</button> : <>
-              <button className="btn" onClick={() => run(() => api(`/students/${edit.id}/reset-password/`, { body: {} }), "Password reset to the index number.", () => setEdit(null))}>Reset password</button>
+              {edit.is_locked && <button className="btn primary" onClick={() => run(() => api(`/students/${edit.id}/unlock/`, { body: {} }), "Unlocked. She can log in again with her same password.", () => setEdit(null))}>Unlock (keep password)</button>}
+              <button className="btn" onClick={() => run(() => api(`/students/${edit.id}/reset-password/`, { body: {} }), (r: any) => `New starting password (shown once): ${r.temporary_password}`, () => setEdit(null))}>Reset password</button>
               {edit.is_active ? <button className="btn" onClick={() => run(() => api(`/students/${edit.id}/deactivate/`, { body: {} }), "Deactivated.", () => setEdit(null))}>Deactivate</button> : <button className="btn" onClick={() => run(() => api(`/students/${edit.id}/activate/`, { body: {} }), "Activated.", () => setEdit(null))}>Activate</button>}
               <button className="btn" onClick={() => confirm("Mark as graduated?") && run(() => api(`/students/${edit.id}/graduate/`, { body: {} }), "Graduated.", () => setEdit(null))}>Graduate</button>
               <button className="btn danger" onClick={() => confirm("Archive (delete) this student? You can restore her later.") && run(() => api(`/students/${edit.id}/`, { method: "DELETE" }), "Archived. It can be restored.", () => setEdit(null))}>Archive</button></>}

@@ -34,6 +34,17 @@ LOCK_MINUTES = 15
 FRIENDLY_FAIL = "Wrong username or password. Please check and try again."
 
 
+def is_locked(u, now=None):
+    """True while a user is locked out by too many wrong passwords."""
+    return bool(u.locked_until and u.locked_until > (now or timezone.now()))
+
+
+def unlock_user(u):
+    """Lift a lock-out WITHOUT touching the password (the student only mistyped it)."""
+    u.failed_logins, u.locked_until = 0, None
+    u.save(update_fields=["failed_logins", "locked_until"])
+
+
 def user_payload(u):
     return {
         "id": u.pk, "username": u.username, "first_name": u.first_name, "last_name": u.last_name,
@@ -175,15 +186,19 @@ class MeView(APIView):
 
 class StudentSerializer(serializers.ModelSerializer):
     school_class_name = serializers.SerializerMethodField()
+    is_locked = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ["id", "username", "first_name", "last_name", "index_number", "school_class",
-                  "school_class_name", "is_active", "is_archived", "graduated"]
-        read_only_fields = ["username", "is_archived", "graduated"]
+                  "school_class_name", "is_active", "is_archived", "graduated", "is_locked", "locked_until"]
+        read_only_fields = ["username", "is_archived", "graduated", "is_locked", "locked_until"]
 
     def get_school_class_name(self, o):
         return str(o.school_class) if o.school_class else None
+
+    def get_is_locked(self, o):
+        return is_locked(o)
 
 
 class StudentViewSet(viewsets.ModelViewSet):
@@ -245,6 +260,14 @@ class StudentViewSet(viewsets.ModelViewSet):
         obj.save(update_fields=["is_archived", "is_active"])
         audit(request.user, "student.restore", obj.pk)
         return Response({"ok": True})
+
+    @action(detail=True, methods=["post"])
+    def unlock(self, request, pk=None):
+        """Lift the lock-out after too many wrong passwords. The password stays as it is."""
+        obj = self.get_object()
+        unlock_user(obj)
+        audit(request.user, "student.unlock", obj.pk)
+        return Response({"ok": True, "detail": "Unlocked. She can try to log in again now."})
 
     @action(detail=True, methods=["post"], url_path="reset-password")
     def reset_password(self, request, pk=None):
@@ -394,7 +417,7 @@ def class_credentials(request):
 @api_view(["POST"])
 @permission_classes([IsAdminRole])
 def students_bulk_action(request):
-    """ADM-02: change_class | reset_passwords | deactivate | graduate for many students at once."""
+    """ADM-02: change_class | reset_passwords | unlock | deactivate | graduate for many students at once."""
     ids = request.data.get("ids")
     action_name = request.data.get("action")
     if not isinstance(ids, list) or not ids:
@@ -418,6 +441,9 @@ def students_bulk_action(request):
         User.objects.bulk_update(users, ["password", "must_change_password", "failed_logins", "locked_until", "temp_serial", "temp_issued_at"])
         Token.objects.filter(user__in=users).delete()
         audit(request.user, "students.bulk.reset_passwords", "", count=n)
+    elif action_name == "unlock":
+        qs.update(failed_logins=0, locked_until=None)  # passwords and sessions are left alone
+        audit(request.user, "students.bulk.unlock", "", count=n)
     elif action_name in ("deactivate", "graduate"):
         fields = {"is_active": False}
         if action_name == "graduate":
@@ -426,7 +452,7 @@ def students_bulk_action(request):
         qs.update(**fields)
         audit(request.user, f"students.bulk.{action_name}", "", count=n)
     else:
-        raise ValidationError({"action": "Choose change_class, reset_passwords, deactivate or graduate."})
+        raise ValidationError({"action": "Choose change_class, reset_passwords, unlock, deactivate or graduate."})
     return Response({"ok": True, "affected": n})
 
 
@@ -435,10 +461,16 @@ def students_bulk_action(request):
 class StaffSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     assignments = serializers.SerializerMethodField()
+    is_locked = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "first_name", "last_name", "email", "is_active", "password", "assignments"]
+        fields = ["id", "username", "first_name", "last_name", "email", "is_active", "password", "assignments",
+                  "is_locked", "locked_until"]
+        read_only_fields = ["is_locked", "locked_until"]
+
+    def get_is_locked(self, o):
+        return is_locked(o)
 
     def get_assignments(self, o):
         return [{"id": a.pk, "subject": a.subject_id, "subject_name": a.subject.name, "school_class": a.school_class_id}
@@ -510,6 +542,14 @@ class StaffAccountViewSet(viewsets.ModelViewSet):
         obj.is_active = True
         obj.save(update_fields=["is_active"])
         audit(request.user, f"{self.label}.activate", obj.pk)
+        return Response({"ok": True})
+
+    @action(detail=True, methods=["post"])
+    def unlock(self, request, pk=None):
+        """Lift a lock-out after too many wrong passwords, keeping the password as it is."""
+        obj = self.get_object()
+        unlock_user(obj)
+        audit(request.user, f"{self.label}.unlock", obj.pk)
         return Response({"ok": True})
 
     @action(detail=True, methods=["post"], url_path="reset-password")

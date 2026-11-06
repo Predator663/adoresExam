@@ -62,3 +62,59 @@ class SecurityTests(AnalyticsBase):
         r = APIClient().get("/api/site-status/")
         self.assertEqual(r.headers.get("X-Content-Type-Options"), "nosniff")
         self.assertIn("default-src 'none'", r.headers.get("Content-Security-Policy", ""))
+
+
+class UnlockTests(AnalyticsBase):
+    """An admin lifts a lock-out without changing the password."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+
+    def lock(self, user):
+        c = APIClient()
+        for _ in range(5):
+            c.post("/api/auth/login/", {"username": user.username, "password": "wrong"}, format="json")
+
+    def login(self, username, password):
+        return APIClient().post("/api/auth/login/", {"username": username, "password": password}, format="json")
+
+    def test_five_wrong_passwords_lock_the_account(self):
+        self.lock(self.amina)
+        self.assertEqual(self.login("amina", "pw-amina-1").status_code, 429)  # even the right password is refused
+
+    def test_unlock_keeps_the_password_and_lets_her_in(self):
+        self.lock(self.amina)
+        r = self.client_for(self.admin).post(f"/api/students/{self.amina.pk}/unlock/", {}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.amina.refresh_from_db()
+        self.assertIsNone(self.amina.locked_until)
+        self.assertEqual(self.amina.failed_logins, 0)
+        self.assertEqual(self.login("amina", "pw-amina-1").status_code, 200)  # same password still works
+
+    def test_list_shows_who_is_locked(self):
+        self.lock(self.amina)
+        rows = self.client_for(self.admin).get("/api/students/").json()
+        rows = rows["results"] if isinstance(rows, dict) else rows
+        by = {r["username"]: r for r in rows}
+        self.assertTrue(by["amina"]["is_locked"])
+        self.assertFalse(by["zawadi"]["is_locked"])
+
+    def test_bulk_unlock(self):
+        self.lock(self.amina)
+        self.lock(self.zawadi)
+        r = self.client_for(self.admin).post("/api/students/bulk-action/",
+                                             {"action": "unlock", "ids": [self.amina.pk, self.zawadi.pk]}, format="json")
+        self.assertEqual(r.json()["affected"], 2)
+        self.assertEqual(User.objects.filter(locked_until__isnull=False).count(), 0)
+
+    def test_teacher_and_student_cannot_unlock(self):
+        self.lock(self.amina)
+        self.assertEqual(self.client_for(self.teacher).post(f"/api/students/{self.amina.pk}/unlock/", {}, format="json").status_code, 403)
+        self.assertEqual(self.client_for(self.zawadi).post(f"/api/students/{self.amina.pk}/unlock/", {}, format="json").status_code, 403)
+
+    def test_admin_can_unlock_a_teacher(self):
+        self.lock(self.teacher)
+        r = self.client_for(self.admin).post(f"/api/teachers/{self.teacher.pk}/unlock/", {}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.login("teach", "Teach-pass-1").status_code, 200)

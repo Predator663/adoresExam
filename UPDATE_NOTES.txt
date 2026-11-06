@@ -1,3 +1,20 @@
+Amani Exams update: unlock students (and staff) locked out by too many wrong passwords
+
+Five wrong passwords lock an account for 15 minutes (unchanged). Until now the only quick fix was "Reset password", which also
+threw away a password the student had remembered correctly. Now an admin can UNLOCK without changing the password.
+- Staff > People > Students: a "locked" tag shows beside the status. Open the student > "Unlock (keep password)".
+  Select several students > "Unlock" (bulk). Teachers and Admins tabs: "locked" tag and an "Unlock" button.
+- Reset password (single) now shows the new starting password once; the old text said "index number", which has not been true
+  since starting passwords became random codes. The bulk reset confirmation text is corrected too.
+- Unlock never touches the password or the student's session. Resetting a password still clears the lock as before.
+- Audit log: student.unlock, teacher.unlock, admin.unlock, students.bulk.unlock.
+No migrations. API (admin only):  POST /api/students/<id>/unlock/   POST /api/teachers/<id>/unlock/   POST /api/admins/<id>/unlock/
+  POST /api/students/bulk-action/ {"action": "unlock", "ids": [...]}   Student and staff lists now return is_locked and locked_until.
+Note: the login limit of 20 per minute per internet address is separate; a whole class on one Wi-Fi can hit it, and unlocking
+an account does not clear it (it clears by itself within a minute).
+Changed: accounts/views.py  accounts/test_security.py (UnlockTests)  frontend/app/staff/people/page.tsx
+
+---- Previous update ----
 Amani Exams update: admin search everywhere + "Not submitted" panel with printing
 
 SEARCH (admins): Staff > People > Teachers and Admins now have a search box (name, username, email; every word must match),
