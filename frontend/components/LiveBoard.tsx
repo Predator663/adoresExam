@@ -2,6 +2,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import AntiCheat from "@/components/AntiCheat";
 import Icon from "@/components/Icon";
+import { Modal } from "@/components/ui";
 import { api } from "@/lib/api";
 
 /* Live monitor board. One request for the whole school, polled only while the tab is visible.
@@ -13,6 +14,7 @@ type Stu = {
   left_screen?: number; answered?: number; started_at?: string | null; submitted_at?: string | null;
   seconds_left?: number; online?: boolean; auto_submitted?: boolean; completion?: "full" | "partial"; attempt_no?: number;
   attempt_id?: number; leaves_used?: number; locked?: boolean; lock_reason?: string;
+  ended_by_admin?: boolean; end_reason?: string;
 };
 type ExamRow = {
   exam_id: number; title: string; subject: string; status: string; classes: string[];
@@ -81,7 +83,7 @@ function ParentPhone({ g }: { g: { id: number; name: string; phone: string; rela
     : <span className="lb-tel">{label}{g.phone} <button className="btn small" disabled={busy} onClick={reveal}>Show number</button></span>;
 }
 
-const Row = memo(function Row({ s, kind, total, at, dur, admin, leave, onLock }: { s: Stu; kind: "w" | "s" | "n"; total: number; at: number; dur: number; admin: boolean; leave?: { enabled: boolean; limit: number }; onLock?: (s: Stu, lock: boolean) => void }) {
+const Row = memo(function Row({ s, kind, total, at, dur, admin, leave, onLock, onEnd }: { s: Stu; kind: "w" | "s" | "n"; total: number; at: number; dur: number; admin: boolean; leave?: { enabled: boolean; limit: number }; onLock?: (s: Stu, lock: boolean) => void; onEnd?: (s: Stu) => void }) {
   const pct = total ? (s.answered ?? 0) / total : 0;
   const used = s.leaves_used ?? 0;
   const why = s.lock_reason === "leaves" ? "locked: left the screen too often" : s.lock_reason === "manual" ? "locked by an administrator" : "";
@@ -94,6 +96,9 @@ const Row = memo(function Row({ s, kind, total, at, dur, admin, leave, onLock }:
         <small>{s.class} · #{s.index}{(s.left_screen ?? 0) > 0 && <em className="lb-flag"> · left screen ×{s.left_screen}{kind === "w" && leave?.enabled ? ` (${used}/${leave.limit} allowed)` : ""}</em>}{kind === "w" && s.locked && <em className="lb-locked"> · 🔒 {why}</em>}</small>
         {kind === "w" && admin && s.attempt_id && onLock && (
           <button className={`btn small lb-lockbtn ${s.locked ? "primary" : ""}`} onClick={() => onLock(s, !s.locked)}>{s.locked ? "🔓 Unlock" : "🔒 Lock"}</button>
+        )}
+        {kind === "w" && admin && s.attempt_id && onEnd && (
+          <button className="btn small danger" onClick={() => onEnd(s)}>End exam</button>
         )}
         {admin && (s.parents?.length
           ? s.parents.slice(0, 3).map((g) => <ParentPhone key={g.id} g={g} />)
@@ -108,7 +113,8 @@ const Row = memo(function Row({ s, kind, total, at, dur, admin, leave, onLock }:
       )}
       {kind === "s" && (
         <div className="lb-prog">
-          <small>{s.completion === "full" ? "Completed" : "Partial"} · submitted <b>{hhmmss(s.submitted_at)}</b>{s.auto_submitted ? " (time ran out)" : ""}</small>
+          <small>{s.completion === "full" ? "Completed" : "Partial"} · submitted <b>{hhmmss(s.submitted_at)}</b>{s.auto_submitted ? " (time ran out)" : ""}{s.ended_by_admin ? " · ended by an administrator" : ""}</small>
+          {s.ended_by_admin && s.end_reason && <small>Reason: {s.end_reason}</small>}
           <small>{s.answered ?? 0}/{total} answered · started {hhmm(s.started_at)}</small>
         </div>
       )}
@@ -121,6 +127,15 @@ const Row = memo(function Row({ s, kind, total, at, dur, admin, leave, onLock }:
 function ExamCard({ e, open, onToggle, admin, at, q, cls, offset, onDue, onChanged }: { e: ExamRow; open: boolean; onToggle: () => void; admin: boolean; at: number; q: string; cls: string; offset: number; onDue: () => void; onChanged: () => void }) {
   const [tab, setTab] = useState<"w" | "f" | "p" | "n">("w");
   const [lockErr, setLockErr] = useState("");
+  const [ending, setEnding] = useState<Stu | null>(null), [mark, setMark] = useState("submitted"), [why, setWhy] = useState(""), [endErr, setEndErr] = useState(""), [endBusy, setEndBusy] = useState(false);
+  // End ONE student's running attempt (works after the exam has closed too). Her answers so far are marked, and the exam can publish for everybody.
+  const endAttempt = async () => {
+    if (!ending) return;
+    setEndBusy(true); setEndErr("");
+    try { await api(`/exams/${e.exam_id}/end-attempt/`, { body: { student_id: ending.id, mark, reason: why.trim() } }); setEnding(null); setWhy(""); setMark("submitted"); onChanged(); }
+    catch (err: any) { setEndErr(err?.message || "Could not end her exam."); }
+    finally { setEndBusy(false); }
+  };
   // Manual lock / unlock of one student. An unlock also gives her a fresh allowance of exits.
   const setLock = useCallback(async (s: Stu, lock: boolean) => {
     if (!s.attempt_id) return;
@@ -169,13 +184,30 @@ function ExamCard({ e, open, onToggle, admin, at, q, cls, offset, onDue, onChang
               {lockErr && <p className="lb-alert" role="alert">{lockErr}</p>}
               {list.length === 0 ? <p className="lb-empty">Nobody here{q || cls ? " for this filter" : " yet"}.</p> : (
                 <ul className="lb-list">
-                  {list.slice(0, limit).map((s) => <Row key={s.id} s={s} kind={tab === "w" ? "w" : tab === "n" ? "n" : "s"} total={e.total_questions} at={at} dur={e.duration_minutes} admin={admin} leave={e.leave_lock} onLock={setLock} />)}
+                  {list.slice(0, limit).map((s) => <Row key={s.id} s={s} kind={tab === "w" ? "w" : tab === "n" ? "n" : "s"} total={e.total_questions} at={at} dur={e.duration_minutes} admin={admin} leave={e.leave_lock} onLock={setLock} onEnd={(x) => { setEndErr(""); setEnding(x); }} />)}
                 </ul>
               )}
               {list.length > limit && <button className="lb-more" onClick={() => setLimit(limit + 40)}>Show {Math.min(40, list.length - limit)} more</button>}
             </>
           ) : <p className="lb-empty">Teachers see the counts above. Student names are for administrators.</p>}
         </div>
+      )}
+      {ending && (
+        <Modal label="End this student's exam" onClose={() => !endBusy && setEnding(null)}>
+          <h3>End {ending.name}&apos;s exam</h3>
+          <p className="muted small">Her answers so far are kept and marked now. She cannot go back into the exam. Once nobody else is still writing, the results of this exam are published for everyone, hers included.</p>
+          <label className="field"><span>Mark her as</span>
+            <select className="input" value={mark} onChange={(x) => setMark(x.target.value)}>
+              <option value="submitted">Submitted</option><option value="time_over">Time over (submitted automatically)</option>
+            </select></label>
+          <label className="field"><span>Reason (required, kept in the audit log)</span>
+            <textarea className="input" rows={3} maxLength={300} value={why} onChange={(x) => setWhy(x.target.value)} placeholder="For example: extra time was given by mistake" /></label>
+          {endErr && <p className="lb-alert" role="alert">{endErr}</p>}
+          <div className="row">
+            <button className="btn" disabled={endBusy} onClick={() => setEnding(null)}>Cancel</button>
+            <button className="btn danger" disabled={endBusy || !why.trim()} onClick={endAttempt}>{endBusy ? "Ending…" : "End her exam"}</button>
+          </div>
+        </Modal>
       )}
     </section>
   );

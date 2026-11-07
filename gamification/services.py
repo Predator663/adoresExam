@@ -167,7 +167,7 @@ def compute_metrics(student, cfg, today=None):
         m["exams_completed"] += 1
         if r.percent >= 100 - 1e-9:
             m["perfect_scores"] += 1
-        if a.status == Attempt.SUBMITTED and r.percent >= rules.STEADY_PACE_PERCENT:
+        if a.status == Attempt.SUBMITTED and not a.ended_by_id and r.percent >= rules.STEADY_PACE_PERCENT:
             m["steady_exams"] += 1
         if e.start_at and a.started_at <= e.start_at + timedelta(minutes=rules.EARLY_START_MINUTES):
             m["early_starts"] += 1
@@ -317,7 +317,7 @@ def reward_attempt(attempt, now=None):
         with transaction.atomic():
             mark = ExamRewardMark.objects.create(user=student, exam_id=exam.pk)
             award_xp(student, "submit", xp["submit_exam"], f"submit:{exam.pk}", exam.pk)
-            if attempt.status == Attempt.SUBMITTED:
+            if attempt.status == Attempt.SUBMITTED and not attempt.ended_by_id:
                 award_xp(student, "early", xp["finish_early"], f"early:{exam.pk}", exam.pk)
             award_xp(student, "score", rules.score_xp(result.percent, xp["score_per_percent"], xp["score_max"]),
                      f"score:{exam.pk}", exam.pk, percent=int(result.percent + 0.5))

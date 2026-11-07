@@ -34,6 +34,7 @@ MESSAGES = {
         # exam day (EDAY-09, EDAY-10)
         "exam.done.ok": "Well done! Your exam is submitted.",
         "exam.done.timeover": "Time is over. Your answers were submitted automatically.",
+        "exam.done.ended": "Your exam was ended by your teacher. The answers you gave were submitted.",
         "exam.results_note": "Your results will be ready on {when}.",
         # XP ledger labels (SRS 5.1)
         "xp.submit": "Submitted an exam",
@@ -83,6 +84,7 @@ MESSAGES = {
         "password.changed": "Nenosiri lako limebadilishwa. Kama si wewe, mwambie mwalimu wako au ofisi ya shule.",
         "exam.done.ok": "Hongera! Mtihani wako umewasilishwa.",
         "exam.done.timeover": "Muda umekwisha. Majibu yako yamewasilishwa kiotomatiki.",
+        "exam.done.ended": "Mtihani wako umesitishwa na mwalimu wako. Majibu uliyotoa yamewasilishwa.",
         "exam.results_note": "Matokeo yako yatakuwa tayari {when}.",
         "xp.submit": "Umewasilisha mtihani",
         "xp.early": "Umemaliza kabla ya muda kuisha",

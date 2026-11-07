@@ -52,6 +52,8 @@ def late_entry_minutes(exam):
 def release_time(attempt):
     """BR-06: results appear at (exam end, or this student's own deadline if later) + delay."""
     delay = SchoolSettings.load().result_delay_minutes
+    if attempt.ended_by_id:  # an administrator ended it by hand: her unused extra time no longer holds her results back, she is released with everyone else
+        return attempt.exam.end_at + timedelta(minutes=delay)
     return max(attempt.exam.end_at, attempt.deadline_at) + timedelta(minutes=delay)
 
 
@@ -152,6 +154,33 @@ def finalize_attempt(attempt_id, now=None, auto=False):
     return attempt
 
 
+END_MARKS = {"submitted": Attempt.SUBMITTED, "time_over": Attempt.AUTO_SUBMITTED}
+
+
+@transaction.atomic
+def end_attempt(attempt_id, admin, mark="submitted", reason="", now=None):
+    """An administrator ends ONE student's running attempt (for example a student with extra time who is still writing after the
+    exam closed, or a student who must be stopped). Her answers so far are kept and marked, and she is recorded as
+    `mark`: "submitted" or "time_over". The exam can then publish for everybody, hers included (sync_exam waits for running
+    attempts, and release_time no longer waits for her unused extra time). Idempotent guard: an attempt that is already over is refused."""
+    now = now or timezone.now()
+    if mark not in END_MARKS:
+        raise ExamError("Choose how to mark her: submitted or time_over.", 400, "bad_mark")
+    reason = (reason or "").strip()
+    if not reason:
+        raise ExamError("Please give a reason.", 400, "reason_required")
+    attempt = Attempt.objects.select_for_update().select_related("exam", "student").get(pk=attempt_id)
+    if attempt.status != Attempt.IN_PROGRESS:
+        raise ExamError("This attempt is already over.", 409, "already_over")
+    attempt.status = END_MARKS[mark]
+    attempt.submitted_at = now
+    attempt.ended_by, attempt.end_reason = admin, reason[:300]
+    attempt.screen_lock = ""  # a locked screen must not outlive the attempt
+    attempt.save(update_fields=["status", "submitted_at", "ended_by", "end_reason", "screen_lock"])
+    compute_result(attempt)
+    return attempt
+
+
 def recompute_exam_results(exam):
     for a in exam.attempts.exclude(status=Attempt.IN_PROGRESS).select_related("exam", "student"):
         compute_result(a)
@@ -233,7 +262,7 @@ def attempt_state(attempt, now=None):
         results_at = release_time(attempt)
         state.update(
             finished=True, time_over=over, results_at=results_at,
-            message=t("exam.done.timeover" if over else "exam.done.ok", lang),
+            message=t("exam.done.ended" if attempt.ended_by_id else ("exam.done.timeover" if over else "exam.done.ok"), lang),
             results_note=t("exam.results_note", lang, when=fmt_when(timezone.localtime(results_at), lang)),
             tips=finish_tips(exam.subject.name, lang, attempt.pk),  # EDAY-09: rotating, subject-specific, motivational
         )

@@ -78,6 +78,9 @@ class Attempt(models.Model):
     screen_lock = models.CharField(max_length=10, blank=True, default="")  # "" | leaves | manual
     screen_locked_at = models.DateTimeField(null=True, blank=True)
     leaves_forgiven = models.PositiveIntegerField(default=0)
+    # Set when an administrator ended this attempt by hand (services.end_attempt). null = it ended by itself (she submitted or time ran out).
+    ended_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    end_reason = models.CharField(max_length=300, blank=True, default="")
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["exam", "student", "attempt_no"], name="one_attempt_per_no")]

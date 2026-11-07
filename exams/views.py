@@ -656,6 +656,31 @@ class ExamViewSet(viewsets.ModelViewSet):
                 audit(request.user, "exam.grant.retake.revoke", exam.pk, count=len(who), usernames=who[:MAX_RETAKE_BATCH])
         return Response({"ok": True, "revoked": len(who)})
 
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminRole], url_path="end-attempt")
+    def end_attempt(self, request, pk=None):
+        """Administrator ends ONE student's running attempt, live or after the exam closed (the Close button cannot: it needs a
+        live exam). Body: student_id, mark ("submitted" | "time_over"), reason. Her answers so far are marked; the exam then
+        publishes for everybody, hers included, as soon as nobody is still writing and the result delay has passed."""
+        exam = self.get_object()
+        services.sync_exam(exam)
+        try:
+            student_id = int(request.data.get("student_id"))
+        except (TypeError, ValueError):
+            raise ValidationError({"student_id": "Choose a student."})
+        attempt = exam.attempts.filter(student_id=student_id, status=Attempt.IN_PROGRESS).order_by("-attempt_no").first()
+        if attempt is None:
+            raise ValidationError({"detail": "She is not writing this exam right now."})
+        mark = request.data.get("mark") or "submitted"
+        try:
+            attempt = services.end_attempt(attempt.pk, request.user, mark, request.data.get("reason"))
+        except ExamError as e:
+            return _err(e)
+        audit(request.user, "exam.attempt.end", exam.pk, student=student_id, mark=mark, reason=attempt.end_reason, attempt=attempt.pk)
+        exam.refresh_from_db()
+        services.sync_exam(exam)  # publishes now if everything else is already done
+        exam.refresh_from_db()
+        return Response({"ok": True, "exam_status": exam.status, "still_writing": exam.attempts.filter(status=Attempt.IN_PROGRESS).count()})
+
     @action(detail=True, methods=["get"])
     def monitor(self, request, pk=None):
         """ADM-06 / TCH-08: one exam. Admins get names, parent phones and per-student detail;
@@ -785,6 +810,7 @@ def _monitor_exam(exam, user, now, online, cache=None):
     data["submitted_students"] = sorted((row(a, {
         "submitted_at": _ts(a, "submitted_at", "finished_at", "ended_at"),
         "auto_submitted": a.status == Attempt.AUTO_SUBMITTED,
+        "ended_by_admin": bool(a.ended_by_id), "end_reason": a.end_reason,
         "completion": "full" if data["total_questions"] and answered.get(a.pk, 0) >= data["total_questions"] else "partial"})
         for a in done),
         key=lambda r: (r["class"], r["name"]))
