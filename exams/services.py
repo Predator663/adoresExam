@@ -159,6 +159,11 @@ def recompute_exam_results(exam):
 
 # ---------------------------------------------------------------- starting
 
+def pending_retake(exam, student):
+    """The oldest retake permission this student has not used yet, or None."""
+    return ExamGrant.objects.filter(exam=exam, student=student, kind=ExamGrant.RETAKE, used=False).order_by("created_at", "pk").first()
+
+
 def start_attempt(exam, student, now=None):
     now = now or timezone.now()
     sync_exam(exam, now)
@@ -170,15 +175,16 @@ def start_attempt(exam, student, now=None):
     if last and last.status == Attempt.IN_PROGRESS:
         return last  # resume (EDAY-06); an overdue one was already auto-submitted by sync_exam
 
-    retake = None
+    # An unused retake grant is the administrator's permission to sit (again). It covers a student who finished or ran out of
+    # time AND a student who never started and missed the late-entry window: she then gets the full duration (below).
+    retake = pending_retake(exam, student)
     if last:
-        retake = ExamGrant.objects.filter(exam=exam, student=student, kind=ExamGrant.RETAKE, used=False).order_by("created_at").first()
         if not retake:
             raise ExamError("You have already taken this exam. Only an administrator can allow a retake.", 409, "already_taken")
     else:
         if now < exam.start_at:
-            raise ExamError("This exam has not started yet.", 403, "too_early")
-        if now > exam.start_at + timedelta(minutes=late_entry_minutes(exam)):
+            raise ExamError("This exam has not started yet.", 403, "too_early")  # permission never lets anyone in before the start
+        if not retake and now > exam.start_at + timedelta(minutes=late_entry_minutes(exam)):
             raise ExamError("The late-entry period is over, so you can no longer start. Please contact your teacher.", 403, "too_late")
 
     eqs = list(exam.questions.filter(voided=False))

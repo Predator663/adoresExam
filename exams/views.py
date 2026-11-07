@@ -2,6 +2,7 @@ import logging
 import random
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Avg, Count, Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -25,6 +26,8 @@ from .sections import letters, qtype_rank
 from .models import Answer, Attempt, AttemptEvent, Exam, ExamGrant, ExamQuestion, Result
 from .services import ExamError
 
+MAX_RETAKE_BATCH = 500  # students per retake request (a whole school year group fits)
+
 
 def _err(e):
     return Response({"detail": e.message, "code": e.code}, status=e.status)
@@ -34,15 +37,17 @@ def _err(e):
 # Every query below is filtered by request.user. A student can never reach another
 # student's attempt or result, whatever id she types (BR-07, RES-08).
 
-def _exam_card(exam, student, now):
+def _exam_card(exam, student, now, retake=None):
     last = exam.attempts.filter(student=student).order_by("-attempt_no").first()
+    if retake is None:
+        retake = services.pending_retake(exam, student) is not None  # an administrator has allowed her to sit this exam
     if last and last.status == Attempt.IN_PROGRESS:
         state = "in_progress"
     elif last:
-        state = "done"
+        state = "open" if retake else "done"
     elif now < exam.start_at:
         state = "upcoming"
-    elif now <= exam.start_at + timedelta(minutes=services.late_entry_minutes(exam)):
+    elif retake or now <= exam.start_at + timedelta(minutes=services.late_entry_minutes(exam)):
         state = "open"
     else:
         state = "missed"
@@ -50,7 +55,7 @@ def _exam_card(exam, student, now):
         "id": exam.pk, "title": exam.title, "subject": exam.subject.name, "start_at": exam.start_at,
         "end_at": exam.end_at, "duration_minutes": exam.duration_minutes,
         "question_count": exam.questions.filter(voided=False).count(), "total_marks": exam.total_marks,
-        "rules_text": exam.rules_text, "state": state,
+        "rules_text": exam.rules_text, "state": state, "retake": bool(retake) and state == "open",
         "attempt_id": last.pk if last else None, "server_time": now,
     }
 
@@ -64,9 +69,12 @@ def student_exams(request):
     for e in exams:
         if e.status != Exam.PUBLISHED:
             services.sync_exam(e, now)
-    exams = [e for e in exams if e.end_at and e.end_at > now - timedelta(days=1)]
+    allowed = set(ExamGrant.objects.filter(student=request.user, kind=ExamGrant.RETAKE, used=False, exam__in=exams)
+                  .values_list("exam_id", flat=True))  # an exam she was allowed to sit stays on her list however old it is
+    writing = set(Attempt.objects.filter(student=request.user, status=Attempt.IN_PROGRESS, exam__in=exams).values_list("exam_id", flat=True))
+    exams = [e for e in exams if e.end_at and (e.end_at > now - timedelta(days=1) or e.pk in allowed or e.pk in writing)]  # a late sitting in progress must never vanish
     exams.sort(key=lambda e: e.start_at)
-    return Response([_exam_card(e, request.user, now) for e in exams])
+    return Response([_exam_card(e, request.user, now, retake=e.pk in allowed) for e in exams])
 
 
 @api_view(["POST"])
@@ -584,6 +592,69 @@ class ExamViewSet(viewsets.ModelViewSet):
             grant.save(update_fields=["used"])
         audit(request.user, f"exam.grant.{kind}", exam.pk, student=student.pk, minutes=minutes, reason=reason)
         return Response({"ok": True})
+
+    @staticmethod
+    def _student_ids(value, limit):
+        if not isinstance(value, list) or not value:
+            raise ValidationError({"student_ids": "Choose at least one student."})
+        if len(value) > limit:
+            raise ValidationError({"student_ids": f"Choose at most {limit} students at a time."})
+        try:
+            return sorted({int(i) for i in value})
+        except (TypeError, ValueError):
+            raise ValidationError({"student_ids": "Student ids must be numbers."})
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminRole], url_path="grant-retakes")
+    def grant_retakes(self, request, pk=None):
+        """Let several students sit this exam: ones who MISSED it (never started, even after the late-entry time), ones whose time
+        ran out, and ones still writing (they can start again once they finish). Each student gets one retake permission, used the
+        first time she starts. One reason for the whole batch, kept in the audit log. Safe to press twice: nobody gets two."""
+        base = self.get_object()
+        reason = (request.data.get("reason") or "").strip()
+        if not reason:
+            raise ValidationError({"reason": "Please give a reason (it is kept in the audit log)."})
+        ids = self._student_ids(request.data.get("student_ids"), MAX_RETAKE_BATCH)
+        now = timezone.now()
+        services.sync_exam(base, now)
+        with transaction.atomic():
+            exam = Exam.objects.select_for_update().get(pk=base.pk)  # two administrators pressing together are handled one after the other
+            if exam.status == Exam.DRAFT or not exam.start_at:
+                raise ValidationError({"detail": "That exam has not been scheduled yet."})
+            students = list(services.eligible_students(exam).filter(pk__in=ids))
+            have = set(ExamGrant.objects.filter(exam=exam, kind=ExamGrant.RETAKE, used=False, student__in=students).values_list("student_id", flat=True))
+            latest = {}
+            for a in exam.attempts.filter(student__in=students).order_by("attempt_no"):
+                latest[a.student_id] = a.status
+            new = [s for s in students if s.pk not in have]
+            ExamGrant.objects.bulk_create([ExamGrant(exam=exam, student=s, kind=ExamGrant.RETAKE, reason=reason[:300], granted_by=request.user) for s in new])
+            breakdown = {"never_started": sum(1 for s in new if s.pk not in latest),
+                         "still_writing": sum(1 for s in new if latest.get(s.pk) == Attempt.IN_PROGRESS),
+                         "finished": sum(1 for s in new if s.pk in latest and latest[s.pk] != Attempt.IN_PROGRESS)}
+            if new:
+                audit(request.user, "exam.grant.retake.bulk", exam.pk, count=len(new), usernames=[s.username for s in new][:MAX_RETAKE_BATCH],
+                      reason=reason, **breakdown)
+        if new:  # the permission is already saved: a failing notification must never undo it
+            try:
+                from notifications.services import notify_i18n
+                notify_i18n([s.pk for s in new], "retake_allowed", "retake.title", "retake.body", {"title": exam.title},
+                            key=f"retake:{exam.pk}:{int(now.timestamp())}", data={"exam_id": exam.pk})
+            except Exception:
+                logging.getLogger(__name__).exception("retake notification failed for exam %s", exam.pk)
+        return Response({"ok": True, "requested": len(ids), "granted": len(new), "already_allowed": len(have),
+                         "not_eligible": len(ids) - len(students), "breakdown": breakdown})
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminRole], url_path="revoke-retakes")
+    def revoke_retakes(self, request, pk=None):
+        """Take back retake permissions that were not used yet (a wrong click). A student who already started keeps her attempt."""
+        exam = self.get_object()
+        ids = self._student_ids(request.data.get("student_ids"), MAX_RETAKE_BATCH)
+        with transaction.atomic():
+            qs = ExamGrant.objects.select_for_update().filter(exam=exam, kind=ExamGrant.RETAKE, used=False, student_id__in=ids)
+            who = list(qs.values_list("student__username", flat=True))
+            qs.delete()
+            if who:
+                audit(request.user, "exam.grant.retake.revoke", exam.pk, count=len(who), usernames=who[:MAX_RETAKE_BATCH])
+        return Response({"ok": True, "revoked": len(who)})
 
     @action(detail=True, methods=["get"])
     def monitor(self, request, pk=None):

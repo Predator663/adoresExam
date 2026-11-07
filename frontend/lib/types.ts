@@ -18,5 +18,5 @@ export type AttemptState = {
 };
 export type ExamCard = {
   id: number; title: string; subject: string; start_at: string; end_at: string; duration_minutes: number; question_count: number;
-  total_marks: number; rules_text: string; state: "upcoming" | "open" | "in_progress" | "done" | "missed"; attempt_id: number | null; server_time: string;
+  total_marks: number; rules_text: string; state: "upcoming" | "open" | "in_progress" | "done" | "missed"; retake?: boolean; attempt_id: number | null; server_time: string;
 };

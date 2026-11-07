@@ -6,6 +6,8 @@
 
 Filters (all three calls): exam=<id> (required), class=<id>, q=<name / username / index number>,
 status=none,writing,auto (default none,writing), sort=name|class|status|index, dir=asc|desc, parents=1.
+Each row also says `retake_allowed` (an administrator has allowed her to sit and she has not started yet). The allow / take-back buttons
+call POST /api/exams/<id>/grant-retakes/ and /revoke-retakes/ (exams/views.py).
 
 Who counts as "not submitted":
   none     never opened the exam (no attempt at all)
@@ -30,7 +32,7 @@ from accounts.permissions import IsAdminRole
 from core import notsubmitted_report
 from core.models import SchoolSettings, audit
 from . import services
-from .models import Attempt, Exam
+from .models import Attempt, Exam, ExamGrant
 
 STATUS_LABEL = {"none": "Did not sit", "writing": "Still writing", "auto": "Not submitted: time ran out"}
 SORTS = ("name", "class", "status", "index")
@@ -120,6 +122,7 @@ def collect(request):
             "index": lambda s: (s.index_number or "~", s.pk)}
     shown.sort(key=keys[sort], reverse=(direction == "desc"))
 
+    allowed = set(ExamGrant.objects.filter(exam=exam, kind=ExamGrant.RETAKE, used=False).values_list("student_id", flat=True))  # permission given, not used yet
     with_parents = p.get("parents") in ("1", "true", "yes")
     guardians = _guardians([s.pk for s in shown]) if with_parents else {}
     rows = []
@@ -129,7 +132,7 @@ def collect(request):
                      "status": states[s.pk], "status_label": STATUS_LABEL[states[s.pk]],
                      "started_at": a.started_at if a else None, "attempt_no": a.attempt_no if a else None,
                      "started_text": timezone.localtime(a.started_at).strftime("%d %b, %H:%M") if a else "-",
-                     "parents": guardians.get(s.pk, [])})
+                     "retake_allowed": s.pk in allowed, "parents": guardians.get(s.pk, [])})
 
     by_class = {}
     for s in eligible:  # every class of the exam, whatever class is picked, so the person can switch between them
@@ -144,7 +147,7 @@ def collect(request):
     summary = {"eligible": eligible_n, "submitted": counts["submitted"] + counts["auto"], "not_submitted": not_sub,
                "none": counts["none"], "writing": counts["writing"], "auto": counts["auto"],
                "pct_submitted": round(100 * (counts["submitted"] + counts["auto"]) / eligible_n, 1) if eligible_n else None,
-               "listed": len(rows)}
+               "listed": len(rows), "allowed": sum(1 for s in in_scope if s.pk in allowed and states[s.pk] in ("none", "writing", "auto"))}
     classes_label = ", ".join(str(c) for c in exam.classes.all()) or "Selected students"
     filters = [("Exam", exam.title), ("Subject", exam.subject.name), ("Classes", classes_label),
                ("Held", f"{timezone.localtime(exam.start_at):%d %b %Y, %H:%M} to {timezone.localtime(exam.end_at):%H:%M}" if exam.end_at else f"{timezone.localtime(exam.start_at):%d %b %Y, %H:%M}"),

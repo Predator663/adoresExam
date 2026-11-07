@@ -1245,3 +1245,12 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 @media(prefers-reduced-motion:reduce){.lk *,.lk{animation:none!important;transition:none!important}.lk-ok circle,.lk-ok path{stroke-dashoffset:0}.lk-badge i{display:none}}
 :root[data-theme=high_contrast] .lk-row,:root[data-theme=high_contrast] .lk-hero,:root[data-theme=high_contrast] .lk-kpi{border-width:2px}
 :root[data-theme=high_contrast] .lk-pips i.on{outline:2px solid var(--text)}
+
+/* ---- Not submitted: allow to sit (components/NotSubmitted.tsx) ---- */
+.ns-allowed{background:#d3efdc;color:#145c2e;margin-left:.35rem}
+.ns-ok b{color:var(--good)}
+.ns-check{width:20px;height:20px;accent-color:var(--primary);cursor:pointer}
+.ns-sel{background:var(--soft)}
+.ns-bulk{position:sticky;top:.5rem;z-index:5;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.6rem 0;padding:.6rem .8rem;border-radius:14px;background:var(--surface);border:1px solid var(--primary);box-shadow:var(--shadow);animation:lk-slide .25s ease both}
+.ns-bulk b{margin-right:auto}
+@media print{.ns-allowed{background:none!important;color:#000!important;padding:0}}

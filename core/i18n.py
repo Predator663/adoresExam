@@ -28,6 +28,8 @@ MESSAGES = {
         "results.body": "Your result and review are ready. Open the app to see how you did.",
         "password.title": "Password changed",
         "password.reset": "An administrator reset your password. Choose a new one when you log in.",
+        "retake.title": "You can sit {title}",
+        "retake.body": "Your teacher has allowed you to sit this exam. Open the app and press Start when you are ready.",
         "password.changed": "Your password was changed. If this was not you, tell your teacher or the school office.",
         # exam day (EDAY-09, EDAY-10)
         "exam.done.ok": "Well done! Your exam is submitted.",
@@ -76,6 +78,8 @@ MESSAGES = {
         "results.body": "Matokeo yako na mapitio yako yako tayari. Fungua programu uone ulivyofanya.",
         "password.title": "Nenosiri limebadilishwa",
         "password.reset": "Msimamizi amebadilisha nenosiri lako. Chagua jipya utakapoingia.",
+        "retake.title": "Unaweza kufanya {title}",
+        "retake.body": "Mwalimu wako amekuruhusu kufanya mtihani huu. Fungua programu na ubonyeze Anza ukiwa tayari.",
         "password.changed": "Nenosiri lako limebadilishwa. Kama si wewe, mwambie mwalimu wako au ofisi ya shule.",
         "exam.done.ok": "Hongera! Mtihani wako umewasilishwa.",
         "exam.done.timeover": "Muda umekwisha. Majibu yako yamewasilishwa kiotomatiki.",

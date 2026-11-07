@@ -101,3 +101,10 @@ device code. Flags are kept 180 days (`python manage.py purge_locations --flag-d
 - For a teacher or admin, **New password** gives a strong random password, shown once. Super Admin accounts are not listed, and you cannot change your own account here.
 - Tick several to unlock them together. New passwords for many at once (**Copy all** or **Download CSV**) work for students only; teachers and admins are done one at a time.
 - Every action is written to the audit log (`login.unlock`, `login.unlock.bulk`, `password.reset`).
+
+### Letting students sit an exam they missed
+
+- Open **Not submitted**, pick the exam, tick the students (or **Select all**) and press **Allow to sit**. Give a reason; it is kept in the audit log.
+- A student who **never started** can start straight away, even after the exam time is over, and gets the full exam time. A student whose **time ran out** sits again. A student **still writing** gets a second sitting only after finishing the current one.
+- Each student can use the permission once. The student sees "Your teacher has allowed you to sit this exam" and gets a notification.
+- **Take back permission** cancels permissions that have not been used yet.

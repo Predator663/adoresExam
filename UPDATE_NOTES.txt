@@ -1,3 +1,24 @@
+Amani Exams update: Allow students who missed an exam to sit it (one, several or everyone listed)
+
+Staff > Not submitted: tick students (or "Select all N") and press "Allow to sit". Works for all three kinds of "not submitted":
+  Did not sit     never started, even after the late-entry time. They can start NOW, at any time after the exam began, and get the FULL
+                  exam time (not cut off at the exam's end). Before this update the single-student "Retake" did nothing for these students:
+                  the permission was saved but the late-entry rule still blocked them and their card said "missed".
+  Time ran out    they sit again; the new sitting is the one the report judges.
+  Still writing   they keep their current attempt; they get a second sitting only AFTER they finish it (you must tick a box to confirm).
+One reason is asked for the whole batch (audit log: exam.grant.retake.bulk, with the names). Each student gets ONE permission, used the first time
+she starts: pressing twice never gives two. "Take back permission" cancels permissions not yet used (audit: exam.grant.retake.revoke).
+Allowed students see "Your teacher has allowed you to sit this exam" on their home screen and get a notification (English or Swahili); the exam
+stays on their list however old it is, and a late sitting in progress never drops off the list. The report marks them "Allowed to sit" and counts them.
+Rules that do NOT change: nobody can start before the exam begins; administrators only; only students on that exam; results appear after her
+own deadline plus the usual delay. Parents are not contacted.
+API (administrators):  POST /api/exams/<id>/grant-retakes/  {student_ids:[..], reason}   (max 500)   POST /api/exams/<id>/revoke-retakes/  {student_ids:[..]}
+                       GET /api/exams/not-submitted/ rows now carry retake_allowed; summary carries allowed.   No migrations. No new settings.
+Fixed:   the existing single-student "Retake" (Exams > Extra time or retake) now also works for a student who never started.
+Changed: exams/services.py (start rule)  exams/views.py (card state, list, 2 endpoints)  exams/notsubmitted.py  core/i18n.py
+         frontend/components/NotSubmitted.tsx  ExamBanner.tsx  lib/types.ts  lib/i18n.ts  app/globals.css      New: exams/test_retakes.py
+Tests:   python manage.py test exams.test_retakes  (15 pass).  Rebuild the front end (npm run build).
+
 Amani Exams update: Locked accounts (Super Admin): students, teachers and admins
 
 Administration > Locked accounts (Super Admin only; Admins and teachers do not see it and the API refuses them). Switch between

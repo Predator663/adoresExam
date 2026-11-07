@@ -18,6 +18,7 @@ export function examStatus(c: ExamCard, n: number, t: (k: string, v?: Record<str
   const diff = start - n, today = dayKey(n) === dayKey(start);
   let head = "", big = "", tone: "live" | "soon" | "calm" | "done" | "missed" = "calm";
   if (c.state === "done") { head = t("exam_done"); tone = "done"; }
+  else if (c.retake && c.state === "open") { head = t("exam_retake_allowed"); tone = "live"; }  // an administrator allowed her to sit it
   else if (c.state === "missed" || n > end) { head = t("exam_missed"); tone = "missed"; }
   else if (c.state === "in_progress") { head = t("exam_in_progress"); tone = "live"; }
   else if (diff <= 0) { head = t("exam_open_now"); tone = "live"; }
