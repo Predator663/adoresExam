@@ -92,3 +92,12 @@ device code. Flags are kept 180 days (`python manage.py purge_locations --flag-d
 - The person sees it as a banner at the very top of the screen, also during an exam and over the lock screen. One tap closes the banner; the message then stays in
   her **Messages** tab. She cannot delete it. When you **Delete** it on the Messages page it disappears from her tab (and banner) too. The page shows who has closed the banner.
 - Students in an exam receive the banner within about 6 seconds; other pages check every 20 seconds.
+
+### Locked accounts (Super Admin only)
+
+- **Administration → Locked accounts** lists students, teachers and admins (switch with the tabs at the top) who typed a wrong password 5 times and are locked for 15 minutes. The list refreshes by itself and shows when each lock ends.
+- **Unlock** (or **Reset tries** for a student who has used some tries but is not locked yet) sets the wrong tries back to zero and removes the lock. Her password does not change.
+- **New password** gives her a new random starting password, shown once. She is signed out, unlocked, and must choose her own password at the next sign-in.
+- For a teacher or admin, **New password** gives a strong random password, shown once. Super Admin accounts are not listed, and you cannot change your own account here.
+- Tick several to unlock them together. New passwords for many at once (**Copy all** or **Download CSV**) work for students only; teachers and admins are done one at a time.
+- Every action is written to the audit log (`login.unlock`, `login.unlock.bulk`, `password.reset`).

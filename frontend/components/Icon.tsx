@@ -33,6 +33,8 @@ const P: Record<string, string> = {
   arrow: "M5 12h14M13 6l6 6-6 6",
   info: "M12 22a10 10 0 100-20 10 10 0 000 20zM12 16v-4M12 8h.01",
   zap: "M13 2L3 14h8l-1 8 10-12h-8l1-8z",
+  unlock: "M5 11h14v10H5zM8 11V7a4 4 0 017.7-1.5",
+  refresh: "M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0114.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0020.5 15",
   radar: "M12 12m-1 0a1 1 0 102 0 1 1 0 10-2 0M12 22a10 10 0 100-20 10 10 0 000 20zM12 18a6 6 0 100-12 6 6 0 000 12zM12 12l6-6",
 };
 export default function Icon({ n, size = 20 }: { n: keyof typeof P | string; size?: number }) {

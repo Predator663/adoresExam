@@ -1,20 +1,26 @@
-Amani Exams update: unlock students (and staff) locked out by too many wrong passwords
+Amani Exams update: Locked accounts (Super Admin): students, teachers and admins
 
-Five wrong passwords lock an account for 15 minutes (unchanged). Until now the only quick fix was "Reset password", which also
-threw away a password the student had remembered correctly. Now an admin can UNLOCK without changing the password.
-- Staff > People > Students: a "locked" tag shows beside the status. Open the student > "Unlock (keep password)".
-  Select several students > "Unlock" (bulk). Teachers and Admins tabs: "locked" tag and an "Unlock" button.
-- Reset password (single) now shows the new starting password once; the old text said "index number", which has not been true
-  since starting passwords became random codes. The bulk reset confirmation text is corrected too.
-- Unlock never touches the password or the student's session. Resetting a password still clears the lock as before.
-- Audit log: student.unlock, teacher.unlock, admin.unlock, students.bulk.unlock.
-No migrations. API (admin only):  POST /api/students/<id>/unlock/   POST /api/teachers/<id>/unlock/   POST /api/admins/<id>/unlock/
-  POST /api/students/bulk-action/ {"action": "unlock", "ids": [...]}   Student and staff lists now return is_locked and locked_until.
-Note: the login limit of 20 per minute per internet address is separate; a whole class on one Wi-Fi can hit it, and unlocking
-an account does not clear it (it clears by itself within a minute).
-Changed: accounts/views.py  accounts/test_security.py (UnlockTests)  frontend/app/staff/people/page.tsx
+Administration > Locked accounts (Super Admin only; Admins and teachers do not see it and the API refuses them). Switch between
+Students / Teachers / Admins (each shows its own locked count). Shows every account locked out by wrong passwords (5 wrong tries = 15 minutes), live: refreshes every 15 s, counts each lock down to its automatic end,
+tabs Locked now / Tries used / Everyone affected, search (name, username, index number) and class filter.
+  Unlock / Reset tries  clears the wrong-try counter AND the lock; the student can sign in at once. Her password is unchanged.
+  New password          random starting password (same kind as the credentials sheet), shown ONCE; she is signed out everywhere,
+                        the lock is cleared, she must choose her own password at the next sign-in; she gets the usual notification.
+  Teachers and admins   Unlock and New password work the same; their new password is strong and random (same rule as Staff > Reset
+                        password) and is given one at a time. Bulk Unlock works for any role; bulk New passwords is students only.
+                        Super Admin accounts are never listed, and you cannot change your own account here.
+  Select several        Unlock / New passwords for up to 200 at a time (bulk passwords: Copy all or Download CSV).
+Every change is written to the audit log with the Super Admin's name (login.unlock, login.unlock.bulk, password.reset). The login
+rules themselves are not changed. Archived students are not listed and cannot be changed here.
+No migrations. No new settings.
+API (Super Admin only):  GET /api/lockouts/?role=student|teacher|admin&status=locked|warning|all&q=&class=&page=   POST /api/lockouts/<id>/reset-attempts/
+                         POST /api/lockouts/<id>/reset-password/   POST /api/lockouts/bulk/  {ids:[..], action: reset_attempts|reset_passwords, role}
+New:     accounts/lockouts.py  accounts/test_lockouts.py  frontend/components/LockedAccounts.tsx  frontend/app/staff/lockouts/page.tsx
+Fixed:   Staff > People > Students: "Reset password" (one and many) said "reset to the index number"; it now says a random starting
+         password was issued and shows it once (single) / points to the Username sheet (many).
+Changed: accounts/urls.py  frontend/app/staff/people/page.tsx  frontend/components/Shell.tsx (menu item)  frontend/components/Icon.tsx (2 icons)  frontend/app/globals.css
+Tests:   python manage.py test accounts.test_lockouts  (16 pass).  Rebuild the front end (npm run build).
 
----- Previous update ----
 Amani Exams update: admin search everywhere + "Not submitted" panel with printing
 
 SEARCH (admins): Staff > People > Teachers and Admins now have a search box (name, username, email; every word must match),
