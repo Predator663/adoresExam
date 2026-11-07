@@ -25,6 +25,7 @@ from notifications.services import notify_password_changed
 from .hashers import InitialPasswordHasher
 from .models import THEMES, BulkUploadBatch, User
 from .permissions import IsAdminRole, IsSuperAdmin
+from .throttles import LoginIPThrottle, LoginUserThrottle
 from . import temp_password
 from .services import (TEMPLATE_COLUMNS, create_students, generate_password, parse_upload, validate_rows,
                        validate_staff_password)
@@ -81,7 +82,7 @@ class _FakeLock:
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_scope = "login"
+    throttle_classes = [LoginIPThrottle, LoginUserThrottle]  # per user name and per address (accounts/throttles.py)
 
     def post(self, request):
         username = (request.data.get("username") or "").strip()

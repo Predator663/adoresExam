@@ -175,6 +175,12 @@ STORAGES = {
 MEDIA_URL = "media/"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 
+# Login limits (accounts/throttles.py). Per USER NAME: one account cannot be hammered. Per ADDRESS: generous, because a whole school shares one
+# internet address and a class logs in at the same moment. Load testing from ONE computer: set LOGIN_IP_THROTTLE_RATE=100000/min on the test server only.
+# The old LOGIN_THROTTLE_RATE name still works as the address limit.
+LOGIN_USER_THROTTLE_RATE = os.environ.get("LOGIN_USER_THROTTLE_RATE", "1000/min" if TESTING else "10/min")
+LOGIN_IP_THROTTLE_RATE = os.environ.get("LOGIN_IP_THROTTLE_RATE") or os.environ.get("LOGIN_THROTTLE_RATE") or ("100000/min" if TESTING else "600/min")
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
@@ -188,8 +194,7 @@ REST_FRAMEWORK = {
         "accounts.permissions.NotForcedPasswordChange",
     ],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    # Load testing from ONE computer needs a higher limit: set LOGIN_THROTTLE_RATE=100000/min on the test server only.
-    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("LOGIN_THROTTLE_RATE", "20/min")},
+    "DEFAULT_THROTTLE_RATES": {},  # the login limits are LOGIN_USER_THROTTLE_RATE / LOGIN_IP_THROTTLE_RATE above (accounts/throttles.py)
     "EXCEPTION_HANDLER": "core.exceptions.friendly_exception_handler",  # crashes become a plain JSON answer; details only in the server log
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     # PDF / Excel / CSV downloads must not be refused because of a browser's Accept header.

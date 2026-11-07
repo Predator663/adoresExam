@@ -6,7 +6,7 @@ It needs only Python 3.9+ (no extra packages), so it runs on a laptop or in Term
 each one logs in, opens her exams, starts the exam, answers every question (pausing like a real student), and finishes.
 
     1. On a TEST server:   python manage.py seed_loadtest --students 500 --questions 40 --yes
-       (the test server must run with LOGIN_THROTTLE_RATE=100000/min, because every simulated student has the same IP)
+       (the test server must run with LOGIN_IP_THROTTLE_RATE=100000/min, because every simulated student has the same IP)
     2. From any computer:  python loadtest/run_load.py --base-url https://TEST-SERVER --students 500
 
 It prints response times (median, 95th and 99th percentile, slowest) and checks them against the SRS:

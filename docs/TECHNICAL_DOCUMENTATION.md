@@ -212,7 +212,7 @@ sequenceDiagram
   participant DB as Database
   U->>W: user name + password
   W->>A: POST /api/auth/login/ (X-School)
-  A->>A: Throttle: 20 per minute per client
+  A->>A: Throttle: 10 per minute per user name, 600 per minute per address
   A->>DB: find user in the school schema
   alt wrong password
     A->>DB: failed_logins += 1, lock 15 min after 5
@@ -864,7 +864,8 @@ Home, maintenance on/off, God's Eye (`eye/`, `eye/data/`, `eye/tables/`) for rea
 | `GUARDIAN_KEY` | Encryption secret for parents' data (**back it up; losing it makes the data unreadable**) | empty |
 | `MEDIA_ROOT` | Where uploads are stored (use the persistent disk) | `./media` |
 | `TOKEN_TTL_HOURS` | Login lifetime | `12` |
-| `LOGIN_THROTTLE_RATE` | Login rate limit | `20/min` |
+| `LOGIN_USER_THROTTLE_RATE` | Login limit per user name | `10/min` |
+| `LOGIN_IP_THROTTLE_RATE` | Login limit per internet address (a school shares one; old name `LOGIN_THROTTLE_RATE` also works) | `600/min` |
 | `NUM_PROXIES` | Reverse proxies in front of Django | `1` in production |
 | `LEGACY_SCHOOL_SCHEMA` | Schema for old clients that send no school clue | empty |
 | `PROCTORING_ENABLED`, `LOCATION_STALE_SECONDS`, `LOCATION_MAX_ACCURACY`, `PROXIMITY_CLEAR_SECONDS` | Anti-cheat tuning | see section 14 |

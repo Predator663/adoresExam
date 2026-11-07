@@ -5,7 +5,7 @@ Goal (SRS NFR-05, acceptance test 9.2): every enrolled student can log in and st
 **Never run this against the real school database.** It creates fake students.
 
 ## Steps
-1. Make a **test server** like the real one (same size, same PostgreSQL type) with its own empty database. Set `LOGIN_THROTTLE_RATE=100000/min` on that test server only (otherwise the login limit of 20 per minute blocks the test, because every fake student has the same internet address).
+1. Make a **test server** like the real one (same size, same PostgreSQL type) with its own empty database. Set `LOGIN_IP_THROTTLE_RATE=100000/min` on that test server only (otherwise the per-address login limit, 600 per minute by default, can block a big test, because every fake student has the same internet address). Leave `LOGIN_USER_THROTTLE_RATE` (10 per minute per user name) at its default.
 2. On the test server: `python manage.py migrate` then
    `python manage.py seed_loadtest --students 500 --questions 40 --yes`
    (use at least twice your real enrolment, as the SRS asks).
