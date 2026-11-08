@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ErrorNote, Loading } from "@/components/ui";
-import { api, friendly } from "@/lib/api";
+import { ApiError, api, friendly } from "@/lib/api";
 
 /** Download results page: search one student, then see how many questions she got right out of how many, exam by exam, with a line for
  *  every question, her topics and subjects. Follows the term, subject and exam chosen above. Status is always a symbol AND a word, never colour alone. */
@@ -22,6 +22,11 @@ type Analysis = {
   subjects: { subject: string; exams: number; questions: number; correct: number; average: number; marks: number; possible: number }[];
   topics: Topic[]; exams: ExamBlock[];
 };
+
+/** A 404 here means the server has not been updated with the student lookup yet: say so, instead of a vague "something went wrong". */
+const explain = (e: unknown) => (e instanceof ApiError && (e.status === 404 || e.status === 405)
+  ? "The student lookup is not on the server yet. Update the backend with analytics/studentanalysis.py and analytics/urls.py, restart it, then reload this page."
+  : friendly(e));
 
 const MARK: Record<Status, [string, string]> = { correct: ["✓", "Correct"], partly: ["◐", "Partly"], wrong: ["✗", "Wrong"], unanswered: ["–", "Not answered"] };
 const ORDER: Status[] = ["correct", "partly", "wrong", "unanswered"];
@@ -100,7 +105,7 @@ export default function StudentAnalysis({ term, subject, exam }: { term: string;
       const p = filters(); p.set("q", text);
       api<{ results: Match[] }>(`/exports/results-report/students/?${p}`)
         .then((d) => { if (seq.current === mine) { setMatches(d.results); setSearchErr(""); } })
-        .catch((e) => { if (seq.current === mine) setSearchErr(friendly(e)); });
+        .catch((e) => { if (seq.current === mine) setSearchErr(explain(e)); });
     }, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,7 +118,7 @@ export default function StudentAnalysis({ term, subject, exam }: { term: string;
     setBusy(true); setErr("");
     api<Analysis>(`/exports/results-report/students/${picked.id}/?${filters()}`)
       .then((d) => { if (seqA.current === mine) setData(d); })
-      .catch((e) => { if (seqA.current === mine) setErr(friendly(e)); })
+      .catch((e) => { if (seqA.current === mine) setErr(explain(e)); })
       .finally(() => { if (seqA.current === mine) setBusy(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picked, term, subject, exam]);
