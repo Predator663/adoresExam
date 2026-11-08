@@ -1254,3 +1254,20 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 .ns-bulk{position:sticky;top:.5rem;z-index:5;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.6rem 0;padding:.6rem .8rem;border-radius:14px;background:var(--surface);border:1px solid var(--primary);box-shadow:var(--shadow);animation:lk-slide .25s ease both}
 .ns-bulk b{margin-right:auto}
 @media print{.ns-allowed{background:none!important;color:#000!important;padding:0}}
+
+/* ---- Download results: look up one student (components/StudentAnalysis). Status is a symbol AND a word; colour only helps. */
+.sa-matches{list-style:none;margin:.4rem 0;padding:0;display:grid;gap:.4rem}
+.sa-match{width:100%;text-align:left;display:block;white-space:normal}
+.sa-body{margin-top:.8rem;animation:fx-in .3s ease both}
+.sa-big{font-size:1.5rem;margin:.6rem 0 .3rem}.sa-big b{font-size:2rem}
+.sa-split{display:flex;height:14px;border-radius:999px;overflow:hidden;border:1px solid var(--border);background:var(--soft);gap:2px}
+.sa-split i{display:block;min-width:6px}
+.sa-correct{background:var(--good)}.sa-partly{background:var(--warn)}.sa-wrong{background:var(--bad)}.sa-unanswered{background:var(--border)}
+.sa-legend{display:flex;flex-wrap:wrap;gap:.3rem 1rem;margin:.4rem 0}
+.sa-correct-t{color:var(--good)}.sa-partly-t{color:var(--warn)}.sa-wrong-t{color:var(--bad)}.sa-unanswered-t{color:var(--muted)}
+.sa-exam{border:1px solid var(--border);border-radius:12px;padding:.6rem .8rem;margin:.5rem 0;background:var(--surface)}
+.sa-exam>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:.2rem 1rem;justify-content:space-between;align-items:baseline;min-height:44px}
+.sa-score{white-space:nowrap}
+.sa-exam table{margin:.4rem 0}
+.sa-wrong-r td:first-child{border-left:4px solid var(--bad)}.sa-partly-r td:first-child{border-left:4px solid var(--warn)}.sa-correct-r td:first-child{border-left:4px solid var(--good)}.sa-unanswered-r td:first-child{border-left:4px solid var(--border)}
+@media print{.sa-matches{display:none}.sa-exam{break-inside:avoid}}

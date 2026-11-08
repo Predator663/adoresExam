@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import loginviews, views
+from . import loginviews, studentanalysis, views
 
 urlpatterns = [
     path("analytics/subjects/", views.subject_list),
@@ -23,5 +23,7 @@ urlpatterns = [
     path("exports/students/", views.students_export),
     path("exports/results-report/options/", views.results_report_options),
     path("exports/results-report/preview/", views.results_report_preview),
+    path("exports/results-report/students/", studentanalysis.student_search),
+    path("exports/results-report/students/<int:student_id>/", studentanalysis.student_analysis),
     path("exports/results-report/", views.results_report_export),
 ]

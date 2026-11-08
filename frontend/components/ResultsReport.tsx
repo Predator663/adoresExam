@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CountUp, ErrorNote, Loading, Tabs, useLoad } from "@/components/ui";
+import StudentAnalysis from "@/components/StudentAnalysis";
 import { useToast } from "@/components/SubmitFlow";
 import { API, ApiError, api, friendly, getToken, schoolHost, words } from "@/lib/api";
 
@@ -226,6 +227,8 @@ export default function ResultsReport() {
         </div>
         {!sections.length && <p className="no" role="alert">Choose at least one part to include.</p>}
       </div>
+
+      <StudentAnalysis term={term} subject={subject} exam={exam} />
 
       {needsPick ? (
         <div className="card rr-hint"><p className="muted">Choose {scope === "form" ? "a form" : "a class"} above to see its figures.</p></div>
