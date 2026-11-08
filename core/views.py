@@ -192,7 +192,7 @@ def school_settings(request):
 @permission_classes([IsAdminRole])
 def settings_logo(request):
     """ADM-09: school logo. Resized and stored as PNG."""
-    from PIL import Image, UnidentifiedImageError
+    from core.images import BadImage, open_image
 
     f = request.FILES.get("logo")
     if not f:
@@ -200,10 +200,9 @@ def settings_logo(request):
     if f.size > 5 * 1024 * 1024:
         return Response({"detail": "Image is too large (max 5 MB)."}, status=400)
     try:
-        img = Image.open(f)
-        img.load()
-    except (UnidentifiedImageError, OSError):
-        return Response({"detail": "That file is not a valid image."}, status=400)
+        img = open_image(f)
+    except BadImage as e:
+        return Response({"detail": str(e)}, status=400)
     img.thumbnail((512, 512))
     buf = io.BytesIO()
     img.convert("RGBA").save(buf, format="PNG")

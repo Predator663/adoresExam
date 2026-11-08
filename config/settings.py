@@ -179,6 +179,10 @@ MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 # internet address and a class logs in at the same moment. Load testing from ONE computer: set LOGIN_IP_THROTTLE_RATE=100000/min on the test server only.
 # The old LOGIN_THROTTLE_RATE name still works as the address limit.
 LOGIN_USER_THROTTLE_RATE = os.environ.get("LOGIN_USER_THROTTLE_RATE", "1000/min" if TESTING else "10/min")
+ADMIN_LOGIN_USER_LIMIT = int(os.environ.get("ADMIN_LOGIN_USER_LIMIT", "1000" if TESTING else "10"))  # Django admin sign-in tries per user name per 15 minutes
+ADMIN_LOGIN_IP_LIMIT = int(os.environ.get("ADMIN_LOGIN_IP_LIMIT", "10000" if TESTING else "30"))  # ... per address per minute (accounts/adminguard.py)
+# Starting passwords are derived from this key (accounts/temp_password.py). Empty = use SECRET_KEY. Set it BEFORE the first codes are issued.
+TEMP_PASSWORD_KEY = os.environ.get("TEMP_PASSWORD_KEY", "")
 LOGIN_IP_THROTTLE_RATE = os.environ.get("LOGIN_IP_THROTTLE_RATE") or os.environ.get("LOGIN_THROTTLE_RATE") or ("100000/min" if TESTING else "600/min")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

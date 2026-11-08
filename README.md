@@ -140,7 +140,7 @@ Public: `i18n/<lang>/`
 - **Practice:** 5 to 20 questions; a question that sits in any exam whose results are not yet published is never offered; at most 5 XP-earning quizzes per day (admin-editable) so nobody farms XP.
 - **Leaderboard:** class level only; weekly (Monday 00:00 EAT) or all-time; students with 0 XP are not listed; ids are never sent.
 - **Swahili text** (including the Kiswahili guide) should be checked by a Kiswahili teacher.
-- Login limits: `LOGIN_USER_THROTTLE_RATE` (default `10/min` per user name) and `LOGIN_IP_THROTTLE_RATE` (default `600/min` per internet address; a whole school shares one address, so it must be generous). Raise the address limit on a load-test server only. The old `LOGIN_THROTTLE_RATE` name still works for the address limit.
+- Login limits: `LOGIN_USER_THROTTLE_RATE` (default `10/min` per user name) and `LOGIN_IP_THROTTLE_RATE` (default `600/min` per internet address; a whole school shares one address, so it must be generous). Raise the address limit on a load-test server only. The old `LOGIN_THROTTLE_RATE` name still works for the address limit. `TEMP_PASSWORD_KEY` (set before the first credentials sheet is printed) gives the starting passwords their own secret; `ADMIN_LOGIN_USER_LIMIT` / `ADMIN_LOGIN_IP_LIMIT` limit sign-ins to the Django admin.
 
 ## Still not built
 The **React/Next.js PWA front end** (screens, themes, read-aloud, service worker, installability, offline answer queue). The API stores and serves everything it needs. Also not possible from code: the pilot exam itself, school sign-off of the SRS section 10 questions, and a real load test on your server.

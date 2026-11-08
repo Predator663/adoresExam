@@ -167,7 +167,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
 @parser_classes([MultiPartParser])
 def upload_image(request):
     """QB-02/03: question images only (not question files, BR-02). Compressed + resized."""
-    from PIL import Image, UnidentifiedImageError
+    from core.images import BadImage, open_image
 
     f, alt = request.FILES.get("image"), (request.data.get("alt_text") or "").strip()
     if not f:
@@ -177,10 +177,9 @@ def upload_image(request):
     if f.size > 10 * 1024 * 1024:
         return Response({"detail": "Image is too large (max 10 MB)."}, status=400)
     try:
-        img = Image.open(f)
-        img.load()
-    except (UnidentifiedImageError, OSError):
-        return Response({"detail": "That file is not a valid JPG, PNG or WebP image."}, status=400)
+        img = open_image(f, invalid="That file is not a valid JPG, PNG or WebP image.")
+    except BadImage as e:
+        return Response({"detail": str(e)}, status=400)
     if img.format not in ("JPEG", "PNG", "WEBP"):
         return Response({"detail": "Only JPG, PNG and WebP images are allowed."}, status=400)
     img.thumbnail((1280, 1280))

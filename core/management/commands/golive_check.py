@@ -41,6 +41,8 @@ class Command(BaseCommand):
         old_pw = User.objects.filter(role=User.Role.STUDENT, must_change_password=True, temp_issued_at__isnull=True, is_archived=False).count()
         check("PASS" if not old_pw else "WARN", "No student still has her index number as starting password",
               f"{old_pw} student(s) never logged in on an old starting password. Run: python manage.py rotate_initial_passwords --yes")
+        check("PASS" if getattr(settings, "TEMP_PASSWORD_KEY", "") else "WARN", "Starting passwords have their own key (TEMP_PASSWORD_KEY)",
+              "Set TEMP_PASSWORD_KEY to a long random value BEFORE issuing the first credentials. Until then they depend on the secret key.")
         hosts = [h for h in settings.ALLOWED_HOSTS if h not in ("localhost", "127.0.0.1")]
         check("PASS" if hosts else "FAIL", "Allowed hosts include the real web address", "Set DJANGO_ALLOWED_HOSTS.")
         check("PASS" if settings.SECURE_SSL_REDIRECT else "FAIL", "HTTPS redirect is on (NFR-07)", "Leave DJANGO_SSL_REDIRECT=1.")

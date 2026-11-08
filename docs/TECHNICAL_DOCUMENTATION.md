@@ -866,6 +866,8 @@ Home, maintenance on/off, God's Eye (`eye/`, `eye/data/`, `eye/tables/`) for rea
 | `TOKEN_TTL_HOURS` | Login lifetime | `12` |
 | `LOGIN_USER_THROTTLE_RATE` | Login limit per user name | `10/min` |
 | `LOGIN_IP_THROTTLE_RATE` | Login limit per internet address (a school shares one; old name `LOGIN_THROTTLE_RATE` also works) | `600/min` |
+| `TEMP_PASSWORD_KEY` | Own secret for the starting passwords on the credentials sheet. Set it BEFORE issuing the first codes; empty = derived from `DJANGO_SECRET_KEY` | empty |
+| `ADMIN_LOGIN_USER_LIMIT` / `ADMIN_LOGIN_IP_LIMIT` | Django admin sign-in tries per user name per 15 minutes / per address per minute | `10` / `30` |
 | `NUM_PROXIES` | Reverse proxies in front of Django | `1` in production |
 | `LEGACY_SCHOOL_SCHEMA` | Schema for old clients that send no school clue | empty |
 | `PROCTORING_ENABLED`, `LOCATION_STALE_SECONDS`, `LOCATION_MAX_ACCURACY`, `PROXIMITY_CLEAR_SECONDS` | Anti-cheat tuning | see section 14 |
