@@ -34,12 +34,16 @@ export function deviceId(): string {
   } catch { return ""; }  // storage blocked: the check is simply skipped for this phone
 }
 
+/** What the browser said the last time a position could not be had (error code and message). lib/gps.ts uses it to name the reason. */
+let lastGeo: { code?: number; message?: string } = {};
+export const lastGeoDetail = () => lastGeo;
+
 export function getFix(timeoutMs = 15000, maxAgeMs = 0): Promise<Fix> {
   return new Promise((resolve, reject) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return reject("unsupported" as FixError);
+    if (typeof navigator === "undefined" || !navigator.geolocation) { lastGeo = {}; return reject("unsupported" as FixError); }
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading }),
-      (e) => reject((e.code === 1 ? "denied" : e.code === 3 ? "timeout" : "unavailable") as FixError),
+      (p) => { lastGeo = {}; resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading }); },
+      (e) => { lastGeo = { code: e.code, message: e.message }; reject((e.code === 1 ? "denied" : e.code === 3 ? "timeout" : "unavailable") as FixError); },
       { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: maxAgeMs },
     );
   });

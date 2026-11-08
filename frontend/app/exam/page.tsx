@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import GpsHelp from "@/components/GpsHelp";
 import Listen from "@/components/Listen";
+import PhoneCheck, { type PhoneResult } from "@/components/PhoneCheck";
 import QuestionView, { hasAnswer, initialValue } from "@/components/QuestionView";
 import ResultsWaiting from "@/components/ResultsWaiting";
 import Shell from "@/components/Shell";
@@ -9,7 +11,7 @@ import { Bar, ErrorNote, Loading, Modal, useLoad, useNow } from "@/components/ui
 import { api, ApiError } from "@/lib/api";
 import { clock, eatDate, makeOffset } from "@/lib/clock";
 import { clearAttempt, dequeue, enqueue, readDraft, readQueue, saveDraft } from "@/lib/offlineQueue";
-import { getFix, readSensors, startMotion, useProctor, type Fix, type FixError, type Sensors, deviceId } from "@/lib/proctor";
+import { getFix, readSensors, startMotion, useProctor, deviceId } from "@/lib/proctor";
 import { useSession } from "@/lib/session";
 import type { AttemptState, ExamCard } from "@/lib/types";
 
@@ -18,8 +20,7 @@ function PreExam({ examId }: { examId: number }) {
   const { t, lang } = useSession();
   const { data, error, loading, reload } = useLoad(() => api<ExamCard[]>("/student/exams/"), [examId]);
   const [agree, setAgree] = useState(false), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
-  const [legal, setLegal] = useState(false), [confirmWb, setConfirmWb] = useState(false);
-  const [chk, setChk] = useState<{ busy: boolean; fix?: Fix; err?: FixError; sensors?: Sensors; done: boolean }>({ busy: false, done: false });
+  const [phone, setPhone] = useState<PhoneResult | null>(null), [recheck, setRecheck] = useState(0);  // `recheck` runs the phone check again from here
   const now = useNow(500);
   if (loading) return <Loading />;
   if (error) return <ErrorNote error={error} retry={reload} />;
@@ -32,16 +33,8 @@ function PreExam({ examId }: { examId: number }) {
   const started = diff <= 0;
   const blocked = c.state === "done" || c.state === "missed";
 
-  /** Anti-cheat device check: location is verified for real (a position must come back); Wi-Fi and Bluetooth are confirmed
-      by the student where the browser cannot tell. See lib/proctor.ts for what a web page can and cannot read. */
-  async function checkDevice() {
-    setChk({ busy: true, done: false }); setErr("");
-    await startMotion().catch(() => {});  // on iPhone this is the moment iOS asks for motion permission (needs a tap)
-    const sensors = await readSensors();
-    try { const fix = await getFix(20000); setChk({ busy: false, done: true, fix, sensors }); }
-    catch (e: any) { setChk({ busy: false, done: true, err: e as FixError, sensors }); }
-  }
-
+  /** One tick covers the rules, the Terms and the Privacy policy (which describe the location checks). The phone check (GPS, Wi-Fi, Bluetooth)
+      is components/PhoneCheck.tsx: it must pass before START works. See lib/proctor.ts for what a web page can and cannot read. */
   async function start() {
     setErr(""); setBusy(true);
     try {
@@ -50,14 +43,15 @@ function PreExam({ examId }: { examId: number }) {
       const st = await api<AttemptState>(`/student/exams/${examId}/start/`, { body: { agree_rules: true, accept_legal: true, location: fix, sensors, device: deviceId() } });
       location.replace(`/exam/?attempt=${st.attempt_id}`);
     } catch (e: any) {
-      setErr(typeof e === "string" ? t(`dev_loc_${e}`) : e.message); setChk((c) => ({ ...c, fix: undefined, err: typeof e === "string" ? e as FixError : c.err, done: true })); setBusy(false);
+      const lost = typeof e === "string" || e?.code === "location_required";  // Location went off since the check: run the check again and explain why
+      setErr(typeof e === "string" ? t(`dev_loc_${e}`) : e.message);
+      if (lost) { setPhone(null); setRecheck((n) => n + 1); }
+      setBusy(false);
     }
   }
 
-  const bleOff = chk.sensors?.ble === "off";
-  const locOk = !!chk.fix && !chk.err;
-  const ready = agree && legal && locOk && confirmWb && !bleOff;
-  const legalText = t("legal_accept").split(/(\{terms\}|\{privacy\})/).map((part, i) =>
+  const ready = agree && !!phone?.ready;
+  const agreeText = t("agree_all").split(/(\{terms\}|\{privacy\})/).map((part, i) =>
     part === "{terms}" ? <a key={i} href="/terms/" target="_blank" rel="noopener">{t("foot_terms")}</a>
       : part === "{privacy}" ? <a key={i} href="/privacy/" target="_blank" rel="noopener">{t("foot_privacy")}</a> : part);
 
@@ -79,26 +73,12 @@ function PreExam({ examId }: { examId: number }) {
         <p className="no" role="alert">{c.state === "done" ? t("exam_done") : t("exam_missed")}</p>
       ) : (
         <>
-          <label className="switch"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> {t("agree_rules")}</label>
-          <section className="dev-check" aria-labelledby="dev-h">
-            <h2 id="dev-h">📍 {t("dev_title")}</h2>
-            <p className="muted small">{t("dev_intro")}</p>
-            <ul className="dev-list">
-              <li className={locOk ? "ok" : chk.err ? "bad" : ""}><b>{t("dev_location")}</b><span>
-                {locOk ? t("dev_loc_ok", { n: Math.round(chk.fix!.accuracy) }) : chk.err ? t(`dev_loc_${chk.err}`) : t("dev_loc_idle")}</span></li>
-              <li className={chk.sensors?.net === "wifi" ? "ok" : ""}><b>{t("dev_wifi")}</b><span>{chk.sensors?.net === "wifi" ? t("dev_wifi_net") : t("dev_unknown")}</span></li>
-              <li className={chk.sensors?.ble === "on" ? "ok" : bleOff ? "bad" : ""}><b>{t("dev_bt")}</b><span>
-                {chk.sensors?.ble === "on" ? t("dev_bt_on") : bleOff ? t("dev_bt_off") : t("dev_unknown")}</span></li>
-              <li><b>{t("dev_motion")}</b><span>{chk.sensors && (chk.sensors.motion === "still" || chk.sensors.motion === "moving") ? t("dev_motion_ok") : t("dev_motion_na")}</span></li>
-            </ul>
-            <button className="btn" disabled={chk.busy || busy} onClick={checkDevice}>{chk.busy ? t("dev_checking") : t("dev_check")}</button>
-            <label className="switch"><input type="checkbox" checked={confirmWb} onChange={(e) => setConfirmWb(e.target.checked)} /> {t("dev_confirm")}</label>
-          </section>
-          <label className="switch"><input type="checkbox" checked={legal} onChange={(e) => setLegal(e.target.checked)} /> <span>{legalText}</span></label>
+          <label className="switch"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> <span>{agreeText}</span></label>
+          <PhoneCheck examId={examId} disabled={busy} runSignal={recheck} onChange={setPhone} />
           {!started && <p className="center-text" role="timer"><span className="muted">{t("starts_in")}</span><span className="big-num" style={{ display: "block" }}>{clock(diff)}</span></p>}
           {err && <p className="no" role="alert">⚠ {err}</p>}
-          {started && !ready && <p className="muted small" role="status">{t("dev_need_all")}</p>}
-          <button className="btn primary big" disabled={!started || !ready || busy} onClick={start}>{busy ? t("loading") : t("start")}</button>
+          {started && !ready && <p className="muted small" role="status">{!agree ? t("dev_need_tick") : t("dev_need_check")}</p>}
+          <button className={`btn primary big ${started && ready && !busy ? "pc-go" : ""}`} disabled={!started || !ready || busy} onClick={start}>{busy ? t("loading") : t("start")}</button>
         </>
       )}
     </div>
@@ -325,6 +305,7 @@ function Runner({ attemptId }: { attemptId: number }) {
         <span className="big-num" aria-hidden>📍</span>
         <h1 id="loc-h">{t("loc_lost_title")}</h1>
         <p>{proctor.state === "denied" ? t("loc_denied_body") : t("loc_lost_body")}</p>
+        <GpsHelp error={proctor.state === "denied" ? "denied" : "unavailable"} />
         <p className={`timer ${low ? "low" : ""}`} role="timer" aria-label={t("time_left")}>{clock(remainingMs)}</p>
         <button className="btn primary big" onClick={() => proctor.retry()}>{t("loc_retry")}</button>
       </div></div>

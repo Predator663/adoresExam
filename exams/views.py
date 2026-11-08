@@ -2,6 +2,7 @@ import logging
 import random
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Avg, Count, Max, Q
 from django.shortcuts import get_object_or_404
@@ -75,6 +76,38 @@ def student_exams(request):
     exams = [e for e in exams if e.end_at and (e.end_at > now - timedelta(days=1) or e.pk in allowed or e.pk in writing)]  # a late sitting in progress must never vanish
     exams.sort(key=lambda e: e.start_at)
     return Response([_exam_card(e, request.user, now, retake=e.pk in allowed) for e in exams])
+
+
+# What the phone check on the pre-exam screen may report (anything else is stored as "other"/"unknown": it is only a hint for a teacher).
+_GPS_WORDS = {"ok", "weak", "insecure", "unsupported", "in_app", "policy", "site_denied", "services_off", "no_signal", "unknown"}
+_NET_WORDS = {"wifi", "mobile", "online", "offline"}
+_BLE_WORDS = {"on", "off", "unknown"}
+_OS_WORDS = {"android", "ios", "other"}
+
+
+class DeviceCheckThrottle(UserRateThrottle):
+    """The rate is set here (like AttemptEventThrottle), so no settings change is needed."""
+    scope = "device_check"
+    rate = "30/min"
+
+
+@api_view(["POST"])
+@permission_classes([IsStudent])
+@throttle_classes([DeviceCheckThrottle])
+def student_device_check(request, exam_id):
+    """The phone check (GPS, Wi-Fi, Bluetooth) did not pass, or location is only rough: remember WHY, so a teacher who is helping
+    the student can see it in the audit log (action device.check.failed). The same reason is kept once every 5 minutes, so
+    pressing "Check again" ten times writes one line. Nothing is stored when everything passed."""
+    exam = get_object_or_404(Exam, pk=exam_id)
+    data = request.data if hasattr(request.data, "get") else {}
+    pick = lambda key, allowed, other: (str(data.get(key) or "")[:20] if str(data.get(key) or "")[:20] in allowed else other)
+    gps, net, ble, os_ = pick("gps", _GPS_WORDS, "unknown"), pick("net", _NET_WORDS, "online"), pick("ble", _BLE_WORDS, "unknown"), pick("os", _OS_WORDS, "other")
+    if gps == "ok" and net != "offline" and ble != "off":
+        return Response({"ok": True, "logged": False})
+    fresh = cache.add(f"devchk:{request.user.pk}:{exam.pk}:{gps}:{net}:{ble}", 1, 300)
+    if fresh:
+        audit(request.user, "device.check.failed", exam.pk, gps=gps, net=net, ble=ble, os=os_)
+    return Response({"ok": True, "logged": bool(fresh)})
 
 
 @api_view(["POST"])
