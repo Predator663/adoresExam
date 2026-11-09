@@ -1,7 +1,7 @@
 {
-  "name": "Amani Girls Online Exams",
-  "short_name": "Amani Exams",
-  "description": "Secure, auto-marked and gamified home exams for Amani Girls Secondary School",
+  "name": "Online Exams",
+  "short_name": "Exams",
+  "description": "Secure, auto-marked and gamified home exams for schools",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

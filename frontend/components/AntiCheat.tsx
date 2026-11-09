@@ -373,6 +373,11 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
   const [data, setData] = useState<PB | null>(null);
   const [err, setErr] = useState("");
   const [labels, setLabels] = useState(true);
+  const [fetchedAt, setFetchedAt] = useState(Math.floor(Date.now() / 1000)), [nowS, setNowS] = useState(Math.floor(Date.now() / 1000)), [spin, setSpin] = useState(0);
+  const [sub, setSub] = useState<"map" | "alerts" | "checks" | "nosig" | "related">("map");  // phone: one section at a time
+  const [wide, setWide] = useState(false);  // desktop: map and panel side by side
+  useEffect(() => { const m = window.matchMedia("(min-width: 960px)"), f = () => setWide(m.matches); f(); m.addEventListener("change", f); return () => m.removeEventListener("change", f); }, []);
+  useEffect(() => { const i = setInterval(() => setNowS(Math.floor(Date.now() / 1000)), 1000); return () => clearInterval(i); }, []);
   const [streets, setStreets] = useState(true);
   useEffect(() => { try { const v = localStorage.getItem("ac_streets"); if (v !== null) setStreets(v === "1"); } catch { /* ignore */ } }, []);
   const toggleStreets = (on: boolean) => { setStreets(on); try { localStorage.setItem("ac_streets", on ? "1" : "0"); } catch { /* ignore */ } };
@@ -388,7 +393,7 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
     busy.current = true;
     try {
       const d = await api<PB>(`/proctoring/exams/${examId}/`);
-      setData(d); setErr("");
+      setData(d); setErr(""); setFetchedAt(Math.floor(Date.now() / 1000));
       const open = new Set(d.alerts.filter((a) => a.active && !a.acknowledged).map((a) => a.id));
       if (seen.current && [...open].some((id) => !seen.current!.has(id))) beep();
       seen.current = open;
@@ -425,104 +430,178 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
   const moving = data?.students.filter((s) => s.moving && s.fresh).length ?? 0;
   const tracked = data?.students.filter((s) => s.fresh).length ?? 0;
 
-  if (!list.length) return <p className="lb-empty">No exam is being written right now. Positions appear here while an exam is live.</p>;
+  const noSig = data?.no_signal.length ?? 0;
+  const panel = wide ? (sub === "checks" || sub === "nosig" ? sub : "alerts") : sub;
+  const ago = Math.max(0, nowS - fetchedAt);
+  const kpi: [string, string | number, string, string, boolean][] = [
+    ["pencil", data?.writing ?? "–", "writing", "b", false], ["pin", data ? tracked : "–", "located", "g", false], ["activity", data ? moving : "–", "moving", "b", false],
+    ["shield", data ? active.length : "–", "too close", "r", active.length > 0], ["radar", data ? openFlags.length : "–", "to check", "a", openFlags.length > 0],
+    ...(data?.lock_enabled ? [["lock", locked.length * 2, "locked", "r", locked.length > 0] as [string, number, string, string, boolean]] : []),
+  ];
+  const tabs: [typeof sub, string, number | null, boolean][] = [
+    ...(wide ? [] : [["map", "Map", null, false] as [typeof sub, string, number | null, boolean]]),
+    ["alerts", "Alerts", data ? active.length : null, active.length > 0], ["checks", "Checks", data ? openFlags.length : null, openFlags.length > 0], ["nosig", "No signal", data ? noSig : null, false],
+    ...(wide ? [] : [["related", "Related", null, false] as [typeof sub, string, number | null, boolean]]),
+  ];
+  const locate = (ids: number[]) => { setFocus({ ids, n: Date.now() }); if (!wide) setSub("map"); };
+
+  if (!list.length) return <div className="lm-empty"><Icon n="radar" size={28} /><p>No exam is being written right now. Positions appear here while an exam is live.</p></div>;
   return (
-    <div className="ac">
-      <div className="ac-top">
-        <label className="ac-pick"><span>Exam</span>
+    <div className="ac acx">
+      <header className="lm-hero acx-hero">
+        <div className="lm-status">
+          <span className={`lm-dot ${err ? "bad" : ""}`} aria-hidden="true" />
+          <span className="lm-status-txt"><b>{err ? "Connection lost" : "Anti-cheat"}</b><small className={err ? "lm-bad" : ""}>{err ? "Trying again…" : ago < 3 ? "Updated just now" : `Updated ${ago < 60 ? `${ago} s` : `${Math.floor(ago / 60)} min`} ago`}</small></span>
+          <button className="lm-refresh" onClick={() => { setSpin((n) => n + 1); load(); }} aria-label="Refresh now"><span key={spin} className="lm-spin"><Icon n="refresh" size={18} /></span></button>
+        </div>
+        <label className="acx-exam"><span>Exam</span>
           <select className="input" value={examId ?? ""} onChange={(e) => setExamId(Number(e.target.value))} aria-label="Exam">
             {list.map((e) => <option key={e.exam_id} value={e.exam_id}>{e.title}{e.status === "live" ? " · LIVE" : ""}</option>)}
           </select></label>
-        <div className="lb-sum">
-          <span><b>{data?.writing ?? "–"}</b><small>writing</small></span>
-          <span><b>{data ? tracked : "–"}</b><small>located</small></span>
-          <span><b>{data ? moving : "–"}</b><small>moving</small></span>
-          <span className={active.length ? "ac-bad" : ""}><b>{data ? active.length : "–"}</b><small>too close</small></span>
-          <span className={openFlags.length ? "ac-bad" : ""}><b>{data ? openFlags.length : "–"}</b><small>to check</small></span>
-          {data?.lock_enabled && <span className={locked.length ? "ac-bad" : ""}><b>{data ? locked.length * 2 : "–"}</b><small>locked</small></span>}
-        </div>
-        <label className="ac-chk"><input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} /> Show names</label>
-        <label className="ac-chk" title={geocoderOff ? "Place names are switched off on the server (GEOCODER_URL is empty)." : "Street, area and region names next to each student. While this is on, rounded positions (no names) are sent to the geocoder; off sends nothing."}><input type="checkbox" checked={streets && !geocoderOff} disabled={geocoderOff} onChange={(e) => toggleStreets(e.target.checked)} /> Show streets</label>
+        <div key={fetchedAt} className={`lm-sweep ${err ? "off" : ""}`} aria-hidden="true" />
+      </header>
+
+      <div className="acx-kpis">
+        {kpi.map(([ic, n, label, tone, hot]) => (
+          <div key={label} className={`lm-kpi t-${tone} ${hot ? "on bad" : ""}`}>
+            <span className="lm-kpi-ic" aria-hidden="true"><Icon n={ic} size={18} /></span>
+            <b>{n}</b><small>{label}</small>
+          </div>
+        ))}
       </div>
-      {err && <p className="lb-alert" role="alert">{err} Retrying…</p>}
-      {data && !data.enabled && <p className="lb-alert">Location monitoring is switched off on the server (PROCTORING_ENABLED=0).</p>}
+
+      <div className="acx-opts" role="group" aria-label="Map options">
+        <button type="button" className={`acx-chip ${labels ? "on" : ""}`} aria-pressed={labels} onClick={() => setLabels(!labels)}>Names</button>
+        <button type="button" className={`acx-chip ${streets && !geocoderOff ? "on" : ""}`} aria-pressed={streets && !geocoderOff} disabled={geocoderOff}
+          title={geocoderOff ? "Place names are switched off on the server (GEOCODER_URL is empty)." : "Street, area and region names next to each student. While this is on, rounded positions (no names) are sent to the geocoder; off sends nothing."}
+          onClick={() => toggleStreets(!streets)}>Streets</button>
+      </div>
+
+      {err && <p className="lb-alert lm-alert" role="alert">{err} Retrying…</p>}
+      {data && !data.enabled && <p className="lb-alert lm-alert">Location monitoring is switched off on the server (PROCTORING_ENABLED=0).</p>}
       {locked.length > 0 && (
         <div className="ac-banner ac-locked" role="alert"><Icon n="shield" size={20} /> <b>{locked.length === 1 ? "2 students are locked out of their exam." : `${locked.length * 2} students are locked out of their exam.`} Their timers keep running, unlock them as soon as they have moved apart.</b>
           <button className="btn" onClick={unlockAll}>Unlock all</button></div>
       )}
-      {data && !data.lock_enabled && <p className="muted small">Locking is off. Turn it on in Settings → School to lock students who sit closer than {data.alert_meters} m.</p>}
+      {data && !data.lock_enabled && <p className="muted small lm-note">Locking is off. Turn it on in Settings → School to lock students who sit closer than {data.alert_meters} m.</p>}
       {active.length > 0 && (
         <div className="ac-banner" role="alert"><Icon n="shield" size={20} /> <b>{active.length === 1 ? "Two students are" : `${active.length} pairs of students are`} sitting less than {data?.alert_meters ?? 20} m apart.</b></div>
       )}
-      <div className="ac-grid2">
-        <div>
+
+      <div className="acx-grid">
+        <div className="lm-tabs acx-tabs" role="tablist" aria-label="Anti-cheat sections">
+          {tabs.map(([k, label, n, hot]) => (
+            <button key={k} role="tab" aria-selected={panel === k} className={panel === k ? "on" : ""} onClick={() => setSub(k)}>
+              {label}{n !== null && <b className={hot ? "lm-pulse acx-hot" : ""}>{n}</b>}
+            </button>
+          ))}
+        </div>
+
+        <div className={`acx-mapcol ${!wide && panel !== "map" ? "acx-off" : ""}`}>
           <ProxMap students={data?.students ?? []} alerts={data?.alerts ?? []} links={data?.links ?? []} threshold={data?.alert_meters ?? 20} labels={labels} streets={streets && !geocoderOff} focusReq={focus} />
           {streets && !geocoderOff && <PlaceSummary students={data?.students ?? []} />}
           <p className="ac-legend" aria-hidden="true">
             <span><i className="d ok" />still</span><span><i className="d mv" />moving</span><span><i className="d al" />too close</span><span><i className="d po" />rough position</span><span><i className="d st" />no recent update</span>
           </p>
         </div>
-        <aside className="ac-side">
-          <h3>Alerts <small>({active.length} open)</small></h3>
-          {!data ? <p className="lb-empty">Loading…</p> : !data.alerts.length ? <p className="lb-empty">Nobody has been closer than {data.alert_meters} m.</p> : (
-            <ul className="ac-alerts">
-              {[...active, ...past].map((a) => (
-                <li key={a.id} className={a.active ? "on" : "off"}>
-                  <div><b>{a.a.name}</b> &amp; <b>{a.b.name}</b>{a.locked && <span className="ac-lock-tag"> 🔒 locked</span>}</div>
-                  <small>{a.active ? `${fmtDist(a.distance_m)} apart now` : `ended · closest ${fmtDist(a.min_distance_m)}`} · since {hhmm(a.first_seen)} · {a.confidence === "confirmed" ? "precise" : "rough position, check"}</small>
-                  {a.active && <PlaceLine lat={a.lat} lng={a.lng} prefix="Near " on={streets} />}
-                  <div className="ac-act">
-                    {a.active && <button className="btn" onClick={() => setFocus({ ids: [a.a.id, a.b.id], n: Date.now() })}>Locate</button>}
-                    {a.locked && <button className="btn primary" onClick={() => unlock(a.id)}>{a.active ? "Unlock (still close)" : "Unlock"}</button>}
-                    <button className="btn" onClick={() => setMsgTo([a.a, a.b])}>Message</button>
-                    <select className="input sm" aria-label={`Mark ${a.a.name} and ${a.b.name} as related`} value="" onChange={(e) => { const k = e.target.value; if (k && confirm(`Mark ${a.a.name} and ${a.b.name} as related (${e.target.selectedOptions[0].text})? They will no longer raise alerts or be locked.`)) markRelated([a.a.id, a.b.id], k); }}>
-                      <option value="">Mark as related…</option><option value="twin">Twins</option><option value="house">Same house</option><option value="room">Same room</option>
-                    </select>
-                    {a.acknowledged ? <small className="ok">Reviewed</small> : <button className="btn" onClick={() => review(a.id)}>Mark reviewed</button>}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          {(data?.links?.length ?? 0) > 0 && (
+
+        <div className={`acx-panel ${!wide && panel === "map" ? "acx-off" : ""}`} role="tabpanel">
+          {!data && <div className="lm-skel" aria-hidden="true">{[0, 1].map((k) => <div key={k} className="lm-card"><i className="s1" /><i className="s2" /><i className="s3" /></div>)}</div>}
+
+          {data && panel === "alerts" && (
             <>
-              <h3>Related students close together <small>({data!.links!.length})</small></h3>
-              <ul className="ac-alerts">
-                {data!.links!.map((l) => { const nm = (id: number) => data!.students.find((x) => x.id === id)?.name ?? "Student"; return (
-                  <li key={l.id} className="off"><div><b>{nm(l.a)}</b> &amp; <b>{nm(l.b)}</b> <span className="ac-sev info">{l.label}</span></div>
-                    <small>{fmtDist(l.distance_m)} apart · expected, no alert and not locked</small></li>); })}
-              </ul>
+              <h3 className="acx-h">Too close <small>{active.length} open · {past.length} ended</small></h3>
+              {!data.alerts.length ? <div className="lm-empty"><Icon n="shield" size={26} /><p>Nobody has been closer than {data.alert_meters} m.</p></div> : (
+                <ul className="acx-list">
+                  {[...active, ...past].map((a) => (
+                    <li key={a.id} className={`acx-card ${a.active ? "hot" : "off"}`}>
+                      <div className="acx-card-h">
+                        <span className="acx-av" aria-hidden="true"><Icon n="users" size={18} /></span>
+                        <div className="acx-who"><b>{a.a.name}</b><b>{a.b.name}</b></div>
+                        <span className={`acx-dist ${a.active ? "on" : ""}`}>{a.active ? fmtDist(a.distance_m) : fmtDist(a.min_distance_m)}</span>
+                      </div>
+                      <div className="lm-flags">
+                        <i className={`lm-chip ${a.active ? "bad" : ""}`}>{a.active ? "apart now" : "ended · closest"}</i>
+                        <i className="lm-chip">since {hhmm(a.first_seen)}</i>
+                        <i className={`lm-chip ${a.confidence === "confirmed" ? "ok" : ""}`}>{a.confidence === "confirmed" ? "precise" : "rough position, check"}</i>
+                        {a.locked && <i className="lm-chip bad">🔒 locked</i>}
+                        {a.acknowledged && <i className="lm-chip ok">Reviewed</i>}
+                      </div>
+                      {a.active && <PlaceLine lat={a.lat} lng={a.lng} prefix="Near " on={streets} />}
+                      <div className="acx-act">
+                        {a.active && <button className="btn" onClick={() => locate([a.a.id, a.b.id])}>Locate</button>}
+                        {a.locked && <button className="btn primary" onClick={() => unlock(a.id)}>{a.active ? "Unlock (still close)" : "Unlock"}</button>}
+                        <button className="btn" onClick={() => setMsgTo([a.a, a.b])}>Message</button>
+                        {!a.acknowledged && <button className="btn" onClick={() => review(a.id)}>Mark reviewed</button>}
+                        <select className="input sm" aria-label={`Mark ${a.a.name} and ${a.b.name} as related`} value="" onChange={(e) => { const k = e.target.value; if (k && confirm(`Mark ${a.a.name} and ${a.b.name} as related (${e.target.selectedOptions[0].text})? They will no longer raise alerts or be locked.`)) markRelated([a.a.id, a.b.id], k); }}>
+                          <option value="">Mark as related…</option><option value="twin">Twins</option><option value="house">Same house</option><option value="room">Same room</option>
+                        </select>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {(data.links?.length ?? 0) > 0 && (
+                <>
+                  <h3 className="acx-h">Related, close together <small>{data.links!.length} · no alert, not locked</small></h3>
+                  <ul className="acx-list">
+                    {data.links!.map((l) => { const nm = (id: number) => data.students.find((x) => x.id === id)?.name ?? "Student"; return (
+                      <li key={l.id} className="acx-card off">
+                        <div className="acx-card-h"><span className="acx-av" aria-hidden="true"><Icon n="users" size={18} /></span><div className="acx-who"><b>{nm(l.a)}</b><b>{nm(l.b)}</b></div><span className="acx-dist">{fmtDist(l.distance_m)}</span></div>
+                        <div className="lm-flags"><i className="lm-chip">{l.label}</i><i className="lm-chip">expected</i></div>
+                      </li>); })}
+                  </ul>
+                </>
+              )}
             </>
           )}
-          <h3>Device and position checks <small>({openFlags.length} open)</small></h3>
-          <p className="muted small">Signs to look at, not proof: a phone that changed during the exam, or a position that does not behave like real GPS.</p>
-          {data && !flags.length ? <p className="lb-empty">Nothing unusual so far.</p> : (
-            <ul className="ac-alerts">
-              {flags.map((f) => (
-                <li key={f.id} className={f.acknowledged || f.severity === "info" ? "off" : "on"}>
-                  <div><b>{f.student.name}</b> <span className={`ac-sev ${f.severity}`}>{f.severity === "high" ? "high" : f.severity === "warning" ? "check" : "info"}</span> {f.label}{f.count > 1 && <small> ×{f.count}</small>}</div>
-                  <small>{f.text}</small>
-                  <small>since {hhmm(f.first_seen)}{f.count > 1 ? `, last ${hhmm(f.last_seen)}` : ""}</small>
-                  <div className="ac-act">
-                    <button className="btn" onClick={() => setMsgTo([{ id: f.student.id, name: f.student.name }])}>Message</button>
-                    {f.acknowledged ? <small className="ok">Reviewed</small> : <button className="btn" onClick={() => reviewFlag(f.id)}>Mark reviewed</button>}
-                  </div>
-                </li>
-              ))}
-            </ul>
+
+          {data && panel === "checks" && (
+            <>
+              <h3 className="acx-h">Device and position checks <small>{openFlags.length} open</small></h3>
+              <p className="muted small lm-note">Signs to look at, not proof: a phone that changed during the exam, or a position that does not behave like real GPS.</p>
+              {!flags.length ? <div className="lm-empty"><Icon n="check" size={26} /><p>Nothing unusual so far.</p></div> : (
+                <ul className="acx-list">
+                  {flags.map((f) => (
+                    <li key={f.id} className={`acx-card ${f.acknowledged || f.severity === "info" ? "off" : f.severity === "high" ? "hot" : "warn"}`}>
+                      <div className="acx-card-h">
+                        <span className="acx-av" aria-hidden="true"><Icon n="radar" size={18} /></span>
+                        <div className="acx-who"><b>{f.student.name}</b><small>{f.label}{f.count > 1 ? ` ×${f.count}` : ""}</small></div>
+                        <span className={`ac-sev ${f.severity}`}>{f.severity === "high" ? "high" : f.severity === "warning" ? "check" : "info"}</span>
+                      </div>
+                      <p className="acx-text">{f.text}</p>
+                      <div className="lm-flags"><i className="lm-chip">since {hhmm(f.first_seen)}</i>{f.count > 1 && <i className="lm-chip">last {hhmm(f.last_seen)}</i>}{f.acknowledged && <i className="lm-chip ok">Reviewed</i>}</div>
+                      <div className="acx-act">
+                        <button className="btn" onClick={() => setMsgTo([{ id: f.student.id, name: f.student.name }])}>Message</button>
+                        {!f.acknowledged && <button className="btn" onClick={() => reviewFlag(f.id)}>Mark reviewed</button>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
-          <h3>No location signal <small>({data?.no_signal.length ?? 0})</small></h3>
-          {data && !data.no_signal.length ? <p className="lb-empty">Every writing student is reporting a position.</p> : (
-            <ul className="ac-alerts">
-              {data?.no_signal.map((s) => { const c = checkText(s.checks || {}); return (
-                <li key={s.id} className="off"><div><b>{s.name}</b> <small>{s.class}</small></div>
-                  <small>{s.last_seen_s == null ? "Has not reported a position yet" : `Last position ${s.last_seen_s}s ago`} · {c.loc}</small></li>); })}
-            </ul>
+
+          {data && panel === "nosig" && (
+            <>
+              <h3 className="acx-h">No location signal <small>{noSig}</small></h3>
+              {!noSig ? <div className="lm-empty"><Icon n="check" size={26} /><p>Every writing student is reporting a position.</p></div> : (
+                <ul className="acx-list">
+                  {data.no_signal.map((s) => { const c = checkText(s.checks || {}); return (
+                    <li key={s.id} className="acx-card off">
+                      <div className="acx-card-h"><span className="acx-av" aria-hidden="true"><Icon n="pin" size={18} /></span><div className="acx-who"><b>{s.name}</b><small>{s.class}</small></div></div>
+                      <div className="lm-flags"><i className="lm-chip bad">{s.last_seen_s == null ? "No position yet" : `Last position ${s.last_seen_s} s ago`}</i><i className="lm-chip">{c.loc}</i></div>
+                    </li>); })}
+                </ul>
+              )}
+            </>
           )}
-          <p className="muted small">An alert is information to check, not proof of cheating: siblings or neighbours may live close by. Positions are kept only while the exam runs.</p>
-        </aside>
+
+          {!wide && panel === "related" && <RelatedStudents onChange={load} />}
+          {data && panel !== "related" && <p className="muted small lm-note">An alert is information to check, not proof of cheating: siblings or neighbours may live close by. Positions are kept only while the exam runs.</p>}
+        </div>
       </div>
-      <RelatedStudents onChange={load} />
+      {wide && <RelatedStudents onChange={load} />}
       {msgTo && <SendMessage to={msgTo} onClose={() => setMsgTo(null)} />}
     </div>
   );

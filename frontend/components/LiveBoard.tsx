@@ -392,7 +392,15 @@ export default function LiveBoard({ admin: adminProp }: { admin?: boolean }) {
         ))}
       </div>
 
-      <div className="lm-filters">
+      {admin && (
+        <div className="lm-tabs lm-main" role="tablist" aria-label="Monitor view">
+          <button role="tab" aria-selected={tabView === "exams"} className={tabView === "exams" ? "on" : ""} onClick={() => setTabView("exams")}><Icon n="pencil" size={15} /> Exams</button>
+          <button role="tab" aria-selected={tabView === "ac"} className={tabView === "ac" ? "on" : ""} onClick={() => setTabView("ac")}>
+            <Icon n="radar" size={15} /> Anti-cheat{openAlerts > 0 && <b className="lb-badge lm-pulse">{openAlerts}</b>}
+          </button>
+        </div>
+      )}
+      {(!admin || tabView === "exams") && <div className="lm-filters">
         <label className="lm-search">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input placeholder="Search name or index no." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search students" />
@@ -411,20 +419,12 @@ export default function LiveBoard({ admin: adminProp }: { admin?: boolean }) {
             <option value={1}>Last 24 hours</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={120}>This term (120 days)</option>
           </select>
         </div>
-      </div>
+      </div>}
 
-      {admin && (
-        <div className="lm-tabs lm-main" role="tablist" aria-label="Monitor view">
-          <button role="tab" aria-selected={tabView === "exams"} className={tabView === "exams" ? "on" : ""} onClick={() => setTabView("exams")}><Icon n="pencil" size={15} /> Exams</button>
-          <button role="tab" aria-selected={tabView === "ac"} className={tabView === "ac" ? "on" : ""} onClick={() => setTabView("ac")}>
-            <Icon n="radar" size={15} /> Anti-cheat{openAlerts > 0 && <b className="lb-badge lm-pulse">{openAlerts}</b>}
-          </button>
-        </div>
-      )}
       {toast && <p className="lm-toast" role="status">▶ {toast}</p>}
       {err && <p className="lb-alert lm-alert" role="alert">{err} Retrying…</p>}
-      {!board && !err && <Skeleton />}
-      {board && exams.length === 0 && <div className="lm-empty"><Icon n="calendar" size={28} /><p>No exams in this selection. Pick a longer period or clear the filters to see older exams and who did or missed them.</p></div>}
+      {!board && !err && !(admin && tabView === "ac") && <Skeleton />}
+      {board && exams.length === 0 && !(admin && tabView === "ac") && <div className="lm-empty"><Icon n="calendar" size={28} /><p>No exams in this selection. Pick a longer period or clear the filters to see older exams and who did or missed them.</p></div>}
       {admin && tabView === "ac" && <AntiCheat exams={(board?.exams ?? []).map((e) => ({ exam_id: e.exam_id, title: e.title, status: e.status, in_progress: e.in_progress }))} />}
       <div className="lm-grid" style={admin && tabView === "ac" ? { display: "none" } : undefined}>
         {exams.map((e, i) => (

@@ -1435,3 +1435,68 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 /* a grid column may never grow wider than the phone because of one long word or one wide child */
 .lm,.lm-body,.lm-list,.lm-counts,.lm-skel{grid-template-columns:minmax(0,1fr)}
 .lm-card,.lm-row,.lm-head{max-width:100%}
+
+/* ================= Anti-cheat tab, redesigned to match the Live monitor (lm-*): hero + KPI tiles + chips + tabs + cards.
+   Phone: one section at a time (Map, Alerts, Checks, No signal, Related). Desktop (960px+): map on the left, tabbed panel on the right. ================= */
+.acx{display:grid;gap:.8rem;max-width:100%;min-width:0}
+.acx>*{min-width:0}
+.acx-hero{display:grid;gap:.6rem}
+.acx-exam{display:grid;gap:.15rem;font-size:.78rem;color:var(--lb-dim);min-width:0}
+.acx-exam .input{width:100%;min-width:0;min-height:44px;text-overflow:ellipsis}
+.acx-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+.lm-kpi.bad{border-color:var(--lb-r)}.lm-kpi.bad b{color:var(--lb-r)}
+.acx-opts{display:flex;flex-wrap:wrap;gap:.45rem}
+.acx-chip{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;min-height:40px;padding:0 .95rem;border-radius:99px;border:1px solid var(--lb-line);background:var(--surface);color:var(--text);font-weight:700;font-size:.88rem}
+.acx-chip::before{content:"";width:.7rem;height:.7rem;border-radius:50%;border:2px solid var(--lb-dim);box-sizing:border-box}
+.acx-chip.on{background:var(--primary);color:var(--on-primary);border-color:transparent}.acx-chip.on::before{background:currentColor;border-color:currentColor}
+.acx-chip:active{transform:scale(.96)}.acx-chip:focus-visible{outline:3px solid var(--primary);outline-offset:2px}.acx-chip:disabled{opacity:.5;cursor:not-allowed}
+.acx-hot{background:var(--lb-r);color:#fff;border-radius:99px;padding:0 .4rem}
+.acx-grid{display:grid;gap:.8rem;grid-template-columns:minmax(0,1fr);align-items:start}
+.acx-tabs{position:sticky;top:0;z-index:6;background:var(--bg);padding:.35rem 0;margin:0}
+.acx-off{display:none!important}
+.acx-mapcol{min-width:0}
+.acx-mapcol .ac-map{height:min(60vh,520px);min-height:300px;border-radius:20px}
+.acx-panel{display:grid;gap:.7rem;min-width:0}
+.acx-h{margin:.2rem 0 0;font-size:1rem;display:flex;flex-wrap:wrap;align-items:baseline;gap:.2rem .6rem}.acx-h small{font-weight:600;color:var(--lb-dim);font-size:.8rem}
+.acx-list{list-style:none;margin:0;padding:0;display:grid;gap:.65rem}
+.acx-card{position:relative;display:grid;gap:.5rem;padding:.75rem .85rem .8rem 1.05rem;border-radius:18px;border:1px solid var(--lb-line);background:var(--surface);min-width:0;overflow:hidden}
+.acx-card::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--lb-dim)}
+.acx-card.hot{border-color:var(--lb-r);background:linear-gradient(120deg,rgba(255,77,94,.12),transparent 65%),var(--surface)}.acx-card.hot::before{background:var(--lb-r)}
+.acx-card.warn::before{background:var(--lb-a)}.acx-card.off{opacity:.92}
+.acx-card-h{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.65rem;align-items:center}
+.acx-av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--lb-dim)}
+.acx-card.hot .acx-av{background:rgba(255,77,94,.16);color:var(--lb-r)}.acx-card.warn .acx-av{background:rgba(255,184,77,.2);color:#8a5a00}
+.acx-who{display:grid;gap:.05rem;min-width:0}.acx-who b,.acx-who small{overflow-wrap:anywhere;line-height:1.2}.acx-who small{color:var(--lb-dim)}
+.acx-who b+b::before{content:"& ";color:var(--lb-dim);font-weight:400}
+.acx-dist{font-weight:800;font-variant-numeric:tabular-nums;font-size:1.05rem;white-space:nowrap}.acx-dist.on{color:var(--lb-r)}
+.acx-text{margin:0;font-size:.88rem;color:var(--lb-dim);overflow-wrap:anywhere}
+.acx-act{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}
+.acx-act .btn,.acx-act .input{min-height:44px;width:100%;min-width:0;font-size:.88rem;padding:.25rem .6rem;white-space:normal}
+.acx-act .input{grid-column:1/-1}
+.acx .rel-panel{margin:0}
+.acx .rel-panel .grid2{grid-template-columns:minmax(0,1fr)}
+.acx .rel-panel .btn{min-height:44px}
+.acx .ac-banner{flex-wrap:wrap;border-radius:16px}
+.acx .ac-banner b{flex:1 1 14rem;min-width:0;overflow-wrap:anywhere}
+.acx .ac-banner .btn{min-height:44px}
+.acx .ac-legend{margin:.55rem .2rem 0}
+.acx .ac-places{margin-top:.6rem}
+.acx .lm-flags{margin-top:0}
+@media(min-width:520px){.acx-act{display:flex;flex-wrap:wrap}.acx-act .btn{width:auto}.acx-act .input{width:auto;grid-column:auto;min-width:11rem}}
+@media(min-width:700px){.acx-kpis{grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr))}.acx-hero{grid-template-columns:minmax(0,1fr) minmax(14rem,24rem);align-items:center}.acx-hero .lm-status{grid-column:1}.acx-exam{grid-column:2;grid-row:1}}
+@media(min-width:960px){
+  .acx-grid{grid-template-columns:minmax(0,1.6fr) minmax(20rem,1fr);grid-template-areas:"map tabs" "map panel";column-gap:1rem;row-gap:.5rem}
+  .acx-tabs{grid-area:tabs;position:static;background:transparent;padding:0}.acx-mapcol{grid-area:map;position:sticky;top:.6rem}.acx-panel{grid-area:panel}
+  .acx-mapcol .ac-map{height:min(70vh,640px)}
+  .acx-panel{max-height:calc(100dvh - 9rem);overflow-y:auto;padding-right:.2rem;overscroll-behavior:contain}
+}
+/* phones: roomier touch targets, map controls and tooltips that fit */
+@media(max-width:519.98px){
+  .acx-mapcol .ac-map{height:min(58dvh,480px);min-height:280px}
+  .ac-ctl .btn{min-height:44px;min-width:44px}
+  .ac-tip{width:min(220px,calc(100vw - 3.5rem))}
+  .acx-dist{font-size:.98rem}
+  .acx-kpis .lm-kpi{padding:.5rem .55rem}.acx-kpis .lm-kpi b{font-size:1.45rem}
+}
+:root[data-theme=high_contrast] .acx-card,:root[data-theme=high_contrast] .acx-chip{border-width:2px;background:var(--surface)}
+@media (prefers-reduced-motion:reduce){.acx *{animation:none!important;transition:none!important}}
