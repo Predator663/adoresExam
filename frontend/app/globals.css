@@ -782,13 +782,12 @@ select.input.sm{padding:.25rem .4rem;font-size:.85rem;width:auto;min-height:0}
 @media print{.off-bar{display:none}}
 
 /* ---- exam save / submit / schedule flow (SubmitFlow.tsx) ---- */
-.fx-toast{position:fixed;left:50%;bottom:calc(1.2rem + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;display:flex;gap:.7rem;align-items:flex-start;width:min(440px,calc(100vw - 1.5rem));padding:.75rem .9rem;border-radius:14px;background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--good);box-shadow:0 10px 30px rgba(0,0,0,.2);animation:fx-up .32s cubic-bezier(.2,.9,.3,1.2) both}
+.fx-toast{position:fixed;left:50%;top:calc(.8rem + env(safe-area-inset-top));transform:translateX(-50%);z-index:80;display:flex;gap:.7rem;align-items:flex-start;width:min(440px,calc(100vw - 1.5rem));padding:.75rem .9rem;border-radius:14px;background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--good);box-shadow:0 10px 30px rgba(0,0,0,.25);animation:fx-down .32s cubic-bezier(.2,.9,.3,1.2) both}
 .fx-toast.err{border-left-color:var(--bad)}
 .fx-toast b{display:block}.fx-toast p{margin:.15rem 0 0;font-size:.9rem;color:var(--muted)}
 .fx-toast-ico{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--good);color:var(--on-primary)}
 .fx-toast.err .fx-toast-ico{background:var(--bad);color:var(--surface)}
 .fx-x{flex:none;border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;min-width:32px;min-height:32px;border-radius:8px}.fx-x:hover{background:var(--soft)}
-@media(max-width:699.98px){.fx-toast{bottom:calc(72px + env(safe-area-inset-bottom))}}
 .fx-card{border-top:3px solid var(--primary)}
 .fx-checks li{animation:fx-in .3s ease both;display:flex;gap:.4rem}.fx-ci{display:inline-block;width:1.1em}.fx-checks li.ok .fx-ci{animation:fx-pop .35s ease both}
 .fx-note{margin:0 0 .6rem;padding:.4rem .6rem;border-radius:10px;background:var(--soft);font-size:.9rem;animation:fx-in .25s ease both}
@@ -816,6 +815,7 @@ select.input.sm{padding:.25rem .4rem;font-size:.85rem;width:auto;min-height:0}
 .fx-badge{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--bad);animation:fx-shake .45s ease both}
 .fx-btns{display:flex;gap:.5rem;flex-wrap:wrap}.fx-saved{margin:.4rem 0 0;animation:fx-in .3s ease both}
 .bld[data-w=xs] .fx-btns,.bld[data-w=xs] .fx-btns .btn{width:100%}
+@keyframes fx-down{from{opacity:0;transform:translate(var(--fx-x,0),-18px) scale(.97)}to{opacity:1;transform:translate(var(--fx-x,0),0) scale(1)}}
 @keyframes fx-up{from{opacity:0;transform:translate(var(--fx-x,0),14px) scale(.97)}to{opacity:1;transform:translate(var(--fx-x,0),0) scale(1)}}
 .fx-toast{--fx-x:-50%}
 @keyframes fx-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
