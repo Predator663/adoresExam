@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { api, getToken, setToken } from "./api";
 import { dict } from "./i18n";
 import { clearOfflineData, setCurrentUser } from "./offlineStore";
@@ -35,12 +35,15 @@ export function applyPrefs(p: Local) {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const userRef = useRef<User | null>(null);  // always the newest user, so two quick choices never build on an old copy
+  const saveSeq = useRef(0);                  // numbers each save: only the newest answer from the server may change the screen
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState("");
   const [localLang, setLocalLang] = useState<"en" | "sw">("en");
   const lang = user?.language || localLang;
 
   const push = useCallback((u: User | null) => {
+    userRef.current = u;
     setUser(u);
     const l = readLocal();
     if (u) {
@@ -95,7 +98,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if ("hc" in patch) { localStorage.setItem(LOCAL, JSON.stringify({ ...l, hc: patch.hc })); applyPrefs({ ...l, hc: patch.hc, ...user && { theme: user.theme } }); delete patch.hc; }
       if (Object.keys(patch).length === 0) return;
       if (!user) { const m = { ...l, ...patch }; localStorage.setItem(LOCAL, JSON.stringify(m)); applyPrefs(m); if (patch.language) setLocalLang(patch.language); return; }
-      push(await api<User>("/me/", { method: "PATCH", body: patch }));
+      // Show the choice at once and remember it on the phone; the server's answer only CONFIRMS it. Before, every step of a slider waited
+      // for the server and each (older) answer put the page back to an older size, which made the text size jump up and down by itself.
+      const mine = ++saveSeq.current;
+      const cur = userRef.current || user;
+      const ACC = ["text_size", "line_spacing", "dyslexia_font", "reduce_motion", "read_aloud"];
+      const acc = Object.fromEntries(Object.entries(patch).filter(([k]) => ACC.includes(k)));
+      push({ ...cur, ..."language" in patch && { language: patch.language }, ..."theme" in patch && { theme: patch.theme }, accessibility: { ...cur.accessibility, ...acc } } as User);
+      try {
+        const fresh = await api<User>("/me/", { method: "PATCH", body: patch });
+        if (mine === saveSeq.current) push(fresh);
+      } catch {
+        // Offline or the server said no: show the server's truth if it can be reached; otherwise the choice stays on this phone.
+        if (mine === saveSeq.current) { try { push(await api<User>("/me/")); } catch { /* still offline */ } }
+      }
     },
     t: (key, vars) => {
       let s = dict[lang][key] ?? dict.en[key] ?? key;
