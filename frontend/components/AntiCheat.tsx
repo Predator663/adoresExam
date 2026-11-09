@@ -30,6 +30,7 @@ const K_MIN = 0.00005;
 const NICE = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
 const niceStep = (target: number) => NICE.find((n) => n >= target) ?? NICE[NICE.length - 1];
 const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`);
+const ini = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || "").join("") || "?";
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 function beep() {
@@ -343,6 +344,7 @@ function ProxMap({ students, alerts, links, threshold, labels, streets, focusReq
         <button className="btn icon" aria-label="Zoom out" onClick={() => zoom(1 / 1.5)}>−</button>
         <button className={`btn icon ${auto ? "on" : ""}`} aria-label="Fit all students" title="Fit all students" onClick={() => setAuto(true)}><Icon n="pin" size={18} /></button>
       </div>
+      {students.length > 0 && <div className="ac-hud" aria-hidden="true"><i />{students.filter((x) => x.fresh).length} live on map</div>}
       {!students.length && <p className="ac-none">No student positions yet. They appear as soon as a student starts the exam.</p>}
       {tipS && tipPos && (() => {
         const c = checkText(tipS.checks || {});
@@ -509,14 +511,14 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
           {!data && <div className="lm-skel" aria-hidden="true">{[0, 1].map((k) => <div key={k} className="lm-card"><i className="s1" /><i className="s2" /><i className="s3" /></div>)}</div>}
 
           {data && panel === "alerts" && (
-            <>
+            <div className="acx-sw">
               <h3 className="acx-h">Too close <small>{active.length} open · {past.length} ended</small></h3>
               {!data.alerts.length ? <div className="lm-empty"><Icon n="shield" size={26} /><p>Nobody has been closer than {data.alert_meters} m.</p></div> : (
                 <ul className="acx-list">
-                  {[...active, ...past].map((a) => (
-                    <li key={a.id} className={`acx-card ${a.active ? "hot" : "off"}`}>
+                  {[...active, ...past].map((a, idx) => (
+                    <li key={a.id} className={`acx-card ${a.active ? "hot" : "off"}`} style={{ ["--i" as any]: Math.min(idx, 10) }}>
                       <div className="acx-card-h">
-                        <span className="acx-av" aria-hidden="true"><Icon n="users" size={18} /></span>
+                        <span className="acx-pair" aria-hidden="true"><b>{ini(a.a.name)}</b><b>{ini(a.b.name)}</b></span>
                         <div className="acx-who"><b>{a.a.name}</b><b>{a.b.name}</b></div>
                         <span className={`acx-dist ${a.active ? "on" : ""}`}>{a.active ? fmtDist(a.distance_m) : fmtDist(a.min_distance_m)}</span>
                       </div>
@@ -545,25 +547,25 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
                 <>
                   <h3 className="acx-h">Related, close together <small>{data.links!.length} · no alert, not locked</small></h3>
                   <ul className="acx-list">
-                    {data.links!.map((l) => { const nm = (id: number) => data.students.find((x) => x.id === id)?.name ?? "Student"; return (
-                      <li key={l.id} className="acx-card off">
-                        <div className="acx-card-h"><span className="acx-av" aria-hidden="true"><Icon n="users" size={18} /></span><div className="acx-who"><b>{nm(l.a)}</b><b>{nm(l.b)}</b></div><span className="acx-dist">{fmtDist(l.distance_m)}</span></div>
+                    {data.links!.map((l, idx) => { const nm = (id: number) => data.students.find((x) => x.id === id)?.name ?? "Student"; return (
+                      <li key={l.id} className="acx-card off" style={{ ["--i" as any]: Math.min(idx, 10) }}>
+                        <div className="acx-card-h"><span className="acx-pair" aria-hidden="true"><b>{ini(nm(l.a))}</b><b>{ini(nm(l.b))}</b></span><div className="acx-who"><b>{nm(l.a)}</b><b>{nm(l.b)}</b></div><span className="acx-dist">{fmtDist(l.distance_m)}</span></div>
                         <div className="lm-flags"><i className="lm-chip">{l.label}</i><i className="lm-chip">expected</i></div>
                       </li>); })}
                   </ul>
                 </>
               )}
-            </>
+            </div>
           )}
 
           {data && panel === "checks" && (
-            <>
+            <div className="acx-sw">
               <h3 className="acx-h">Device and position checks <small>{openFlags.length} open</small></h3>
               <p className="muted small lm-note">Signs to look at, not proof: a phone that changed during the exam, or a position that does not behave like real GPS.</p>
               {!flags.length ? <div className="lm-empty"><Icon n="check" size={26} /><p>Nothing unusual so far.</p></div> : (
                 <ul className="acx-list">
-                  {flags.map((f) => (
-                    <li key={f.id} className={`acx-card ${f.acknowledged || f.severity === "info" ? "off" : f.severity === "high" ? "hot" : "warn"}`}>
+                  {flags.map((f, idx) => (
+                    <li key={f.id} className={`acx-card ${f.acknowledged || f.severity === "info" ? "off" : f.severity === "high" ? "hot" : "warn"}`} style={{ ["--i" as any]: Math.min(idx, 10) }}>
                       <div className="acx-card-h">
                         <span className="acx-av" aria-hidden="true"><Icon n="radar" size={18} /></span>
                         <div className="acx-who"><b>{f.student.name}</b><small>{f.label}{f.count > 1 ? ` ×${f.count}` : ""}</small></div>
@@ -579,22 +581,22 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
                   ))}
                 </ul>
               )}
-            </>
+            </div>
           )}
 
           {data && panel === "nosig" && (
-            <>
+            <div className="acx-sw">
               <h3 className="acx-h">No location signal <small>{noSig}</small></h3>
               {!noSig ? <div className="lm-empty"><Icon n="check" size={26} /><p>Every writing student is reporting a position.</p></div> : (
                 <ul className="acx-list">
-                  {data.no_signal.map((s) => { const c = checkText(s.checks || {}); return (
-                    <li key={s.id} className="acx-card off">
+                  {data.no_signal.map((s, idx) => { const c = checkText(s.checks || {}); return (
+                    <li key={s.id} className="acx-card off" style={{ ["--i" as any]: Math.min(idx, 10) }}>
                       <div className="acx-card-h"><span className="acx-av" aria-hidden="true"><Icon n="pin" size={18} /></span><div className="acx-who"><b>{s.name}</b><small>{s.class}</small></div></div>
                       <div className="lm-flags"><i className="lm-chip bad">{s.last_seen_s == null ? "No position yet" : `Last position ${s.last_seen_s} s ago`}</i><i className="lm-chip">{c.loc}</i></div>
                     </li>); })}
                 </ul>
               )}
-            </>
+            </div>
           )}
 
           {!wide && panel === "related" && <RelatedStudents onChange={load} />}

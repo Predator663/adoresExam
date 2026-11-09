@@ -248,20 +248,20 @@ function ExamCard({ e, i, open, onToggle, admin, at, q, cls, offset, onDue, onCh
         <span className="lm-title">
           <strong>{e.title}</strong>
           <span className="lm-chips">
-            <i>{e.subject}</i>{e.classes.length > 0 && <i>{e.classes.join(", ")}</i>}
-            <i>{hhmm(e.start_at)}–{hhmm(e.end_at)}</i><i>{e.duration_minutes} min</i><i>{e.total_questions} questions</i>
+            <i><Icon n="book" size={12} />{e.subject}</i>{e.classes.length > 0 && <i><Icon n="users" size={12} />{e.classes.join(", ")}</i>}
+            <i><Icon n="clock" size={12} />{hhmm(e.start_at)}–{hhmm(e.end_at)} · {e.duration_minutes} min</i><i><Icon n="pencil" size={12} />{e.total_questions} questions</i>
           </span>
         </span>
         <span className="lm-state">
           {soon ? <StartsIn startIso={e.start_at} offset={offset} onDue={onDue} /> : <span className={live ? "lb-live" : "lb-closed"}>{live ? "LIVE" : e.status.toUpperCase()}</span>}
-          <span className={`lm-chev ${open ? "up" : ""}`} aria-hidden>▾</span>
+          <span className={`lm-chev ${open ? "up" : ""}`} aria-hidden><Icon n="chevron" size={16} /></span>
         </span>
         <span className="lm-counts">
           <StackBar a={e.in_progress} b={e.submitted} c={e.not_started} />
-          <span className="lm-legend">
-            <span><i className="w" /> <b><CountUp value={e.in_progress} /></b> writing</span>
-            <span><i className="s" /> <b><CountUp value={e.submitted} /></b> submitted</span>
-            <span><i className="n" /> <b><CountUp value={e.not_started} /></b> not started</span>
+          <span className="lm-stats">
+            <span className="lm-stat w"><b><CountUp value={e.in_progress} /></b><em><i />writing</em></span>
+            <span className="lm-stat s"><b><CountUp value={e.submitted} /></b><em><i />submitted</em></span>
+            <span className="lm-stat n"><b><CountUp value={e.not_started} /></b><em><i />not started</em></span>
           </span>
         </span>
       </button>
@@ -393,10 +393,11 @@ export default function LiveBoard({ admin: adminProp }: { admin?: boolean }) {
       </div>
 
       {admin && (
-        <div className="lm-tabs lm-main" role="tablist" aria-label="Monitor view">
-          <button role="tab" aria-selected={tabView === "exams"} className={tabView === "exams" ? "on" : ""} onClick={() => setTabView("exams")}><Icon n="pencil" size={15} /> Exams</button>
+        <div className="lm-switch" role="tablist" aria-label="Monitor view" style={{ ["--n" as any]: 2, ["--i" as any]: tabView === "ac" ? 1 : 0 }}>
+          <span className="lm-switch-ind" aria-hidden="true" />
+          <button role="tab" aria-selected={tabView === "exams"} className={tabView === "exams" ? "on" : ""} onClick={() => setTabView("exams")}><Icon n="pencil" size={16} /> Exams</button>
           <button role="tab" aria-selected={tabView === "ac"} className={tabView === "ac" ? "on" : ""} onClick={() => setTabView("ac")}>
-            <Icon n="radar" size={15} /> Anti-cheat{openAlerts > 0 && <b className="lb-badge lm-pulse">{openAlerts}</b>}
+            <Icon n="radar" size={16} /> Anti-cheat{openAlerts > 0 && <b className="lb-badge lm-pulse">{openAlerts}</b>}
           </button>
         </div>
       )}
@@ -425,7 +426,7 @@ export default function LiveBoard({ admin: adminProp }: { admin?: boolean }) {
       {err && <p className="lb-alert lm-alert" role="alert">{err} Retrying…</p>}
       {!board && !err && !(admin && tabView === "ac") && <Skeleton />}
       {board && exams.length === 0 && !(admin && tabView === "ac") && <div className="lm-empty"><Icon n="calendar" size={28} /><p>No exams in this selection. Pick a longer period or clear the filters to see older exams and who did or missed them.</p></div>}
-      {admin && tabView === "ac" && <AntiCheat exams={(board?.exams ?? []).map((e) => ({ exam_id: e.exam_id, title: e.title, status: e.status, in_progress: e.in_progress }))} />}
+      {admin && tabView === "ac" && <div className="lm-view" key="ac"><AntiCheat exams={(board?.exams ?? []).map((e) => ({ exam_id: e.exam_id, title: e.title, status: e.status, in_progress: e.in_progress }))} /></div>}
       <div className="lm-grid" style={admin && tabView === "ac" ? { display: "none" } : undefined}>
         {exams.map((e, i) => (
           <ExamCard key={e.exam_id} e={e} i={i} open={openId === e.exam_id} onToggle={() => setOpenId(openId === e.exam_id ? null : e.exam_id)}
