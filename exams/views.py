@@ -80,8 +80,6 @@ def student_exams(request):
 
 # What the phone check on the pre-exam screen may report (anything else is stored as "other"/"unknown": it is only a hint for a teacher).
 _GPS_WORDS = {"ok", "weak", "insecure", "unsupported", "in_app", "policy", "site_denied", "services_off", "no_signal", "unknown"}
-_NET_WORDS = {"wifi", "mobile", "online", "offline"}
-_BLE_WORDS = {"on", "off", "unknown"}
 _OS_WORDS = {"android", "ios", "other"}
 
 
@@ -95,18 +93,18 @@ class DeviceCheckThrottle(UserRateThrottle):
 @permission_classes([IsStudent])
 @throttle_classes([DeviceCheckThrottle])
 def student_device_check(request, exam_id):
-    """The phone check (GPS, Wi-Fi, Bluetooth) did not pass, or location is only rough: remember WHY, so a teacher who is helping
+    """The optional location check did not pass, or location is only rough: remember WHY, so a teacher who is helping
     the student can see it in the audit log (action device.check.failed). The same reason is kept once every 5 minutes, so
-    pressing "Check again" ten times writes one line. Nothing is stored when everything passed."""
+    pressing "Check again" ten times writes one line. Nothing is stored when location works. Wi-Fi and Bluetooth are not checked."""
     exam = get_object_or_404(Exam, pk=exam_id)
     data = request.data if hasattr(request.data, "get") else {}
     pick = lambda key, allowed, other: (str(data.get(key) or "")[:20] if str(data.get(key) or "")[:20] in allowed else other)
-    gps, net, ble, os_ = pick("gps", _GPS_WORDS, "unknown"), pick("net", _NET_WORDS, "online"), pick("ble", _BLE_WORDS, "unknown"), pick("os", _OS_WORDS, "other")
-    if gps == "ok" and net != "offline" and ble != "off":
+    gps, os_ = pick("gps", _GPS_WORDS, "unknown"), pick("os", _OS_WORDS, "other")
+    if gps == "ok":
         return Response({"ok": True, "logged": False})
-    fresh = cache.add(f"devchk:{request.user.pk}:{exam.pk}:{gps}:{net}:{ble}", 1, 300)
+    fresh = cache.add(f"devchk:{request.user.pk}:{exam.pk}:{gps}", 1, 300)
     if fresh:
-        audit(request.user, "device.check.failed", exam.pk, gps=gps, net=net, ble=ble, os=os_)
+        audit(request.user, "device.check.failed", exam.pk, gps=gps, os=os_)
     return Response({"ok": True, "logged": bool(fresh)})
 
 
@@ -118,21 +116,19 @@ def student_start(request, exam_id):
         return Response({"detail": "Please tick that you have read and agree to the rules.", "code": "rules"}, status=400)
     fix = None
     if proctoring.enabled():
-        # Terms + Privacy policy (which cover location monitoring) must be accepted for every exam, and the phone must
-        # prove that location services are on by sending a position.
+        # Terms + Privacy policy (which cover location monitoring) must be accepted for every exam. Location itself is
+        # OPTIONAL: a valid position is stored when the phone sends one, but the exam starts with or without it.
         if not request.data.get("accept_legal"):
             return Response({"detail": "Please accept the Terms of use and the Privacy policy before you begin.", "code": "legal"}, status=400)
         fix = proctoring.parse_fix(request.data.get("location") or {})
-        if not fix:
-            return Response({"detail": "Turn on location services (GPS), allow location for this app, then try again. "
-                                       "Your location is needed during the exam.", "code": "location_required"}, status=400)
     try:
         attempt = services.start_attempt(exam, request.user)
     except ExamError as e:
         return _err(e)
     if proctoring.enabled():
         proctoring.record_acceptance(request.user, exam)
-        proctoring.ingest(attempt, fix, speed=None, heading=None, sensors=request.data.get("sensors"), **proctoring.client_info(request))
+        if fix:
+            proctoring.ingest(attempt, fix, speed=None, heading=None, sensors=request.data.get("sensors"), **proctoring.client_info(request))
     return Response(services.attempt_state(attempt), status=201)
 
 

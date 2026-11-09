@@ -18,38 +18,37 @@ class DeviceCheckTests(AnalyticsBase):
         return AuditLog.objects.filter(action="device.check.failed")
 
     def test_a_blocked_gps_is_logged_with_its_reason(self):
-        r = self.sc.post(self.url, {"gps": "site_denied", "net": "wifi", "ble": "unknown", "os": "android"}, format="json")
+        r = self.sc.post(self.url, {"gps": "site_denied", "os": "android"}, format="json")
         self.assertEqual((r.status_code, r.json()), (200, {"ok": True, "logged": True}))
         log = self.logs().get()
         self.assertEqual((log.actor_id, log.target), (self.amina.pk, str(self.exam.pk)))
-        self.assertEqual((log.detail["gps"], log.detail["net"], log.detail["ble"], log.detail["os"]), ("site_denied", "wifi", "unknown", "android"))
+        self.assertEqual((log.detail["gps"], log.detail["os"]), ("site_denied", "android"))
 
     def test_pressing_check_again_does_not_flood_the_log(self):
-        body = {"gps": "services_off", "net": "mobile", "ble": "on", "os": "ios"}
+        body = {"gps": "services_off", "os": "ios"}
         self.assertTrue(self.sc.post(self.url, body, format="json").json()["logged"])
         self.assertFalse(self.sc.post(self.url, body, format="json").json()["logged"])
         self.assertEqual(self.logs().count(), 1)
         self.sc.post(self.url, {**body, "gps": "no_signal"}, format="json")  # a different reason is news
         self.assertEqual(self.logs().count(), 2)
 
-    def test_bluetooth_off_and_no_internet_are_logged_even_with_gps_ok(self):
-        self.sc.post(self.url, {"gps": "ok", "net": "wifi", "ble": "off", "os": "android"}, format="json")
-        self.sc.post(self.url, {"gps": "ok", "net": "offline", "ble": "on", "os": "android"}, format="json")
-        self.assertEqual(self.logs().count(), 2)
+    def test_wifi_and_bluetooth_are_ignored(self):
+        self.sc.post(self.url, {"gps": "ok", "net": "offline", "ble": "off", "os": "android"}, format="json")
+        self.assertFalse(self.logs().exists())
 
     def test_a_passing_check_stores_nothing(self):
-        r = self.sc.post(self.url, {"gps": "ok", "net": "wifi", "ble": "on", "os": "android"}, format="json")
+        r = self.sc.post(self.url, {"gps": "ok", "os": "android"}, format="json")
         self.assertEqual(r.json(), {"ok": True, "logged": False})
         self.assertFalse(self.logs().exists())
 
     def test_rough_location_is_logged_as_weak(self):
-        self.sc.post(self.url, {"gps": "weak", "net": "wifi", "ble": "on", "os": "android"}, format="json")
+        self.sc.post(self.url, {"gps": "weak", "os": "android"}, format="json")
         self.assertEqual(self.logs().get().detail["gps"], "weak")
 
     def test_made_up_values_are_not_stored(self):
         self.sc.post(self.url, {"gps": "<script>alert(1)</script>", "net": "x" * 500, "ble": {"a": 1}, "os": "TempleOS"}, format="json")
         d = self.logs().get().detail
-        self.assertEqual((d["gps"], d["net"], d["ble"], d["os"]), ("unknown", "online", "unknown", "other"))
+        self.assertEqual((d["gps"], d["os"]), ("unknown", "other"))
         self.assertEqual(self.sc.post(self.url, ["not", "a", "dict"], format="json").status_code, 200)
 
     def test_only_students_and_only_real_exams(self):

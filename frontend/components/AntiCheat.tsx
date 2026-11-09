@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
    other websites, so student positions never leave the school's own server. Alerts are information for a person to check,
    they are not proof of cheating (the Terms and Privacy policy say so). */
 
-type Checks = { perm?: string; ble?: string; net?: string; motion?: string };
+type Checks = { perm?: string; motion?: string };
 type PS = { id: number; name: string; class: string; index: string; lat: number; lng: number; accuracy: number; speed: number | null; heading: number | null;
   moving: boolean; moving_source: string; age_s: number; fresh: boolean; poor: boolean; checks: Checks };
 type PA = { id: number; a: { id: number; name: string }; b: { id: number; name: string }; distance_m: number; min_distance_m: number; confidence: string;
@@ -128,10 +128,8 @@ function PlaceSummary({ students }: { students: PS[] }) {
 
 const checkText = (c: Checks) => {
   const loc = c.perm === "granted" ? "Location on" : c.perm === "denied" ? "Location BLOCKED" : "Location ?";
-  const ble = c.ble === "on" ? "Bluetooth on" : c.ble === "off" ? "Bluetooth OFF" : "Bluetooth not readable";
-  const net = c.net === "wifi" ? "Wi-Fi" : c.net === "cellular" ? "mobile data" : c.net === "none" ? "no network" : "network ?";
   const mo = c.motion === "moving" ? "device moving" : c.motion === "still" ? "device still" : "motion ?";
-  return { loc, ble, net, mo, bad: c.perm === "denied" || c.ble === "off" };
+  return { loc, mo, bad: c.perm === "denied" };
 };
 
 /* ------------------------------------------------------------------ the plan view */
@@ -358,7 +356,7 @@ function ProxMap({ students, alerts, links, threshold, labels, streets, focusReq
             <span>Accuracy ±{Math.round(tipS.accuracy)} m{tipS.poor ? " (too rough to compare)" : ""}{tipS.speed != null && tipS.speed > 0.3 ? ` · ${(tipS.speed * 3.6).toFixed(1)} km/h` : ""}</span>
             {other && <span className="al">⚠ {fmtDist(tipAlert!.distance_m)} from {other.name}</span>}
             {relOf.get(tipS.id) && <span className="rel">👥 {relOf.get(tipS.id)!.label}: {fmtDist(relOf.get(tipS.id)!.distance_m)} from {students.find((x) => x.id === (relOf.get(tipS.id)!.a === tipS.id ? relOf.get(tipS.id)!.b : relOf.get(tipS.id)!.a))?.name ?? "a relative"}, not locked</span>}
-            <span className={c.bad ? "al" : "dim"}>{c.loc} · {c.ble} · {c.net} · {c.mo}</span>
+            <span className={c.bad ? "al" : "dim"}>{c.loc} · {c.mo}</span>
             <PlaceLine lat={tipS.lat} lng={tipS.lng} prefix="Near " on={streets} />
             <span className="dim">Updated {tipS.age_s}s ago</span>
           </div>
@@ -518,7 +516,7 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
             <ul className="ac-alerts">
               {data?.no_signal.map((s) => { const c = checkText(s.checks || {}); return (
                 <li key={s.id} className="off"><div><b>{s.name}</b> <small>{s.class}</small></div>
-                  <small>{s.last_seen_s == null ? "Has not reported a position yet" : `Last position ${s.last_seen_s}s ago`} · {c.loc} · {c.ble}</small></li>); })}
+                  <small>{s.last_seen_s == null ? "Has not reported a position yet" : `Last position ${s.last_seen_s}s ago`} · {c.loc}</small></li>); })}
             </ul>
           )}
           <p className="muted small">An alert is information to check, not proof of cheating: siblings or neighbours may live close by. Positions are kept only while the exam runs.</p>

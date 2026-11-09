@@ -30,7 +30,7 @@ class LiveLocation(models.Model):
     anchor_lng = models.FloatField(null=True, blank=True)
     moving_until = models.DateTimeField(null=True, blank=True)
     moving_source = models.CharField(max_length=10, blank=True)  # gps | motion
-    sensors = models.JSONField(default=dict, blank=True)  # permission / bluetooth / network / motion status reported by the phone
+    sensors = models.JSONField(default=dict, blank=True)  # location permission / motion status reported by the phone
     devices = models.JSONField(default=dict, blank=True)  # {"first": {id, platform, ip}, "last": {...}}: which device reports for this attempt
     spoof = models.JSONField(default=dict, blank=True)    # consecutive-report counters for the fake-position checks (see spoof.py)
     updated_at = models.DateTimeField(db_index=True)

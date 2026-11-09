@@ -27,8 +27,9 @@
 - Unaweza kuanza hadi **muda wa kuchelewa** (kawaida dakika 10) baada ya kuanza. Ukianza kuchelewa, **huongezewi muda**.
 
 ### Mipangilio ya simu na eneo (kila mtihani)
-- Kabla ya kubonyeza ANZA lazima: uwashe **Eneo (GPS)**, **Wi-Fi** na **Bluetooth**, uruhusu Eneo kwa programu, ubonyeze **Kagua simu yangu**, uthibitishe, na ukubali **Masharti ya matumizi** na **Sera ya faragha**.
-- Acha Eneo, Wi-Fi na Bluetooth vikiwa vimewashwa hadi uwasilishe. Eneo lako hutumika tu kukagua kuwa wanafunzi wanakaa angalau mita 20 kutoka kwa kila mmoja. Eneo likizimwa, maswali yako hufichwa hadi uliwashe tena, na saa inaendelea.
+- Kabla ya kubonyeza ANZA lazima ukubali kanuni, **Masharti ya matumizi** na **Sera ya faragha**.
+- **Eneo (GPS) si lazima**: unaweza kuanza mtihani liwe limewashwa au limezimwa. Ni vizuri kuliwasha (gusa **Kagua eneo langu**) kwa sababu linasaidia shule kuhakikisha kila mwanafunzi anafanya mtihani wake mwenyewe kwa haki. Wi-Fi na Bluetooth hazihitajiki.
+- Eneo likiwashwa, hutumika tu kukagua kuwa wanafunzi wanakaa angalau mita 20 kutoka kwa kila mmoja. Likizimwa, unaweza kuendelea kuandika.
 - Kaa mbali na wanafunzi wengine wanaofanya mtihani huohuo.
 
 ## 5. Wakati wa mtihani

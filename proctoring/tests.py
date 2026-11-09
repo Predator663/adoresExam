@@ -52,23 +52,30 @@ class StartRules(Base):
         self.assertEqual((r.status_code, r.json()["code"]), (400, "legal"))
         self.assertFalse(Attempt.objects.exists())
 
-    def test_location_is_required(self):
+    def test_location_is_optional(self):
+        """Whether GPS is on or off (no position, empty, or an invalid one), the student can start; no position is stored."""
         self.open_exam()
-        c = self.client_for(self.amina)
-        for loc in (None, {}, {"lat": 0, "lng": 0, "accuracy": 5}, {"lat": "x", "lng": 1}):
+        for i, loc in enumerate((None, {}, {"lat": 0, "lng": 0, "accuracy": 5}, {"lat": "x", "lng": 1})):
+            Attempt.objects.all().delete()
+            c = self.client_for(self.amina)
             r = c.post(f"/api/student/exams/{self.exam.pk}/start/", {"agree_rules": True, "accept_legal": True, "location": loc}, format="json")
-            self.assertEqual((r.status_code, r.json()["code"]), (400, "location_required"))
-        self.assertFalse(Attempt.objects.exists())
+            self.assertEqual(r.status_code, 201, loc)
+            self.assertFalse(LiveLocation.objects.filter(student=self.amina).exists())
+
+    def test_start_without_any_location_key(self):
+        self.open_exam()
+        r = self.client_for(self.amina).post(f"/api/student/exams/{self.exam.pk}/start/", {"agree_rules": True, "accept_legal": True}, format="json")
+        self.assertEqual(r.status_code, 201)
 
     def test_start_records_acceptance_and_first_position(self):
         self.open_exam()
         c = self.client_for(self.amina)
         r = c.post(f"/api/student/exams/{self.exam.pk}/start/", {"agree_rules": True, "accept_legal": True, "location": at(),
-                                                                 "sensors": {"ble": "unsupported", "net": "wifi", "perm": "granted", "evil": "x"}}, format="json")
+                                                                 "sensors": {"ble": "on", "net": "wifi", "perm": "granted", "evil": "x"}}, format="json")
         self.assertEqual(r.status_code, 201)
         self.assertEqual(LegalAcceptance.objects.filter(user=self.amina, exam=self.exam).count(), 1)
         ll = LiveLocation.objects.get(student=self.amina)
-        self.assertEqual(ll.sensors, {"ble": "unsupported", "net": "wifi", "perm": "granted"})
+        self.assertEqual(ll.sensors, {"perm": "granted"})  # Wi-Fi / Bluetooth status is no longer kept
 
     @override_settings(PROCTORING_ENABLED=False)
     def test_can_be_switched_off(self):

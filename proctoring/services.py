@@ -60,8 +60,7 @@ def parse_fix(data):
 def clean_sensors(raw):
     """Keep only the few short status words the phone may send (never free text)."""
     raw = raw if isinstance(raw, dict) else {}
-    allowed = {"perm": {"granted", "denied", "prompt", "unknown"}, "ble": {"on", "off", "unsupported", "unknown"},
-               "net": {"wifi", "cellular", "ethernet", "none", "unknown"}, "motion": {"still", "moving", "denied", "unsupported", "unknown"},
+    allowed = {"perm": {"granted", "denied", "prompt", "unknown"}, "motion": {"still", "moving", "denied", "unsupported", "unknown"},
                "source": {"watch", "poll"}}
     out = {k: (raw.get(k) if raw.get(k) in v else "unknown") for k, v in allowed.items() if k in raw}
     return out

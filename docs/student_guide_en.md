@@ -27,8 +27,9 @@ Installing makes the app open faster and lets us send you reminders.
 - You may start up to the **late-entry time** (usually 10 minutes) after the start. If you start late, you do **not** get extra time.
 
 ### Phone settings and location (every exam)
-- Before you can press START you must: turn on **Location (GPS)**, **Wi-Fi** and **Bluetooth**, allow Location for the app, tap **Check my phone**, tick the confirmation, and tick that you accept the **Terms of use** and **Privacy policy**.
-- Keep Location, Wi-Fi and Bluetooth on until you submit. Your position is used only to check that students sit at least 20 metres apart. If Location is switched off, your questions are hidden until you turn it on again, and the timer keeps running.
+- Before you can press START you must tick that you accept the rules, the **Terms of use** and the **Privacy policy**.
+- **Location (GPS) is optional**: you can start the exam whether it is on or off. Turning it on is recommended (tap **Check my location**). Wi-Fi and Bluetooth are not required.
+- If Location is on, your position is used only to check that students sit at least 20 metres apart. If it is off, you can keep writing.
 - Sit apart from other students writing the same exam.
 
 ## 5. During the exam

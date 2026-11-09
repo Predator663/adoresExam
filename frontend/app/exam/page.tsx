@@ -20,7 +20,7 @@ function PreExam({ examId }: { examId: number }) {
   const { t, lang } = useSession();
   const { data, error, loading, reload } = useLoad(() => api<ExamCard[]>("/student/exams/"), [examId]);
   const [agree, setAgree] = useState(false), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
-  const [phone, setPhone] = useState<PhoneResult | null>(null), [recheck, setRecheck] = useState(0);  // `recheck` runs the phone check again from here
+  const [phone, setPhone] = useState<PhoneResult | null>(null);
   const now = useNow(500);
   if (loading) return <Loading />;
   if (error) return <ErrorNote error={error} retry={reload} />;
@@ -33,24 +33,23 @@ function PreExam({ examId }: { examId: number }) {
   const started = diff <= 0;
   const blocked = c.state === "done" || c.state === "missed";
 
-  /** One tick covers the rules, the Terms and the Privacy policy (which describe the location checks). The phone check (GPS, Wi-Fi, Bluetooth)
-      is components/PhoneCheck.tsx: it must pass before START works. See lib/proctor.ts for what a web page can and cannot read. */
+  /** One tick covers the rules, the Terms and the Privacy policy (which describe the location checks). Location (components/PhoneCheck.tsx)
+      is OPTIONAL: START works whether it is on or off. If a position is available it is sent with the start request, otherwise not. */
   async function start() {
     setErr(""); setBusy(true);
     try {
-      const fix = await getFix(20000);  // a fresh position at the moment she starts proves Location is on
+      let fix = phone?.fix;
+      if (!fix && !phone) { try { fix = await getFix(6000); } catch { /* Location is off or blocked: she may still start */ } }
       const sensors = await readSensors();
-      const st = await api<AttemptState>(`/student/exams/${examId}/start/`, { body: { agree_rules: true, accept_legal: true, location: fix, sensors, device: deviceId() } });
+      const st = await api<AttemptState>(`/student/exams/${examId}/start/`, { body: { agree_rules: true, accept_legal: true, ...(fix ? { location: fix } : {}), sensors, device: deviceId() } });
       location.replace(`/exam/?attempt=${st.attempt_id}`);
     } catch (e: any) {
-      const lost = typeof e === "string" || e?.code === "location_required";  // Location went off since the check: run the check again and explain why
       setErr(typeof e === "string" ? t(`dev_loc_${e}`) : e.message);
-      if (lost) { setPhone(null); setRecheck((n) => n + 1); }
       setBusy(false);
     }
   }
 
-  const ready = agree && !!phone?.ready;
+  const ready = agree;
   const agreeText = t("agree_all").split(/(\{terms\}|\{privacy\})/).map((part, i) =>
     part === "{terms}" ? <a key={i} href="/terms/" target="_blank" rel="noopener">{t("foot_terms")}</a>
       : part === "{privacy}" ? <a key={i} href="/privacy/" target="_blank" rel="noopener">{t("foot_privacy")}</a> : part);
@@ -74,10 +73,10 @@ function PreExam({ examId }: { examId: number }) {
       ) : (
         <>
           <label className="switch"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> <span>{agreeText}</span></label>
-          <PhoneCheck examId={examId} disabled={busy} runSignal={recheck} onChange={setPhone} />
+          <PhoneCheck examId={examId} disabled={busy} onChange={setPhone} />
           {!started && <p className="center-text" role="timer"><span className="muted">{t("starts_in")}</span><span className="big-num" style={{ display: "block" }}>{clock(diff)}</span></p>}
           {err && <p className="no" role="alert">⚠ {err}</p>}
-          {started && !ready && <p className="muted small" role="status">{!agree ? t("dev_need_tick") : t("dev_need_check")}</p>}
+          {started && !ready && <p className="muted small" role="status">{t("dev_need_tick")}</p>}
           <button className={`btn primary big ${started && ready && !busy ? "pc-go" : ""}`} disabled={!started || !ready || busy} onClick={start}>{busy ? t("loading") : t("start")}</button>
         </>
       )}
@@ -298,19 +297,6 @@ function Runner({ attemptId }: { attemptId: number }) {
   const q = st.question as NonNullable<typeof st.question>;  // null while locked: the server withholds the question text
   const total = st.total_questions, idx = st.index || 1;
   const low = remainingMs < 5 * 60_000;
-  if (proctor.state === "denied" || proctor.state === "lost") {
-    // Location was switched off: the question is hidden until it is back. The timer keeps running on the server.
-    return (
-      <div className="overlay" role="alertdialog" aria-labelledby="loc-h"><div>
-        <span className="big-num" aria-hidden>📍</span>
-        <h1 id="loc-h">{t("loc_lost_title")}</h1>
-        <p>{proctor.state === "denied" ? t("loc_denied_body") : t("loc_lost_body")}</p>
-        <GpsHelp error={proctor.state === "denied" ? "denied" : "unavailable"} />
-        <p className={`timer ${low ? "low" : ""}`} role="timer" aria-label={t("time_left")}>{clock(remainingMs)}</p>
-        <button className="btn primary big" onClick={() => proctor.retry()}>{t("loc_retry")}</button>
-      </div></div>
-    );
-  }
   if (locked) {
     // Sitting too close to another student: the question is hidden until an administrator unlocks. The timer keeps running on the server.
     return (
@@ -331,10 +317,10 @@ function Runner({ attemptId }: { attemptId: number }) {
       {offline && <div className="offline-banner" role="status">📡 {t("offline_banner")}</div>}
       {banner && <div className="warn-banner" role="alert">⏳ {banner}</div>}
       {leaveMsg && <div className="warn-banner leave-banner" role="alert">⚠️ {leaveMsg} <button className="btn small" onClick={() => setLeaveMsg("")}>OK</button></div>}
-      {proctor.bleOff && <div className="offline-banner" role="status">📶 {t("bt_warn")}</div>}
+      {(proctor.state === "denied" || proctor.state === "lost") && <div className="offline-banner" role="status">📍 {t("loc_off_note")} {t("loc_why")}</div>}
       <div className="exam-head">
         <div className="row">
-          <div className="grow"><b>{st.title}</b><div className="small muted" aria-live="polite">{t("question_x_of_y", { x: idx, y: total })} · <span title={proctor.accuracy ? `±${proctor.accuracy} m` : ""}>📍 {t("loc_on")}</span></div></div>
+          <div className="grow"><b>{st.title}</b><div className="small muted" aria-live="polite">{t("question_x_of_y", { x: idx, y: total })} · <span title={proctor.accuracy ? `±${proctor.accuracy} m` : ""}>📍 {proctor.state === "ok" ? t("loc_on") : proctor.state === "starting" ? "…" : t("loc_off")}</span></div></div>
           <button className="btn icon" aria-pressed={sound} aria-label={t("sound")} onClick={() => { const v = !sound; setSound(v); localStorage.setItem("amani_sound", v ? "on" : "off"); }}>{sound ? "🔔" : "🔕"}</button>
           <div className={`timer ${low ? "low" : ""}`} role="timer" aria-label={t("time_left")}>{low ? "⏳ " : ""}{clock(remainingMs)}</div>
         </div>

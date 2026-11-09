@@ -9,7 +9,7 @@ export default function Terms() {
   const site = useSite();
   return (
     <PublicPage title={t("terms_title")} updated>
-      <div className="hint"><b>Muhtasari kwa Kiswahili.</b> Tumia akaunti yako mwenyewe, usimpe mtu nenosiri lako, na ufanye mtihani kwa uaminifu. Usijaribu kuingia kwenye akaunti za wengine. Wakati wa mtihani lazima uwashe Eneo (GPS), Wi-Fi na Bluetooth, na ukubali masharti na sera ya faragha kabla ya kuanza. Wanafunzi wawili wakikaa chini ya mita 20 kutoka kwa kila mmoja, utawala hupata taarifa. Shule inaweza kusimamisha akaunti inayotumiwa vibaya. Kwa kutumia mfumo huu unakubali masharti haya.</div>
+      <div className="hint"><b>Muhtasari kwa Kiswahili.</b> Tumia akaunti yako mwenyewe, usimpe mtu nenosiri lako, na ufanye mtihani kwa uaminifu. Usijaribu kuingia kwenye akaunti za wengine. Kabla ya kuanza lazima ukubali masharti na sera ya faragha. Eneo (GPS) si lazima, lakini ni vizuri kuliwasha ili mtihani uwe wa haki kwa wote. Wanafunzi wawili wakikaa chini ya mita 20 kutoka kwa kila mmoja, utawala hupata taarifa. Shule inaweza kusimamisha akaunti inayotumiwa vibaya. Kwa kutumia mfumo huu unakubali masharti haya.</div>
 
       <p>These terms apply when you use {site.app}, the online examination system of {site.school}. By logging in you agree to them. If you are under 18, your parent or guardian’s agreement with the school’s rules also applies.</p>
 
@@ -32,12 +32,11 @@ export default function Terms() {
       <h2>2A. Phone settings and location checks during exams</h2>
       <ul>
         <li><b>Accept before you begin.</b> Before every exam you must tick that you accept these Terms of use and the <a href="/privacy/">Privacy policy</a>. Without it the exam cannot be started.</li>
-        <li><b>Turn on Location (GPS), Wi-Fi and Bluetooth</b> when the exam window opens, allow Location for this app, and keep all three on until you submit. The exam cannot be started without Location, and if Location is switched off during the exam the questions are hidden until it is on again. The timer keeps running meanwhile.</li>
+        <li><b>Location (GPS) is optional.</b> You can start and write the exam whether Location is on or off. We recommend turning it on and allowing it for this app, because it helps the school confirm that every student sits the exam alone and fairly. Wi-Fi and Bluetooth are not required.</li>
         <li><b>What is checked.</b> While you write, your phone’s position and motion are sent to the school, so administrators can see whether two or more students are sitting closer together than the distance the school has set (20 metres unless changed). If the school has switched on locking, your exam is locked while you sit that close to another student: a message tells you to move apart, the timer keeps running, and an administrator unlocks it. Details, who sees them and how long they are kept are in section 2A of the Privacy policy.</li>
         <li><b>Alerts are not a verdict.</b> A close position can have an innocent reason, such as a sister in the same house, and positions are not always exact. An administrator reviews every alert, and you will be given a chance to explain before any action is taken.</li>
         <li><b>Do not tamper.</b> Do not use fake-location apps, airplane mode, a second device or any other trick to hide or change where you are. Do not log in again on another phone or computer while you are writing, and do not share your password. The school checks for a change of device and for positions that are not real GPS. This counts as cheating.</li>
-        <li><b>If your phone cannot do this,</b> or you have a good reason not to share your location, tell your teacher before the exam so the school can arrange another way.</li>
-      </ul>
+              </ul>
 
       <h2>3. Marking and results</h2>
       <p>Answers are marked automatically. Nobody can change one student’s score. If a question is found to be faulty, the school may void it and all results are recalculated. Results appear only at the published time. In special cases, such as a power cut, an administrator may grant extra time or a retake, and the reason is recorded.</p>
