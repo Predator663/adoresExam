@@ -91,7 +91,7 @@ export default function RichEditor({ value, onChange, label, minRows = 4, compac
       </div>
       <div ref={ref} className="input rich" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label={label}
         style={{ minHeight: `${compact ? 2.4 : minRows * 1.6}rem`, marginTop: ".5rem" }} onInput={emit}
-        onKeyDown={(e) => { if (compact && e.key === "Enter") e.preventDefault(); }} onBlur={() => { remember(); emit(); }}
+        onKeyDown={(e) => { if (compact && e.key === "Enter" && !e.shiftKey) e.preventDefault(); }} onBlur={() => { remember(); emit(); }}
         onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }} />
       {dlg === "formula" && <FormulaDialog onInsert={insert} onClose={() => setDlg("")} />}
       {dlg === "image" && <ImageDialog onInsert={insert} onClose={() => setDlg("")} />}

@@ -4,6 +4,7 @@ import { blank, build, fresh, ItemRow, type S } from "./QuestionEditor";
 import RichEditor from "./RichEditor";
 import SymbolPad from "./SymbolPad";
 import { api } from "@/lib/api";
+import { enterToNext } from "@/lib/enterNext";
 import { errorLines, plain, qtypeName, QTYPES, uid } from "@/lib/staff";
 
 /** Write every question of the exam on one page, then save them all at once.
@@ -228,10 +229,10 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
   useEffect(() => { if (summary) setTimeout(() => document.getElementById("bk-summary")?.scrollIntoView({ behavior: "smooth", block: "center" }), 120); }, [summary]);
   const types = QTYPES;
   return (
-    <div className="bk">
+    <div className="bk" onKeyDownCapture={enterToNext}>
       <div className="card bk-head">
         <div className="row"><h3 className="grow" style={{ margin: 0 }}>Create all the questions</h3></div>
-        <p className="muted small">Write every question here, one after another. When you are done, save them all and they go straight into this exam. Then review the paper and submit it.</p>
+        <p className="muted small">Write every question here, one after another. When you are done, save them all and they go straight into this exam. Then review the paper and submit it. Tip: press <b>Enter</b> to jump to the next field, <b>Shift+Enter</b> for a new line.</p>
         <details className="bk-more" open={false}>
           <summary>Settings for new questions (form, topic, difficulty, marks)</summary>
           <div className="grid2">

@@ -7,6 +7,7 @@ import { ErrorNote, Loading, useLoad } from "./ui";
 import { api, mediaUrl } from "@/lib/api";
 import { errorLines, plain, QTYPES, uid } from "@/lib/staff";
 import { useSession } from "@/lib/session";
+import { enterToNext } from "@/lib/enterNext";
 import type { Question } from "@/lib/types";
 
 export type Item = { id: string; text: string; image: string | null; alt_text: string };
@@ -173,9 +174,10 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
   );
 
   return (
-    <div className="qeditor">
+    <div className="qeditor" onKeyDownCapture={enterToNext}>
       <div className="row"><button className="btn" onClick={onClose}>{backLabel || "← Back to list"}</button><span className="pill">{cid ? `#${cid}` : "New"} · {status}</span></div>
       {draft && <div className="hint" role="status">An unsaved draft from this device was found. <button className="btn" onClick={() => { setS(draft); setDraft(null); }}>Restore it</button> <button className="btn" onClick={() => { localStorage.removeItem(key); setDraft(null); }}>Discard</button></div>}
+      <p className="muted small">Tip: press <b>Enter</b> to jump to the next field, <b>Shift+Enter</b> for a new line.</p>
       {lock && <p className="hint">This question is archived (it was used in an exam).</p>}
       <div className="card">
         <div className="grid2">
