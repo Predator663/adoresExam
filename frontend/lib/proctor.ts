@@ -122,11 +122,12 @@ export function useProctor(attemptId: number | null, every = 6000) {
     if (!attemptId) return;
     stop.current = false; fails.current = 0; setState("starting");
     startMotion().catch(() => {});  // works on Android / already-granted iOS; otherwise motion stays "unknown", which is fine
-    tick();
+    // The start request already sent a position, so the first report waits a random 1-5 s: hundreds of phones must not report in the same second.
+    const first = setTimeout(tick, 1000 + Math.random() * 4000);
     const iv = setInterval(tick, every);
     const vis = () => { if (!document.hidden) tick(); };
     document.addEventListener("visibilitychange", vis);
-    return () => { stop.current = true; clearInterval(iv); document.removeEventListener("visibilitychange", vis); };
+    return () => { stop.current = true; clearTimeout(first); clearInterval(iv); document.removeEventListener("visibilitychange", vis); };
   }, [attemptId, every, tick]);
 
   /** `locked`: an administrator has to unlock this exam because the student sits too close to another one. The next report overrides `markLocked`. */

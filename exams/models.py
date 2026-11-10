@@ -38,9 +38,15 @@ class Exam(models.Model):
     class Meta:
         ordering = ["start_at"]
 
+    def question_stats(self):
+        """(number of counted questions, total marks) from ONE light query that reads only the marks, not every question's whole
+        JSON (answers, explanations, images). The exam list and every START use this."""
+        marks = list(self.questions.filter(voided=False).values_list("payload__marks", flat=True))
+        return len(marks), round(sum(m or 0 for m in marks), 2)
+
     @property
     def total_marks(self):
-        return round(sum(q.payload["marks"] for q in self.questions.all() if not q.voided), 2)
+        return self.question_stats()[1]
 
 
 class ExamQuestion(models.Model):

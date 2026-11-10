@@ -12,6 +12,7 @@ Order of the clues:
 
 An address that is named but not registered gets 404 "unknown_school"; a suspended school gets 403 "school_suspended"."""
 import re
+import time
 
 from django.conf import settings
 from django.db import connection
@@ -46,11 +47,24 @@ class _Deny(Exception):
         self.status, self.code, self.detail = status, code, detail
 
 
+_DOMAIN_CACHE = {}  # host -> (time taken, tenant or None). Every API request names its school; the answer almost never changes.
+_DOMAIN_TTL = 60  # seconds: a school suspended or renamed is noticed within a minute
+
+
 def _by_domain(host):
     if not host:
         return None
+    now = time.monotonic()
+    hit = _DOMAIN_CACHE.get(host)
+    if hit and now - hit[0] < _DOMAIN_TTL and not getattr(settings, "TESTING", False):
+        return hit[1]
     d = get_tenant_domain_model().objects.select_related("tenant").filter(domain=host).first()
-    return d.tenant if d else None
+    tenant = d.tenant if d else None
+    if tenant is not None:  # an unknown address is never remembered: a school registered a moment ago works at once
+        if len(_DOMAIN_CACHE) > 500:
+            _DOMAIN_CACHE.clear()
+        _DOMAIN_CACHE[host] = (now, tenant)
+    return tenant
 
 
 def _by_schema(schema):

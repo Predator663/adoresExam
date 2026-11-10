@@ -79,7 +79,7 @@ def exam_board(request, exam_id):
     """Anti-cheat tab: where every writing student is, who is moving, who is too close to whom, and who has no signal."""
     exam = get_object_or_404(Exam, pk=exam_id)
     now = timezone.now()
-    services.close_stale_alerts(exam.pk, now)
+    services.close_stale_alerts(exam.pk, now, force=True)
     attempts = list(Attempt.objects.filter(exam=exam, status=Attempt.IN_PROGRESS).select_related("student", "student__school_class"))
     by_attempt = {ll.attempt_id: ll for ll in LiveLocation.objects.filter(attempt__in=attempts).select_related("student", "student__school_class")}
     students, silent = [], []

@@ -82,9 +82,10 @@ def sync_exam(exam, now=None):
         if now >= exam.end_at + timedelta(minutes=delay) and not exam.attempts.filter(status=Attempt.IN_PROGRESS).exists():
             target = Exam.PUBLISHED
     if target != exam.status:
+        # Conditional UPDATE: when hundreds of requests notice the change in the same second only one of them writes (and notifies).
+        changed = Exam.objects.filter(pk=exam.pk).exclude(status=target).update(status=target)
         exam.status = target
-        exam.save(update_fields=["status"])
-        if target == Exam.PUBLISHED:
+        if changed and target == Exam.PUBLISHED:
             try:  # RES-02: a notification problem must never block publishing
                 from notifications.services import results_ready
 
@@ -216,8 +217,8 @@ def start_attempt(exam, student, now=None):
         if not retake and now > exam.start_at + timedelta(minutes=late_entry_minutes(exam)):
             raise ExamError("The late-entry period is over, so you can no longer start. Please contact your teacher.", 403, "too_late")
 
-    eqs = list(exam.questions.filter(voided=False))
-    if not eqs:
+    question_ids = list(exam.questions.filter(voided=False).values_list("pk", flat=True))  # ids only: never load every question's JSON per student
+    if not question_ids:
         raise ExamError("This exam has no questions yet.", 409, "empty")
 
     base = now + timedelta(minutes=exam.duration_minutes)
@@ -227,7 +228,7 @@ def start_attempt(exam, student, now=None):
     deadline = base + timedelta(minutes=sum(g.extra_minutes for g in extra))
 
     seed = random.SystemRandom().randrange(1, 2**31)
-    order = [eq.pk for eq in eqs]
+    order = list(question_ids)
     if exam.shuffle_questions:
         random.Random(seed).shuffle(order)
     try:

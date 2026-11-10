@@ -52,10 +52,11 @@ def _exam_card(exam, student, now, retake=None):
         state = "open"
     else:
         state = "missed"
+    q_count, q_marks = exam.question_stats()  # one light query (marks only)
     return {
         "id": exam.pk, "title": exam.title, "subject": exam.subject.name, "start_at": exam.start_at,
         "end_at": exam.end_at, "duration_minutes": exam.duration_minutes,
-        "question_count": exam.questions.filter(voided=False).count(), "total_marks": exam.total_marks,
+        "question_count": q_count, "total_marks": q_marks,
         "rules_text": exam.rules_text, "state": state, "retake": bool(retake) and state == "open",
         "attempt_id": last.pk if last else None, "server_time": now,
     }
@@ -128,7 +129,7 @@ def student_start(request, exam_id):
     if proctoring.enabled():
         proctoring.record_acceptance(request.user, exam)
         if fix:
-            proctoring.ingest(attempt, fix, speed=None, heading=None, sensors=request.data.get("sensors"), **proctoring.client_info(request))
+            proctoring.ingest(attempt, fix, speed=None, heading=None, sensors=request.data.get("sensors"), evaluate_now=False, **proctoring.client_info(request))  # the neighbour check waits for the 6-second pings: hundreds of starts in one second must stay cheap
     return Response(services.attempt_state(attempt), status=201)
 
 

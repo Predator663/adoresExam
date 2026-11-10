@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -16,6 +17,13 @@ log = logging.getLogger(__name__)
 
 MOVING_HOLD_S = 15  # how long the "moving" indicator stays on after the last sign of movement
 MIN_GAP_S = 2  # reports arriving faster than this are ignored (a phone that floods the server)
+
+
+def eval_gap():
+    """Seconds between two neighbour checks for the SAME student (the position itself is still saved on every report). The neighbour
+    check is the expensive part: with an alert distance of 20 m a whole hall is "near", so it is not repeated every 6 seconds per phone.
+    0 = check on every report (used by the tests). Override with PROXIMITY_EVAL_GAP_SECONDS."""
+    return float(getattr(settings, "PROXIMITY_EVAL_GAP_SECONDS", 0 if getattr(settings, "TESTING", False) else 12))
 
 
 def enabled():
@@ -70,7 +78,7 @@ def record_acceptance(user, exam):
     return LegalAcceptance.objects.create(user=user, exam=exam, version=settings.LEGAL_VERSION)
 
 
-def ingest(attempt, fix, speed=None, heading=None, sensors=None, motion_moving=False, now=None, device="", ua="", ip=""):
+def ingest(attempt, fix, speed=None, heading=None, sensors=None, motion_moving=False, now=None, device="", ua="", ip="", evaluate_now=True):
     """Store the latest position of a student and look for neighbours and for signs of a faked position or another device.
     `device` is the random id the browser made for itself, `ua` its User-Agent and `ip` the address the server saw.
     Returns the LiveLocation."""
@@ -104,10 +112,12 @@ def ingest(attempt, fix, speed=None, heading=None, sensors=None, motion_moving=F
             ll.save()
         else:
             ll = LiveLocation.objects.create(attempt=attempt, **fields)
-    try:
-        evaluate(ll, now)
-    except Exception:  # a failure in the alert logic must never break the student's exam
-        log.exception("proximity evaluation failed")
+    gap = eval_gap()
+    if evaluate_now and (gap <= 0 or cache.add(f"prox:eval:{attempt.pk}", 1, max(1, int(gap)))):  # cache.add = only one report per gap wins
+        try:
+            evaluate(ll, now)
+        except Exception:  # a failure in the alert logic must never break the student's exam
+            log.exception("proximity evaluation failed")
     try:
         check_integrity(attempt, fix, prev_fix, prev_dt, counters, device_change, now)
     except Exception:
@@ -229,16 +239,23 @@ def _pair(x, y):
 
 
 def evaluate(ll, now):
-    """Compare this student with every other student of the same exam who has a fresh position, and open or refresh alerts."""
+    """Compare this student with every other student of the same exam who has a fresh position, and open or refresh alerts.
+    Query count does not grow with the number of neighbours: the neighbours come in ONE query (ids and positions only) and the
+    student's open alerts in ONE more; only a pair that really changes costs a write."""
     cfg = SchoolSettings.load()
     limit, lock_on = float(cfg.proximity_alert_meters), bool(cfg.proximity_lock_enabled)
     dlat, dlng = geo.bbox(ll.lat, ll.lng, limit + 5)
     fresh = now - timedelta(seconds=stale_after())
-    near = (LiveLocation.objects.filter(exam_id=ll.exam_id, attempt__status=Attempt.IN_PROGRESS, updated_at__gte=fresh,
-                                        lat__range=(ll.lat - dlat, ll.lat + dlat), lng__range=(ll.lng - dlng, ll.lng + dlng))
-            .exclude(student_id=ll.student_id).select_related("student"))
+    near = list(LiveLocation.objects.filter(exam_id=ll.exam_id, attempt__status=Attempt.IN_PROGRESS, updated_at__gte=fresh,
+                                            lat__range=(ll.lat - dlat, ll.lat + dlat), lng__range=(ll.lng - dlng, ll.lng + dlng))
+                .exclude(student_id=ll.student_id).only("student_id", "lat", "lng", "accuracy"))
+    if not near:
+        close_stale_alerts(ll.exam_id, now)
+        return
     new_alerts, newly_locked = [], []
     excused = related_ids(ll.student_id)  # twins, same house, same room: expected to be close, so no alert and never locked
+    me = ll.student_id
+    open_alerts = {(al.a_id, al.b_id): al for al in ProximityAlert.objects.filter(exam_id=ll.exam_id, active=True).filter(Q(a_id=me) | Q(b_id=me))}
     for other in near:
         if other.student_id in excused:
             continue
@@ -246,10 +263,10 @@ def evaluate(ll, now):
         conf = geo.classify_pair(d, ll.accuracy, other.accuracy, limit, max_accuracy())
         if not conf:
             continue
-        a, b = _pair(ll.student, other.student)
-        alert = ProximityAlert.objects.filter(exam_id=ll.exam_id, a=a, b=b, active=True).first()
+        a_id, b_id = (me, other.student_id) if me < other.student_id else (other.student_id, me)
+        alert = open_alerts.get((a_id, b_id))
         snap = {"at": now.isoformat(), "distance_m": round(d, 1),
-                "positions": {str(ll.student_id): [ll.lat, ll.lng, ll.accuracy], str(other.student_id): [other.lat, other.lng, other.accuracy]}}
+                "positions": {str(me): [ll.lat, ll.lng, ll.accuracy], str(other.student_id): [other.lat, other.lng, other.accuracy]}}
         if alert:
             alert.last_seen, alert.last_distance = now, d
             if d < alert.min_distance:
@@ -258,7 +275,7 @@ def evaluate(ll, now):
                 alert.confidence = conf
             alert.save(update_fields=["last_seen", "last_distance", "min_distance", "snapshot", "confidence"])
         else:
-            alert = ProximityAlert.objects.create(exam_id=ll.exam_id, a=a, b=b, first_seen=now, last_seen=now, min_distance=d,
+            alert = ProximityAlert.objects.create(exam_id=ll.exam_id, a_id=a_id, b_id=b_id, first_seen=now, last_seen=now, min_distance=d,
                                                   last_distance=d, confidence=conf, snapshot=snap)
             new_alerts.append(alert)
         # Only a precise position can lock a screen: a rough indoor fix could lock a student who is really far away, and her
@@ -456,24 +473,42 @@ def unlock_all(exam_id, admin, now=None):
     return n
 
 
-def close_stale_alerts(exam_id, now):
+def close_stale_alerts(exam_id, now, force=False):
+    if not force and not getattr(settings, "TESTING", False) and not cache.add(f"prox:sweep:{exam_id}", 1, 10):
+        return 0  # swept in the last 10 seconds by another report
     return ProximityAlert.objects.filter(exam_id=exam_id, active=True, last_seen__lt=now - timedelta(seconds=clear_after())).update(active=False)
+
+
+def _hydrate(alerts):
+    """Fill al.a, al.b and al.exam for a batch of alerts with two queries, instead of three lazy queries per alert."""
+    from exams.models import Exam
+    users = User.objects.in_bulk({i for al in alerts for i in (al.a_id, al.b_id)})
+    exams = Exam.objects.in_bulk({al.exam_id for al in alerts})
+    for al in alerts:
+        if al.a_id in users:
+            al.a = users[al.a_id]
+        if al.b_id in users:
+            al.b = users[al.b_id]
+        if al.exam_id in exams:
+            al.exam = exams[al.exam_id]
 
 
 def _notify_admins(alerts):
     from notifications.services import notify
     admins = list(User.objects.filter(role__in=["admin", "super_admin"], is_active=True))
-    for al in alerts:
+    _hydrate(alerts)
+    for n, al in enumerate(alerts):
         title = "Students sitting close together"
         body = (f"{name_of(al.a)} and {name_of(al.b)} are about {round(al.last_distance)} m apart during “{al.exam.title}”"
                 f"{'' if al.confidence == ProximityAlert.CONFIRMED else ' (position is rough, please check)'}."
                 f"{' Both exam screens are locked until you unlock them.' if al.locked else ''} Open Live monitor → Anti-cheat.")
-        notify(admins, "integrity_alert", title, body, key=f"prox:{al.pk}", data={"exam_id": al.exam_id, "alert_id": al.pk}, push=True)
+        notify(admins, "integrity_alert", title, body, key=f"prox:{al.pk}", data={"exam_id": al.exam_id, "alert_id": al.pk}, push=n < 3)  # a hall full of new pairs must not start hundreds of push threads
 
 
 def _notify_locked(alerts):
     from notifications.services import notify
     admins = list(User.objects.filter(role__in=["admin", "super_admin"], is_active=True))
+    _hydrate(alerts)
     for al in alerts:
         body = (f"{name_of(al.a)} and {name_of(al.b)} are now confirmed about {round(al.last_distance)} m apart during “{al.exam.title}”. "
                 "Both exam screens are locked until you unlock them. Open Live monitor → Anti-cheat.")

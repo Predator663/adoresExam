@@ -1,0 +1,16 @@
+Exam-start load fixes (copy each file over the same path in your project)
+
+core/models.py          SchoolSettings.load() cached 15 s (cleared on save)
+exams/models.py         Exam.question_stats(): marks only, one light query; total_marks uses it
+exams/services.py       start_attempt loads question ids only; sync_exam status change is one conditional UPDATE
+exams/views.py          exam card uses question_stats; START skips the neighbour check (evaluate_now=False)
+proctoring/services.py  neighbour check: bulk alerts (no per-neighbour queries), at most once per 12 s per student
+                        (PROXIMITY_EVAL_GAP_SECONDS), stale-alert sweep once per 10 s per exam, batched alert hydration,
+                        push only for the first 3 new alerts of one check
+proctoring/views.py     admin board still sweeps stale alerts every time (force=True)
+schools/middleware.py   school lookup by host cached 60 s (unknown hosts never cached)
+gunicorn.conf.py        default workers capped at 5, threads 8 (40 DB connections max)
+frontend/app/exam/page.tsx, frontend/lib/proctor.ts   random 0-3 s wait on START (first 30 s only), first location ping after 1-5 s
+                        -> rebuild the frontend (npm run build) so frontend/out is regenerated
+
+Tests: run  python manage.py test exams proctoring core  (not run here: no PostgreSQL in my sandbox).

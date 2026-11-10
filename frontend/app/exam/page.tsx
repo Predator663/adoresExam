@@ -38,6 +38,8 @@ function PreExam({ examId }: { examId: number }) {
   async function start() {
     setErr(""); setBusy(true);
     try {
+      // Everybody taps START in the same second the exam opens. A short random wait (only in the first 30 s) spreads those requests out.
+      if (n - new Date(c.start_at).getTime() < 30_000) await new Promise((r) => setTimeout(r, Math.random() * 3000));
       let fix = phone?.fix;
       if (!fix && !phone) { try { fix = await getFix(6000); } catch { /* Location is off or blocked: she may still start */ } }
       const sensors = await readSensors();

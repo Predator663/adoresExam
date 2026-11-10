@@ -33,13 +33,26 @@ class SchoolSettings(models.Model):
     leave_lock_enabled = models.BooleanField(default=True)  # anti-cheat: lock a student's exam once she has left the exam screen more than leave_lock_limit times
     leave_lock_limit = models.PositiveSmallIntegerField(default=3)  # how many times she may leave; the next time locks her until an admin unlocks
 
+    CACHE_KEY, CACHE_SECONDS = "school_settings_row", 15
+
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
+        from django.core.cache import cache
+        cache.delete(self.CACHE_KEY)  # the next load() reads the new values at once (other workers within CACHE_SECONDS)
 
     @classmethod
     def load(cls):
+        """The settings row. Read on almost every exam request (lock checks, late entry, proximity), so it is kept in the cache
+        for a few seconds instead of costing a query each time. The cache key includes the school (schools/cache.py)."""
+        from django.core.cache import cache
+        if not getattr(settings, "TESTING", False):
+            obj = cache.get(cls.CACHE_KEY)
+            if obj is not None:
+                return obj
         obj, _ = cls.objects.get_or_create(pk=1)
+        if not getattr(settings, "TESTING", False):
+            cache.set(cls.CACHE_KEY, obj, cls.CACHE_SECONDS)
         return obj
 
 
