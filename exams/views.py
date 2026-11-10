@@ -444,7 +444,10 @@ class ExamViewSet(viewsets.ModelViewSet):
     def bank(self, request, pk=None):
         exam = self.get_object()
         p = request.query_params
-        base = Question.objects.filter(subject=exam.subject, status=Question.APPROVED)
+        # What the picker can show: every approved question of the subject, plus this teacher's OWN unapproved ones
+        # (shown with a "Draft" label; they cannot go into the paper until approved). Colleagues' drafts stay private.
+        base = Question.objects.filter(subject=exam.subject).filter(
+            Q(status=Question.APPROVED) | Q(created_by=request.user, status__in=[Question.DRAFT, Question.SUBMITTED]))
         topics = sorted(set(base.exclude(topic="").values_list("topic", flat=True)))
         # Two shelves: the questions this teacher wrote, and those written by her colleagues for the same subject.
         # exclude() keeps questions whose author account was deleted on the "others" shelf.
@@ -482,7 +485,7 @@ class ExamViewSet(viewsets.ModelViewSet):
         for row, q in zip(data, rows):
             row["used_count"], row["last_used"] = q.used_count, q.last_used
         return Response({"count": count, "page": page, "pages": pages, "page_size": size, "scope": scope or "",
-                         "topics": topics, "total_approved": base.count(), "counts": counts, "results": data})
+                         "topics": topics, "total_approved": base.filter(status=Question.APPROVED).count(), "counts": counts, "results": data})
 
     # ---- the teacher's work in progress, kept on the server so she can log out and carry on later ----
     MAX_DRAFT_BYTES = 2_000_000

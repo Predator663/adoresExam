@@ -13,7 +13,7 @@ import { canonicalOrder, groupSections } from "@/lib/sections";
 import { errorLines, plain, qtypeName, QTYPES } from "@/lib/staff";
 import type { Question } from "@/lib/types";
 
-type Q = { id: number; subject: number; form_level: number; topic: string; subtopic: string; difficulty: string; marks: number; qtype: string; prompt: string; content: any; answer: any; explanation: string; used_count?: number; last_used?: string | null; created_by_name?: string; is_mine?: boolean };
+type Q = { id: number; subject: number; form_level: number; topic: string; subtopic: string; difficulty: string; marks: number; qtype: string; prompt: string; content: any; answer: any; explanation: string; used_count?: number; last_used?: string | null; created_by_name?: string; is_mine?: boolean; can_edit?: boolean; status?: string };
 type Shelf = "mine" | "others";
 /** Everything kept on the server for this teacher and this exam: unsaved selection (in order), the batch and the single question she was typing, and where she was. */
 type Draft = { tab?: string; step?: string; sel?: number[] | null; bulk?: BulkState | null; editor?: S | null };
@@ -45,10 +45,12 @@ const Diff = ({ d }: { d: string }) => <span className={`dpill d-${d}`}>{d}</spa
 /* ------------------------------------------------------------------ pagination */
 
 /* ------------------------------------------------------------------ question bank picker */
-function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, onShelf }: { exam: any; scope: Shelf; selIds: Set<number>; onToggle: (q: Q) => void; onAddMany: (qs: Q[]) => void; onCreate: () => void; onCounts: (c: { mine: number; others: number }) => void; onShelf: (s: Shelf) => void }) {
+function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, onShelf, onEdit, onPublish }: { exam: any; scope: Shelf; selIds: Set<number>; onToggle: (q: Q) => void; onAddMany: (qs: Q[]) => void; onCreate: () => void; onCounts: (c: { mine: number; others: number }) => void; onShelf: (s: Shelf) => void; onEdit: (id: number) => void; onPublish: (q: Q) => Promise<void> }) {
   const [f, setF] = useState<Filters>(F0), [text, setText] = useState("");
   const [res, setRes] = useState<any>(null), [busy, setBusy] = useState(true), [err, setErr] = useState(""), [open, setOpen] = useState<number | null>(null);
+  const [pubBusy, setPubBusy] = useState<number | null>(null), [reload, setReload] = useState(0);
   const top = useRef<HTMLDivElement>(null);
+  const publish = async (q: Q) => { setPubBusy(q.id); try { await onPublish(q); setReload((n) => n + 1); } catch (e: any) { setErr(e.message || "Could not approve the question."); } finally { setPubBusy(null); } };
   const set = (p: Partial<Filters>) => setF((x) => ({ ...x, page: 1, ...p }));
   useEffect(() => { const t = setTimeout(() => setF((x) => (x.q === text ? x : { ...x, q: text, page: 1 })), 350); return () => clearTimeout(t); }, [text]);
   const key = JSON.stringify(f);
@@ -60,19 +62,19 @@ function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, on
       .then((r) => { if (!live) return; setRes(r); setErr(""); if (r.counts) onCounts(r.counts); if (r.page !== f.page) setF((x) => ({ ...x, page: r.page })); })
       .catch((e) => live && setErr(e.message)).finally(() => live && setBusy(false));
     return () => { live = false; };
-  }, [exam.id, scope, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [exam.id, scope, key, reload]); // eslint-disable-line react-hooks/exhaustive-deps
   const goto = (p: number) => { setF((x) => ({ ...x, page: p })); top.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const filtered = !!(f.q || f.topic || f.difficulty || f.qtype || f.form_level || f.usage);
   const results: Q[] = res?.results || [];
-  const notAdded = results.filter((q) => !selIds.has(q.id));
+  const notAdded = results.filter((q) => !selIds.has(q.id) && (q.status || "approved") === "approved");  // an unapproved draft cannot go into a paper
 
   if (!res && busy) return <Loading />;
   if (err && !res) return <div className="card error" role="alert"><p>⚠ {err}</p></div>;
-  if (res && res.total_approved === 0) return (
+  if (res && res.counts && res.counts.mine + res.counts.others === 0) return (
     <div className="card bld-empty"><h3>No approved questions for this subject yet</h3><p className="muted">Create the first one right here. It is approved and added to this exam straight away.</p><button className="btn primary" onClick={onCreate}>+ Create a question</button></div>
   );
   if (res && res.counts && res.counts[scope] === 0) return scope === "mine" ? (
-    <div className="card bld-empty"><h3>You have no approved questions for this subject yet</h3><p className="muted small">Questions you write show here. {res.counts.others > 0 ? `${res.counts.others} written by other teachers are waiting in the other tab.` : ""}</p>
+    <div className="card bld-empty"><h3>You have no questions for this subject yet</h3><p className="muted small">Questions you write show here, with your drafts. {res.counts.others > 0 ? `${res.counts.others} written by other teachers are waiting in the other tab.` : ""}</p>
       <div className="rnd-actions"><button className="btn primary" onClick={onCreate}>+ Create a question</button>{res.counts.others > 0 && <button className="btn" onClick={() => onShelf("others")}>👥 See other teachers' questions</button>}</div></div>
   ) : (
     <div className="card bld-empty"><h3>No other teacher has shared a question for this subject yet</h3><p className="muted small">Approved questions written by your colleagues who teach the same subject appear here.</p>
@@ -108,6 +110,7 @@ function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, on
             <article key={q.id} className={`qcard ${on ? "on" : ""}`}>
               <div className="qc-main">
                 <div className="qc-meta">
+                  {q.status && q.status !== "approved" && <span className="pill warn" title="Approve it to use it in an exam">Draft</span>}
                   <span className="pill">{qtypeName(q.qtype)}</span>
                   {q.topic && <span className="pill">{q.topic}</span>}
                   {scope === "others" && <span className="pill by" title="Written by">👤 {q.created_by_name || "a colleague"}</span>}
@@ -115,10 +118,15 @@ function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, on
                   {q.used_count ? <span className="pill used" title={q.last_used ? `Last used ${new Date(q.last_used).toLocaleDateString()}` : ""}>Used in {q.used_count} other exam{q.used_count === 1 ? "" : "s"}</span> : <span className="pill fresh">Never used</span>}
                 </div>
                 <p className="qc-text">{plain(q.prompt).slice(0, 220) || "(image only)"}</p>
-                <button className="linkbtn" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : q.id)}>{isOpen ? "Hide preview ▲" : "Preview with answer ▼"}</button>
+                <div className="row" style={{ gap: ".8rem", flexWrap: "wrap" }}>
+                  <button className="linkbtn" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : q.id)}>{isOpen ? "Hide preview ▲" : "Preview with answer ▼"}</button>
+                  {q.can_edit && <button className="linkbtn" onClick={() => onEdit(q.id)}>✎ Edit</button>}
+                </div>
                 {isOpen && <div className="qc-preview"><QPreview q={q} showKey />{q.explanation && <p className="muted small"><b>Explanation:</b> {plain(q.explanation)}</p>}</div>}
               </div>
-              <button className={`btn qc-add ${on ? "" : "primary"}`} aria-pressed={on} onClick={() => onToggle(q)}>{on ? "✓ Added" : "+ Add"}</button>
+              {q.status && q.status !== "approved"
+                ? <button className="btn primary qc-add" disabled={pubBusy === q.id} onClick={() => publish(q)}>{pubBusy === q.id ? "…" : "Approve + add"}</button>
+                : <button className={`btn qc-add ${on ? "" : "primary"}`} aria-pressed={on} onClick={() => onToggle(q)}>{on ? "✓ Added" : "+ Add"}</button>}
             </article>
           );
         })}
@@ -214,6 +222,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
   // The marks stored on the exam's own copy of each question (source id -> marks; 0 if voided). The exam list adds these up, so the builder must too.
   const [savedMarks, setSavedMarks] = useState<Record<number, number>>({});
   const [step, setStep] = useState<"select" | "preview">(editable ? "select" : "preview"), [tab, setTab] = useState<"mine" | "others" | "bulk" | "create" | "random" | "selected">("mine"), [bulkSeen, setBulkSeen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null), [bankVer, setBankVer] = useState(0), [bulkKey, setBulkKey] = useState(0), [hasWork, setHasWork] = useState(false);
   const [counts, setCounts] = useState<{ mine: number; others: number } | null>(null), [initialBulk, setInitialBulk] = useState<BulkState | null>(null);
 
   // ---- the teacher's work in progress, kept on the server (one draft per teacher per exam) ----
@@ -229,6 +238,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
   const patchDraft = useCallback((p: Partial<Draft>) => {
     if (!editable || !armed.current) return;
     draftRef.current = { ...draftRef.current, ...p };
+    const c = draftRef.current; setHasWork(!!(c.bulk || c.editor || Array.isArray(c.sel)));
     pending.current = true; setDstate("saving");
     clearTimeout(timer.current); timer.current = setTimeout(pushDraft, 1000);
   }, [editable, pushDraft]);
@@ -268,7 +278,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
           if (live) setSel(want.map((i) => by.get(i)).filter(Boolean) as Q[]);
         }
         if (live && d) {
-          draftRef.current = d;
+          draftRef.current = d; setHasWork(!!(d.bulk?.cards?.length || d.editor || Array.isArray(d.sel)));
           const hasBulk = !!d.bulk?.cards?.length;
           if (hasBulk) setInitialBulk(d.bulk as BulkState);
           if (hasBulk || d.tab === "bulk") setBulkSeen(true);
@@ -296,6 +306,23 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
   }, [tab, step, sel, dirty, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const add = (qs: Q[]) => setSel((s) => [...s, ...qs.filter((q) => !s.some((x) => x.id === q.id))]);
+  const publish = async (q: Q) => { await api(`/questions/${q.id}/submit/`, { method: "POST", body: {} }); add([{ ...q, status: "approved" }]); flash("Approved and added to this exam."); };
+  const closeEdit = async () => {  // back from editing one of her own questions: refresh the shelf and the copy in the paper being built
+    const id = editId; setEditId(null); setBankVer((v) => v + 1);
+    if (id && sel.some((x) => x.id === id)) { try { const [fresh] = await api<Q[]>(`/questions/?ids=${id}`); if (fresh) setSel((s) => s.map((x) => (x.id === id ? { ...x, ...fresh } : x))); } catch { /* the old copy stays */ } }
+  };
+  const discardDraft = async () => {
+    if (!window.confirm("Throw away your unsaved work for this exam? This removes the questions you typed but did not save, and any selection you did not save. Questions already created stay in your question bank.")) return;
+    clearTimeout(timer.current); pending.current = false;
+    try { await api(`/exams/${exam.id}/draft/`, { method: "DELETE" }); } catch (e: any) { show("err", "Could not discard", e.message); return; }
+    draftRef.current = {}; setHasWork(false); setDstate("idle");
+    setInitialBulk(null); setBulkKey((k) => k + 1); createKeyRef.current += 1; setCreateKey((k) => k + 1); setEditId(null); setStep("select"); setTab("mine");
+    try {  // the selection goes back to what is saved in the paper
+      const qs = saved.length ? await api<Q[]>(`/questions/?ids=${saved.join(",")}`) : [], by = new Map(qs.map((q) => [q.id, q]));
+      setSel(saved.map((i) => by.get(i)).filter(Boolean) as Q[]);
+    } catch { /* keep what is on screen */ }
+    flash("Unsaved work discarded.");
+  };
   const toggle = (q: Q) => setSel((s) => (s.some((x) => x.id === q.id) ? s.filter((x) => x.id !== q.id) : [...s, q]));
   const move = (id: number, d: -1 | 1) => setSel((s) => {
     const q = s.find((x) => x.id === id); if (!q) return s;
@@ -356,6 +383,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
         {editable && dstate === "saved" && <span className="draft-note ok" role="status">✓ Work kept: you can log out and continue later</span>}
         {editable && dstate === "err" && <button className="draft-note err" onClick={() => { pending.current = true; pushDraft(); }}>⚠ Could not keep your work. Tap to retry</button>}
         {dirty && editable && <span className="pill warn">Not added to the paper yet</span>}
+        {editable && hasWork && <button className="draft-note err" style={{ textDecoration: "none", color: "var(--muted)" }} onClick={discardDraft}>🗑 Discard unsaved work</button>}
       </div>
       {drift > 0 && editable && <p className="hint">{drift} question{drift === 1 ? "" : "s"} now {drift === 1 ? "has" : "have"} different marks in the question bank than in the saved paper. The totals shown are the saved ones; saving the paper again updates it to the bank's marks.</p>}
       {orphans > 0 && editable && <p className="hint">{orphans} question(s) in the saved paper no longer exist in the question bank and will be dropped when you save.</p>}
@@ -366,20 +394,21 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
           <div>
             <div className="bld-tabs" role="tablist">
               {([["mine", `👤 My questions${counts ? ` (${counts.mine})` : ""}`], ["others", `👥 Other teachers'${counts ? ` (${counts.others})` : ""}`], ["bulk", "⚡ Create all"], ["create", "✏️ Create new"], ["random", "🎲 Random"], ["selected", `✓ Selected (${sel.length})`]] as const).filter(([k]) => !(wide && k === "selected")).map(([k, l]) =>
-                <button key={k} role="tab" aria-selected={tab === k} className={`bld-tab ${tab === k ? "on" : ""}`} onClick={() => { setTab(k); if (k === "bulk") setBulkSeen(true); }}>{l}{k === "bulk" && <span className="bk-new" aria-hidden>NEW</span>}</button>)}
+                <button key={k} role="tab" aria-selected={tab === k} className={`bld-tab ${tab === k ? "on" : ""}`} onClick={() => { setEditId(null); setTab(k); if (k === "bulk") setBulkSeen(true); }}>{l}{k === "bulk" && <span className="bk-new" aria-hidden>NEW</span>}</button>)}
             </div>
-            {bulkSeen && <div hidden={tab !== "bulk"} className={tab === "bulk" ? "bk-show" : ""}><BulkCreate exam={exam} initial={initialBulk} onPersist={(b) => patchDraft({ bulk: b })} onAdd={add} onFinished={(n) => flash(`${n} question${n === 1 ? "" : "s"} created and added to this exam.`)} onReview={() => setStep("preview")} /></div>}
-            {(tab === "mine" || tab === "others") && <Bank key={tab} exam={exam} scope={tab} selIds={selIds} onToggle={toggle} onAddMany={(qs) => { add(qs); flash(`${qs.length} added.`); }} onCreate={() => setTab("create")} onCounts={setCounts} onShelf={setTab} />}
-            {tab === "create" && <QuestionEditor key={createKey} id={null} subject={exam.subject} backLabel="← Back to my questions" onClose={() => setTab("mine")}
+            {bulkSeen && <div hidden={tab !== "bulk" || editId !== null} className={tab === "bulk" ? "bk-show" : ""}><BulkCreate key={bulkKey} exam={exam} initial={initialBulk} onPersist={(b) => patchDraft({ bulk: b })} onAdd={add} onFinished={(n) => flash(`${n} question${n === 1 ? "" : "s"} created and added to this exam.`)} onReview={() => setStep("preview")} /></div>}
+            {editId !== null && <QuestionEditor key={`edit${editId}`} id={editId} subject={exam.subject} backLabel="← Back to my questions" onClose={closeEdit} />}
+            {editId === null && (tab === "mine" || tab === "others") && <Bank key={`${tab}${bankVer}`} exam={exam} scope={tab} onEdit={setEditId} onPublish={publish} selIds={selIds} onToggle={toggle} onAddMany={(qs) => { add(qs); flash(`${qs.length} added.`); }} onCreate={() => setTab("create")} onCounts={setCounts} onShelf={setTab} />}
+            {editId === null && tab === "create" && <QuestionEditor key={createKey} id={null} subject={exam.subject} backLabel="← Back to my questions" onClose={() => setTab("mine")}
               initial={draftRef.current.editor || null} onDraft={(s) => { const next = isBlank(s) ? null : s; if (createKey === createKeyRef.current && (next || draftRef.current.editor)) patchDraft({ editor: next }); }}
               onCreated={(q) => { add([q]); createKeyRef.current += 1; patchDraft({ editor: null }); setCreateKey((k) => k + 1); setTab("mine"); flash("Question created, approved and added to this exam."); }} />}
-            {tab === "random" && <Random exam={exam} selIds={selIds} onAdded={(qs) => { add(qs); flash(`${qs.length} random question${qs.length === 1 ? "" : "s"} added.`); setTab("selected"); }} />}
-            {tab === "selected" && <Selected narrow sel={shown} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
+            {editId === null && tab === "random" && <Random exam={exam} selIds={selIds} onAdded={(qs) => { add(qs); flash(`${qs.length} random question${qs.length === 1 ? "" : "s"} added.`); setTab("selected"); }} />}
+            {editId === null && tab === "selected" && <Selected narrow sel={shown} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
           </div>
           {wide && <Selected sel={shown} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
         </div>
       )}
-      {step === "select" && editable && !wide && sel.length > 0 && tab !== "selected" && tab !== "bulk" && tab !== "create" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(shown.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
+      {step === "select" && editable && !wide && editId === null && sel.length > 0 && tab !== "selected" && tab !== "bulk" && tab !== "create" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(shown.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
 
       {step === "preview" && (
         <>

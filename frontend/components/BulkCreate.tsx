@@ -232,7 +232,7 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
     <div className="bk" onKeyDownCapture={enterToNext}>
       <div className="card bk-head">
         <div className="row"><h3 className="grow" style={{ margin: 0 }}>Create all the questions</h3></div>
-        <p className="muted small">Write every question here, one after another. When you are done, save them all and they go straight into this exam. Then review the paper and submit it. Tip: press <b>Enter</b> to jump to the next field, <b>Shift+Enter</b> for a new line.</p>
+        <p className="muted small">Write every question here, one after another. When you are done, save them all and they go straight into this exam. Then review the paper and submit it. Tip: press <b>Enter</b> to jump to the next field, <b>Shift+Enter</b> for a new line (you can switch this off in Settings).</p>
         <details className="bk-more" open={false}>
           <summary>Settings for new questions (form, topic, difficulty, marks)</summary>
           <div className="grid2">

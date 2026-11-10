@@ -8,6 +8,7 @@ import Icon from "@/components/Icon";
 import { api } from "@/lib/api";
 import { AVATAR_EMOJI } from "@/lib/emoji";
 import { useSession } from "@/lib/session";
+import { enterNextEnabled, setEnterNext } from "@/lib/enterNext";
 
 function b64(s: string) {
   const pad = "=".repeat((4 - (s.length % 4)) % 4), raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
@@ -53,6 +54,8 @@ export default function Settings() {
   const { user, t, lang, savePrefs, logout } = useSession();
   const [prof, setProf] = useState<any>(null), [name, setName] = useState(""), [saved, setSaved] = useState("");
   useEffect(() => { if (user?.role === "student") api("/gamification/profile/").then((p) => { setProf(p); setName(p.display_name); }).catch(() => {}); }, [user]);
+  const [enterOn, setEnterOn] = useState(true);
+  useEffect(() => { setEnterOn(enterNextEnabled()); }, []);
   const patch = async (b: any) => { try { setProf(await api("/gamification/profile/", { method: "PATCH", body: b })); setSaved(t("saved")); setTimeout(() => setSaved(""), 2000); } catch (e: any) { setSaved(e.message); } };
   return (
     <Shell title={t("nav_more")}>
@@ -66,6 +69,13 @@ export default function Settings() {
       </div>
 
       <div className="card"><h2>{t("accessibility")}</h2><A11yPanel /></div>
+
+      {user && user.role !== "student" && (
+        <div className="card"><h2>Writing questions</h2>
+          <label className="switch"><input type="checkbox" checked={enterOn} onChange={(e) => { setEnterOn(e.target.checked); setEnterNext(e.target.checked); }} /> Enter jumps to the next field (Shift+Enter makes a new line)</label>
+          <p className="muted small">Turn this off if you prefer Enter to start a new line in the question box. This choice is kept on this device.</p>
+        </div>
+      )}
 
       {prof && (
         <div className="card"><h2>{t("my_profile")}</h2>

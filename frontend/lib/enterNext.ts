@@ -12,7 +12,13 @@ function usable(el: HTMLElement) {
   return el.getClientRects().length > 0;
 }
 
+const KEY = "amani_enter_next";
+/** A choice made on this device (Settings → Writing questions). On unless she switched it off. */
+export const enterNextEnabled = () => { try { return localStorage.getItem(KEY) !== "0"; } catch { return true; } };
+export const setEnterNext = (on: boolean) => { try { localStorage.setItem(KEY, on ? "1" : "0"); } catch { /* ignore */ } };
+
 export function enterToNext(e: KeyboardEvent<HTMLElement>) {
+  if (!enterNextEnabled()) return;
   if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.nativeEvent.isComposing) return;
   const t = e.target as HTMLElement;
   if (!t.matches?.(FIELDS)) return;

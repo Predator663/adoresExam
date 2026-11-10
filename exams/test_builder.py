@@ -40,6 +40,16 @@ class BuilderTests(TestCase):
         self.assertEqual({x["id"] for x in r["results"]}, {x.pk for x in self.mine})
         self.assertTrue(all(x["is_mine"] for x in r["results"]))
 
+    def test_my_own_drafts_show_on_my_shelf_only(self):
+        mine_draft = q(self.maths, self.a, status=Question.DRAFT, prompt="my draft")
+        r = self.bank(scope="mine")
+        self.assertIn(mine_draft.pk, {x["id"] for x in r["results"]})
+        self.assertEqual({x["status"] for x in r["results"] if x["id"] == mine_draft.pk}, {"draft"})
+        self.assertEqual(r["counts"]["mine"], 3)
+        other = APIClient(); other.force_authenticate(self.b)  # never on a colleague's shelf
+        seen = {x["id"] for x in other.get(f"/api/exams/{self.exam.pk}/bank/", {"scope": "others"}).json()["results"]}
+        self.assertNotIn(mine_draft.pk, seen)
+
     def test_others_shelf_has_colleagues_approved_questions_of_this_subject(self):
         r = self.bank(scope="others")
         self.assertEqual({x["id"] for x in r["results"]}, {x.pk for x in self.theirs})
@@ -49,7 +59,7 @@ class BuilderTests(TestCase):
     def test_counts_cover_both_shelves_whatever_the_filters(self):
         r = self.bank(scope="mine", q="nothing matches this")
         self.assertEqual(r["count"], 0)
-        self.assertEqual(r["counts"], {"mine": 2, "others": 1})
+        self.assertEqual(r["counts"], {"mine": 2, "others": 1})  # b's private draft is on nobody else's shelf
 
     def test_no_scope_still_returns_everything_approved(self):
         self.assertEqual(self.bank()["count"], 3)
