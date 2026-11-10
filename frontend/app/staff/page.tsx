@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { PagedList, Pager, useClientPage } from "@/components/Pager";
+import { InstallBanner } from "@/components/InstallApp";
 import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
 import StaffOverview from "@/components/StaffOverview";
@@ -145,6 +146,7 @@ export default function Staff() {
       {user && user.role === "student" ? <p>{t("not_allowed")}</p> : (
         <>
           <StaffNav />
+          <InstallBanner who={admin ? "admin" : "teacher"} />
           <Tabs tabs={tabs} value={tab} onChange={setTab} />
           {tab === "overview" && <StaffOverview />}
           {tab === "subjects" && <Subjects />}

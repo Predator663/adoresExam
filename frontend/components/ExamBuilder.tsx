@@ -132,13 +132,13 @@ function Random({ exam, selIds, onAdded }: { exam: any; selIds: Set<number>; onA
       <h3>Add random questions</h3>
       <p className="muted small">For example 10 easy and 5 hard from one topic. Questions already in your selection are skipped. You can review and remove any of them afterwards.</p>
       {rules.map((r, i) => (
-        <div key={i} className="row" style={{ marginBottom: ".5rem" }}>
-          <select className="input grow" aria-label="Topic" value={r.topic} onChange={(e) => upd(i, { topic: e.target.value })}><option value="">Any topic</option>{topics.map((t) => <option key={t}>{t}</option>)}</select>
-          <select className="input" style={{ width: 130 }} aria-label="Difficulty" value={r.difficulty} onChange={(e) => upd(i, { difficulty: e.target.value })}><option value="">Any level</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select>
-          <input className="input" style={{ width: 90 }} type="number" min={1} aria-label="How many" value={r.count} onChange={(e) => upd(i, { count: Number(e.target.value) })} />
+        <div key={i} className="rnd-row">
+          <select className="input" aria-label="Topic" value={r.topic} onChange={(e) => upd(i, { topic: e.target.value })}><option value="">Any topic</option>{topics.map((t) => <option key={t}>{t}</option>)}</select>
+          <select className="input" aria-label="Difficulty" value={r.difficulty} onChange={(e) => upd(i, { difficulty: e.target.value })}><option value="">Any level</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select>
+          <input className="input" type="number" min={1} inputMode="numeric" aria-label="How many" value={r.count} onChange={(e) => upd(i, { count: Number(e.target.value) })} />
           {rules.length > 1 && <button className="btn danger icon" aria-label="Remove rule" onClick={() => setRules(rules.filter((_, j) => j !== i))}>✕</button>}
         </div>))}
-      <div className="row"><button className="btn" onClick={() => setRules([...rules, { topic: "", difficulty: "", count: 5 }])}>+ Another rule</button><button className="btn primary" disabled={busy} onClick={go}>🎲 Add random questions</button></div>
+      <div className="rnd-actions"><button className="btn" onClick={() => setRules([...rules, { topic: "", difficulty: "", count: 5 }])}>+ Another rule</button><button className="btn primary" disabled={busy} onClick={go}>🎲 Add random questions</button></div>
       {err.length > 0 && <div className="card error" role="alert" style={{ marginTop: ".7rem" }}>{err.map((e, i) => <p key={i}>⚠ {e}</p>)}</div>}
     </div>
   );
@@ -315,7 +315,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
           {wide && <Selected sel={shown} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
         </div>
       )}
-      {step === "select" && editable && !wide && sel.length > 0 && tab !== "selected" && tab !== "bulk" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(shown.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
+      {step === "select" && editable && !wide && sel.length > 0 && tab !== "selected" && tab !== "bulk" && tab !== "create" && <div className="bld-bar"><span><b>{sel.length}</b> selected · <b>{Math.round(shown.reduce((a, q) => a + Number(q.marks), 0) * 100) / 100}</b> marks</span><span className="row" style={{ gap: ".4rem" }}><button className="btn" disabled={!dirty || run?.status === "busy"} onClick={() => perform("save")}>{dirty ? "Save" : "Saved ✓"}</button><button className="btn primary" onClick={() => setStep("preview")}>Preview →</button></span></div>}
 
       {step === "preview" && (
         <>

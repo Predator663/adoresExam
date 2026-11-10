@@ -124,6 +124,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
     ...(admin ? [{ title: "Administration", items: [
       { href: "/staff/people/", icon: "users", label: "People" }, { href: "/staff/guardians/", icon: "phone", label: "Parents" }, { href: "/staff/messages/", icon: "mail", label: "Messages" }, { href: "/staff/school/", icon: "building", label: "School analytics" }, { href: "/staff/logins/", icon: "activity", label: "Login activity" }, ...(user.role === "super_admin" ? [{ href: "/staff/lockouts/", icon: "lock", label: "Locked accounts" }] : []), { href: "/staff/reports/", icon: "download", label: "Download results" }, { href: "/staff/not-submitted/", icon: "file", label: "Not submitted" },
       { href: "/staff/audit/", icon: "shield", label: "Audit log" }, { href: "/staff/settings/", icon: "sliders", label: "Settings" } ] }] : []),
+    { title: "App", items: [{ href: "/install/", icon: "download", label: "Install the app" }] },
   ];
   const groups = isStudent ? student : staff;
   const active = (h: string) => (h === "/" ? path === "/" : h === "/staff/" ? path === "/staff/" || path === "/staff" : path.startsWith(h.replace(/\/$/, "")));
