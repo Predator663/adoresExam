@@ -31,6 +31,12 @@ const fromApi = (q: any): S => {
   if (q.qtype === "fill_blank") { s.accepted = (q.answer.accepted || []).join("\n"); if (q.answer.numeric) { s.numValue = String(q.answer.numeric.value); s.numTol = String(q.answer.numeric.tolerance); } }
   return s;
 };
+/** True while nothing has been typed yet (so an untouched editor is not stored as a draft). */
+export function isBlank(s: S): boolean {
+  const empty = (l: Item[]) => l.every((o) => !o.text.trim() && !o.image);
+  return !plain(s.prompt) && !/<img/i.test(s.prompt) && !plain(s.explanation) && !s.topic.trim() && !s.subtopic.trim()
+    && empty(s.options) && empty(s.left) && empty(s.right) && empty(s.items) && !s.accepted.trim() && s.numValue === "" && s.tf === null && !s.correct.length;
+}
 const enc = (l: Item[]) => l.map((o) => ({ id: o.id, text: o.text, image: o.image, alt_text: o.alt_text }));
 
 export function build(s: S) {
@@ -74,13 +80,15 @@ export function ItemRow({ it, onChange, onRemove, extra, label, canRemove }: { i
 
 /** `subject` + `onCreated` make it the embedded editor inside the exam builder: the subject is fixed, and the
  *  question is saved, approved and handed back so the builder can add it to the current exam. */
-export default function QuestionEditor({ id, onClose, subject, onCreated, backLabel }: { id: number | null; onClose: () => void; subject?: number; onCreated?: (q: any) => void; backLabel?: string }) {
+export default function QuestionEditor({ id, onClose, subject, onCreated, backLabel, initial, onDraft }: { id: number | null; onClose: () => void; subject?: number; onCreated?: (q: any) => void; backLabel?: string;
+  /** Embedded in the exam builder: the question she was typing last time, and where to report every change so it is kept on the server. */
+  initial?: S | null; onDraft?: (s: S) => void }) {
   const { user } = useSession();
   const admin = user?.role === "admin" || user?.role === "super_admin";
   const subjects = useLoad(() => api<any[]>("/subjects/"));
   const assigned = useLoad(() => (admin ? Promise.resolve(null) : api<any[]>("/assignments/")), [admin]);
   const existing = useLoad(() => (id ? api<any>(`/questions/${id}/`) : Promise.resolve(null)), [id]);
-  const [s, setS] = useState<S>(() => ({ ...fresh(), subject: subject ? String(subject) : "" })), [status, setStatus] = useState("draft"), [errs, setErrs] = useState<string[]>([]), [msg, setMsg] = useState(""), [busy, setBusy] = useState(false);
+  const [s, setS] = useState<S>(() => (initial ? { ...fresh(), ...initial, subject: subject ? String(subject) : initial.subject } : { ...fresh(), subject: subject ? String(subject) : "" })), [status, setStatus] = useState("draft"), [errs, setErrs] = useState<string[]>([]), [msg, setMsg] = useState(""), [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<S | null>(null), [similar, setSimilar] = useState<any[]>([]), [cid, setCid] = useState<number | null>(id), [view, setView] = useState<"phone" | "computer">("phone");
   const key = `amani_qdraft_${id || "new"}`, loaded = useRef(false), accRef = useRef<HTMLTextAreaElement>(null);
   const up = (p: Partial<S>) => setS((x) => ({ ...x, ...p }));
@@ -89,12 +97,18 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
     if (loaded.current || existing.loading) return;
     loaded.current = true;
     if (existing.data) { setS(fromApi(existing.data)); setStatus(existing.data.status); }
+    if (onDraft) return;  // inside the exam builder the draft lives on the server, not on this device
     try { const d = localStorage.getItem(key); if (d) setDraft(JSON.parse(d)); } catch { /* ignore */ }
-  }, [existing.loading, existing.data, key]);
+  }, [existing.loading, existing.data, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // QB-08: autosave the draft while typing (kept on this device until saved to the server).
   const dirty = useRef(false);
-  useEffect(() => { if (!loaded.current) return; dirty.current = true; const t = setTimeout(() => { try { localStorage.setItem(key, JSON.stringify(s)); } catch { /* full */ } }, 1500); return () => clearTimeout(t); }, [s, key]);
+  useEffect(() => {
+    if (!loaded.current) return;
+    dirty.current = true;
+    if (onDraft) { onDraft(s); return; }  // the builder debounces and stores it on the server
+    const t = setTimeout(() => { try { localStorage.setItem(key, JSON.stringify(s)); } catch { /* full */ } }, 1500); return () => clearTimeout(t);
+  }, [s, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // QB-12: warn about likely duplicates.
   useEffect(() => {

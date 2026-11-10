@@ -1,18 +1,22 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
-import BulkCreate from "./BulkCreate";
-import QuestionEditor from "./QuestionEditor";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import BulkCreate, { type BulkState } from "./BulkCreate";
+import QuestionEditor, { isBlank, type S } from "./QuestionEditor";
 import { Pager } from "./Pager";
 import QuestionView from "./QuestionView";
 import { PaperActions, useToast, type Action, type Run, FLOW } from "./SubmitFlow";
 import { Loading } from "./ui";
 import { api } from "@/lib/api";
+import { onBeforeLogout } from "@/lib/session";
 import { DATETIME, eatDate } from "@/lib/clock";
 import { canonicalOrder, groupSections } from "@/lib/sections";
 import { errorLines, plain, qtypeName, QTYPES } from "@/lib/staff";
 import type { Question } from "@/lib/types";
 
-type Q = { id: number; subject: number; form_level: number; topic: string; subtopic: string; difficulty: string; marks: number; qtype: string; prompt: string; content: any; answer: any; explanation: string; used_count?: number; last_used?: string | null };
+type Q = { id: number; subject: number; form_level: number; topic: string; subtopic: string; difficulty: string; marks: number; qtype: string; prompt: string; content: any; answer: any; explanation: string; used_count?: number; last_used?: string | null; created_by_name?: string; is_mine?: boolean };
+type Shelf = "mine" | "others";
+/** Everything kept on the server for this teacher and this exam: unsaved selection (in order), the batch and the single question she was typing, and where she was. */
+type Draft = { tab?: string; step?: string; sel?: number[] | null; bulk?: BulkState | null; editor?: S | null };
 type Filters = { q: string; topic: string; difficulty: string; qtype: string; form_level: string; usage: string; sort: string; page: number; size: number };
 const F0: Filters = { q: "", topic: "", difficulty: "", qtype: "", form_level: "", usage: "", sort: "newest", page: 1, size: 10 };
 
@@ -41,7 +45,7 @@ const Diff = ({ d }: { d: string }) => <span className={`dpill d-${d}`}>{d}</spa
 /* ------------------------------------------------------------------ pagination */
 
 /* ------------------------------------------------------------------ question bank picker */
-function Bank({ exam, selIds, onToggle, onAddMany, onCreate }: { exam: any; selIds: Set<number>; onToggle: (q: Q) => void; onAddMany: (qs: Q[]) => void; onCreate: () => void }) {
+function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, onShelf }: { exam: any; scope: Shelf; selIds: Set<number>; onToggle: (q: Q) => void; onAddMany: (qs: Q[]) => void; onCreate: () => void; onCounts: (c: { mine: number; others: number }) => void; onShelf: (s: Shelf) => void }) {
   const [f, setF] = useState<Filters>(F0), [text, setText] = useState("");
   const [res, setRes] = useState<any>(null), [busy, setBusy] = useState(true), [err, setErr] = useState(""), [open, setOpen] = useState<number | null>(null);
   const top = useRef<HTMLDivElement>(null);
@@ -50,13 +54,13 @@ function Bank({ exam, selIds, onToggle, onAddMany, onCreate }: { exam: any; selI
   const key = JSON.stringify(f);
   useEffect(() => {
     let live = true; setBusy(true);
-    const qs = new URLSearchParams({ page: String(f.page), page_size: String(f.size), sort: f.sort });
+    const qs = new URLSearchParams({ page: String(f.page), page_size: String(f.size), sort: f.sort, scope });
     (["q", "topic", "difficulty", "qtype", "form_level", "usage"] as const).forEach((k) => f[k] && qs.set(k, f[k]));
     api<any>(`/exams/${exam.id}/bank/?${qs}`)
-      .then((r) => { if (!live) return; setRes(r); setErr(""); if (r.page !== f.page) setF((x) => ({ ...x, page: r.page })); })
+      .then((r) => { if (!live) return; setRes(r); setErr(""); if (r.counts) onCounts(r.counts); if (r.page !== f.page) setF((x) => ({ ...x, page: r.page })); })
       .catch((e) => live && setErr(e.message)).finally(() => live && setBusy(false));
     return () => { live = false; };
-  }, [exam.id, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [exam.id, scope, key]); // eslint-disable-line react-hooks/exhaustive-deps
   const goto = (p: number) => { setF((x) => ({ ...x, page: p })); top.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const filtered = !!(f.q || f.topic || f.difficulty || f.qtype || f.form_level || f.usage);
   const results: Q[] = res?.results || [];
@@ -66,6 +70,13 @@ function Bank({ exam, selIds, onToggle, onAddMany, onCreate }: { exam: any; selI
   if (err && !res) return <div className="card error" role="alert"><p>⚠ {err}</p></div>;
   if (res && res.total_approved === 0) return (
     <div className="card bld-empty"><h3>No approved questions for this subject yet</h3><p className="muted">Create the first one right here. It is approved and added to this exam straight away.</p><button className="btn primary" onClick={onCreate}>+ Create a question</button></div>
+  );
+  if (res && res.counts && res.counts[scope] === 0) return scope === "mine" ? (
+    <div className="card bld-empty"><h3>You have no approved questions for this subject yet</h3><p className="muted small">Questions you write show here. {res.counts.others > 0 ? `${res.counts.others} written by other teachers are waiting in the other tab.` : ""}</p>
+      <div className="rnd-actions"><button className="btn primary" onClick={onCreate}>+ Create a question</button>{res.counts.others > 0 && <button className="btn" onClick={() => onShelf("others")}>👥 See other teachers' questions</button>}</div></div>
+  ) : (
+    <div className="card bld-empty"><h3>No other teacher has shared a question for this subject yet</h3><p className="muted small">Approved questions written by your colleagues who teach the same subject appear here.</p>
+      <div className="rnd-actions"><button className="btn" onClick={() => onShelf("mine")}>👤 My questions</button><button className="btn primary" onClick={onCreate}>+ Create a question</button></div></div>
   );
   return (
     <div ref={top}>
@@ -99,6 +110,7 @@ function Bank({ exam, selIds, onToggle, onAddMany, onCreate }: { exam: any; selI
                 <div className="qc-meta">
                   <span className="pill">{qtypeName(q.qtype)}</span>
                   {q.topic && <span className="pill">{q.topic}</span>}
+                  {scope === "others" && <span className="pill by" title="Written by">👤 {q.created_by_name || "a colleague"}</span>}
                   <Diff d={q.difficulty} /><span className="muted small">Form {q.form_level} · {q.marks} mark{q.marks === 1 ? "" : "s"}</span>
                   {q.used_count ? <span className="pill used" title={q.last_used ? `Last used ${new Date(q.last_used).toLocaleDateString()}` : ""}>Used in {q.used_count} other exam{q.used_count === 1 ? "" : "s"}</span> : <span className="pill fresh">Never used</span>}
                 </div>
@@ -147,6 +159,7 @@ function Random({ exam, selIds, onAdded }: { exam: any; selIds: Set<number>; onA
 /* ------------------------------------------------------------------ selected list */
 function Selected({ sel, onRemove, onMove, onClear, onPreview, onSave, canSave, narrow }: { sel: Q[]; onRemove: (id: number) => void; onMove: (id: number, d: -1 | 1) => void; onClear: () => void; onPreview: () => void; onSave: () => void; canSave: boolean; narrow?: boolean }) {
   const secs = groupSections(sel), marks = sel.reduce((a, q) => a + Number(q.marks), 0);
+  let n = 0;  // the same running number the paper preview gives each question (it carries on across sections)
   return (
     <div className={`card bld-sel ${narrow ? "" : "bld-aside"}`}>
       <div className="row"><h3 className="grow" style={{ margin: 0 }}>Current exam</h3>{sel.length > 0 && <button className="btn ghost" onClick={onClear}>Clear</button>}</div>
@@ -158,6 +171,7 @@ function Selected({ sel, onRemove, onMove, onClear, onPreview, onSave, canSave, 
               <p className="bld-sec-h"><b>Section {s.letter}</b> · {s.title} <span className="muted">({s.items.length} · {s.marks} marks)</span></p>
               {s.items.map((q, i) => (
                 <div key={q.id} className="bld-sel-row">
+                  <span className="bld-sel-n" aria-label={`Question ${n + 1}`}>{++n}</span>
                   <span className="grow small">{plain(q.prompt).slice(0, 70) || "(image only)"}</span>
                   <button className="btn ghost icon" disabled={i === 0} aria-label="Move up" onClick={() => onMove(q.id, -1)}>↑</button>
                   <button className="btn ghost icon" disabled={i === s.items.length - 1} aria-label="Move down" onClick={() => onMove(q.id, 1)}>↓</button>
@@ -199,7 +213,33 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
   const [sel, setSel] = useState<Q[]>([]), [saved, setSaved] = useState<number[]>([]), [ready, setReady] = useState(false), [loadErr, setLoadErr] = useState(""), [orphans, setOrphans] = useState(0);
   // The marks stored on the exam's own copy of each question (source id -> marks; 0 if voided). The exam list adds these up, so the builder must too.
   const [savedMarks, setSavedMarks] = useState<Record<number, number>>({});
-  const [step, setStep] = useState<"select" | "preview">(editable ? "select" : "preview"), [tab, setTab] = useState<"bank" | "bulk" | "create" | "random" | "selected">("bank"), [bulkSeen, setBulkSeen] = useState(false);
+  const [step, setStep] = useState<"select" | "preview">(editable ? "select" : "preview"), [tab, setTab] = useState<"mine" | "others" | "bulk" | "create" | "random" | "selected">("mine"), [bulkSeen, setBulkSeen] = useState(false);
+  const [counts, setCounts] = useState<{ mine: number; others: number } | null>(null), [initialBulk, setInitialBulk] = useState<BulkState | null>(null);
+
+  // ---- the teacher's work in progress, kept on the server (one draft per teacher per exam) ----
+  const [dstate, setDstate] = useState<"idle" | "saving" | "saved" | "err">("idle");
+  const draftRef = useRef<Draft>({}), armed = useRef(false), pending = useRef(false), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), createKeyRef = useRef(0), skipFirst = useRef(true);
+  const pushDraft = useCallback(async () => {
+    clearTimeout(timer.current);
+    if (!pending.current || !armed.current) return;
+    pending.current = false;
+    try { await api(`/exams/${exam.id}/draft/`, { method: "PUT", body: { data: draftRef.current } }); if (!pending.current) setDstate("saved"); }
+    catch { pending.current = true; setDstate("err"); }
+  }, [exam.id]);
+  const patchDraft = useCallback((p: Partial<Draft>) => {
+    if (!editable || !armed.current) return;
+    draftRef.current = { ...draftRef.current, ...p };
+    pending.current = true; setDstate("saving");
+    clearTimeout(timer.current); timer.current = setTimeout(pushDraft, 1000);
+  }, [editable, pushDraft]);
+  useEffect(() => {  // save at once when she leaves the page or switches app, when the builder closes, and just before logging out
+    if (!editable) return;
+    const hide = () => { if (document.visibilityState === "hidden") pushDraft(); };
+    document.addEventListener("visibilitychange", hide); window.addEventListener("pagehide", pushDraft);
+    const off = onBeforeLogout(pushDraft);
+    return () => { document.removeEventListener("visibilitychange", hide); window.removeEventListener("pagehide", pushDraft); off(); pushDraft(); };
+  }, [editable, pushDraft]);
+  useEffect(() => { if (dstate !== "saving" && dstate !== "err") return; const h = (e: BeforeUnloadEvent) => { e.preventDefault(); }; window.addEventListener("beforeunload", h); return () => window.removeEventListener("beforeunload", h); }, [dstate]);
   const [run, setRun] = useState<Run | null>(null), [createKey, setCreateKey] = useState(0), { toast, show } = useToast();
   const root = useRef<HTMLDivElement>(null), [w, setW] = useState<"xs" | "narrow" | "wide">("narrow"), wide = w === "wide";
   useEffect(() => {  // lay out by the builder's own width (the sidebar takes space on desktop), not the screen's
@@ -209,7 +249,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
     if (typeof ResizeObserver === "undefined") { window.addEventListener("resize", measure); return () => window.removeEventListener("resize", measure); }
     const ro = new ResizeObserver(measure); ro.observe(el); return () => ro.disconnect();
   }, [ready]);
-  useEffect(() => { if (wide && tab === "selected") setTab("bank"); }, [wide, tab]);
+  useEffect(() => { if (wide && tab === "selected") setTab("mine"); }, [wide, tab]);
   const flash = (m: string) => show("ok", m);
 
   useEffect(() => {
@@ -219,10 +259,24 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
         const paper = await api<any[]>(`/exams/${exam.id}/questions/`);
         const ids: number[] = paper.map((p) => p.source).filter(Boolean);
         if (live) { setSaved(ids); setOrphans(paper.length - ids.length); setSavedMarks(Object.fromEntries(paper.filter((p) => p.source).map((p) => [p.source, p.voided ? 0 : Number(p.marks) || 0]))); }
-        if (ids.length) {
-          const qs = await api<Q[]>(`/questions/?ids=${ids.join(",")}`), by = new Map(qs.map((q) => [q.id, q]));
-          if (live) setSel(ids.map((i) => by.get(i)).filter(Boolean) as Q[]);
+        // Where she stopped last time (unsaved selection, typed questions, tab). A failure here must never block the builder.
+        let d: Draft | null = null;
+        if (editable) { try { d = (await api<any>(`/exams/${exam.id}/draft/`)).data || null; } catch { d = null; } }
+        const want: number[] = d && Array.isArray(d.sel) ? d.sel.filter((x) => Number.isInteger(x)) : ids;
+        if (want.length) {
+          const qs = await api<Q[]>(`/questions/?ids=${want.join(",")}`), by = new Map(qs.map((q) => [q.id, q]));
+          if (live) setSel(want.map((i) => by.get(i)).filter(Boolean) as Q[]);
         }
+        if (live && d) {
+          draftRef.current = d;
+          const hasBulk = !!d.bulk?.cards?.length;
+          if (hasBulk) setInitialBulk(d.bulk as BulkState);
+          if (hasBulk || d.tab === "bulk") setBulkSeen(true);
+          if (d.tab && ["mine", "others", "bulk", "create", "random", "selected"].includes(d.tab)) setTab(d.tab as any);
+          if (d.step === "preview" && want.length) setStep("preview");
+          if (Array.isArray(d.sel) || hasBulk || d.editor) show("ok", "Welcome back", "Your unsaved work was restored. You continue where you stopped.");
+        }
+        armed.current = true;
       } catch (e: any) { live && setLoadErr(e.message); }
       live && setReady(true);
     })();
@@ -234,7 +288,12 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
   // Unsaved: show what saving will store (the question bank's current marks). Saved: show exactly what is stored, which is what the exam list shows.
   const shown = useMemo(() => sel.map((q) => (!dirty && q.id in savedMarks ? { ...q, marks: savedMarks[q.id] } : q)), [sel, dirty, savedMarks]);
   const drift = useMemo(() => sel.filter((q) => q.id in savedMarks && savedMarks[q.id] !== Number(q.marks)).length, [sel, savedMarks]);
-  useEffect(() => { if (!dirty) return; const h = (e: BeforeUnloadEvent) => { e.preventDefault(); }; window.addEventListener("beforeunload", h); return () => window.removeEventListener("beforeunload", h); }, [dirty]);
+  // Remember the layout and the unsaved selection (in order). Skips the first run, which only mirrors what was just restored.
+  useEffect(() => {
+    if (!ready) return;
+    if (skipFirst.current) { skipFirst.current = false; return; }
+    patchDraft({ tab, step, sel: dirty ? sel.map((q) => q.id) : null });
+  }, [tab, step, sel, dirty, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const add = (qs: Q[]) => setSel((s) => [...s, ...qs.filter((q) => !s.some((x) => x.id === q.id))]);
   const toggle = (q: Q) => setSel((s) => (s.some((x) => x.id === q.id) ? s.filter((x) => x.id !== q.id) : [...s, q]));
@@ -292,7 +351,11 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
       <div className="bld-steps" role="tablist" aria-label="Exam paper steps">
         {editable && <button role="tab" aria-selected={step === "select"} className={`bld-step ${step === "select" ? "on" : ""}`} onClick={() => setStep("select")}><i>1</i> Select questions</button>}
         <button role="tab" aria-selected={step === "preview"} className={`bld-step ${step === "preview" ? "on" : ""}`} disabled={!sel.length} onClick={() => setStep("preview")}><i>{editable ? 2 : "•"}</i> Preview paper</button>
-        <span className="grow" />{dirty && editable && <span className="pill warn">Unsaved changes</span>}
+        <span className="grow" />
+        {editable && dstate === "saving" && <span className="draft-note" role="status">Saving your work…</span>}
+        {editable && dstate === "saved" && <span className="draft-note ok" role="status">✓ Work kept: you can log out and continue later</span>}
+        {editable && dstate === "err" && <button className="draft-note err" onClick={() => { pending.current = true; pushDraft(); }}>⚠ Could not keep your work. Tap to retry</button>}
+        {dirty && editable && <span className="pill warn">Not added to the paper yet</span>}
       </div>
       {drift > 0 && editable && <p className="hint">{drift} question{drift === 1 ? "" : "s"} now {drift === 1 ? "has" : "have"} different marks in the question bank than in the saved paper. The totals shown are the saved ones; saving the paper again updates it to the bank's marks.</p>}
       {orphans > 0 && editable && <p className="hint">{orphans} question(s) in the saved paper no longer exist in the question bank and will be dropped when you save.</p>}
@@ -302,13 +365,14 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
         <div className="bld-grid">
           <div>
             <div className="bld-tabs" role="tablist">
-              {([["bank", "📚 Question bank"], ["bulk", "⚡ Create all"], ["create", "✏️ Create new"], ["random", "🎲 Random"], ["selected", `✓ Selected (${sel.length})`]] as const).filter(([k]) => !(wide && k === "selected")).map(([k, l]) =>
+              {([["mine", `👤 My questions${counts ? ` (${counts.mine})` : ""}`], ["others", `👥 Other teachers'${counts ? ` (${counts.others})` : ""}`], ["bulk", "⚡ Create all"], ["create", "✏️ Create new"], ["random", "🎲 Random"], ["selected", `✓ Selected (${sel.length})`]] as const).filter(([k]) => !(wide && k === "selected")).map(([k, l]) =>
                 <button key={k} role="tab" aria-selected={tab === k} className={`bld-tab ${tab === k ? "on" : ""}`} onClick={() => { setTab(k); if (k === "bulk") setBulkSeen(true); }}>{l}{k === "bulk" && <span className="bk-new" aria-hidden>NEW</span>}</button>)}
             </div>
-            {bulkSeen && <div hidden={tab !== "bulk"} className={tab === "bulk" ? "bk-show" : ""}><BulkCreate exam={exam} onAdd={add} onFinished={(n) => flash(`${n} question${n === 1 ? "" : "s"} created and added to this exam.`)} onReview={() => setStep("preview")} /></div>}
-            {tab === "bank" && <Bank exam={exam} selIds={selIds} onToggle={toggle} onAddMany={(qs) => { add(qs); flash(`${qs.length} added.`); }} onCreate={() => setTab("create")} />}
-            {tab === "create" && <QuestionEditor key={createKey} id={null} subject={exam.subject} backLabel="← Back to question bank" onClose={() => setTab("bank")}
-              onCreated={(q) => { add([q]); setCreateKey((k) => k + 1); setTab("bank"); flash("Question created, approved and added to this exam."); }} />}
+            {bulkSeen && <div hidden={tab !== "bulk"} className={tab === "bulk" ? "bk-show" : ""}><BulkCreate exam={exam} initial={initialBulk} onPersist={(b) => patchDraft({ bulk: b })} onAdd={add} onFinished={(n) => flash(`${n} question${n === 1 ? "" : "s"} created and added to this exam.`)} onReview={() => setStep("preview")} /></div>}
+            {(tab === "mine" || tab === "others") && <Bank key={tab} exam={exam} scope={tab} selIds={selIds} onToggle={toggle} onAddMany={(qs) => { add(qs); flash(`${qs.length} added.`); }} onCreate={() => setTab("create")} onCounts={setCounts} onShelf={setTab} />}
+            {tab === "create" && <QuestionEditor key={createKey} id={null} subject={exam.subject} backLabel="← Back to my questions" onClose={() => setTab("mine")}
+              initial={draftRef.current.editor || null} onDraft={(s) => { const next = isBlank(s) ? null : s; if (createKey === createKeyRef.current && (next || draftRef.current.editor)) patchDraft({ editor: next }); }}
+              onCreated={(q) => { add([q]); createKeyRef.current += 1; patchDraft({ editor: null }); setCreateKey((k) => k + 1); setTab("mine"); flash("Question created, approved and added to this exam."); }} />}
             {tab === "random" && <Random exam={exam} selIds={selIds} onAdded={(qs) => { add(qs); flash(`${qs.length} random question${qs.length === 1 ? "" : "s"} added.`); setTab("selected"); }} />}
             {tab === "selected" && <Selected narrow sel={shown} onRemove={(id) => setSel(sel.filter((q) => q.id !== id))} onMove={move} onClear={() => setSel([])} onPreview={() => setStep("preview")} onSave={() => perform("save")} canSave={dirty} />}
           </div>

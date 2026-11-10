@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 from datetime import timedelta
@@ -24,7 +25,7 @@ from questions.views import QuestionSerializer
 from proctoring import services as proctoring
 from . import services
 from .sections import letters, qtype_rank
-from .models import Answer, Attempt, AttemptEvent, Exam, ExamGrant, ExamQuestion, Result
+from .models import Answer, Attempt, AttemptEvent, BuilderDraft, Exam, ExamGrant, ExamQuestion, Result
 from .services import ExamError
 
 MAX_RETAKE_BATCH = 500  # students per retake request (a whole school year group fits)
@@ -445,7 +446,18 @@ class ExamViewSet(viewsets.ModelViewSet):
         p = request.query_params
         base = Question.objects.filter(subject=exam.subject, status=Question.APPROVED)
         topics = sorted(set(base.exclude(topic="").values_list("topic", flat=True)))
-        qs = base.annotate(used_count=Count("examquestion", filter=~Q(examquestion__exam=exam), distinct=True),
+        # Two shelves: the questions this teacher wrote, and those written by her colleagues for the same subject.
+        # exclude() keeps questions whose author account was deleted on the "others" shelf.
+        mine_count = base.filter(created_by=request.user).count()
+        counts = {"mine": mine_count, "others": base.count() - mine_count}
+        scope = p.get("scope")
+        if scope == "mine":
+            base_scoped = base.filter(created_by=request.user)
+        elif scope == "others":
+            base_scoped = base.exclude(created_by=request.user)
+        else:
+            base_scoped = base
+        qs = base_scoped.annotate(used_count=Count("examquestion", filter=~Q(examquestion__exam=exam), distinct=True),
                            last_used=Max("examquestion__exam__start_at", filter=~Q(examquestion__exam=exam)))
         for f in ("topic", "difficulty", "qtype", "form_level"):
             if p.get(f):
@@ -466,11 +478,36 @@ class ExamViewSet(viewsets.ModelViewSet):
         pages = max(1, -(-count // size))
         page = min(page, pages)
         rows = list(qs[(page - 1) * size: page * size])
-        data = QuestionSerializer(rows, many=True).data
+        data = QuestionSerializer(rows, many=True, context={"request": request}).data  # adds is_mine / created_by_name
         for row, q in zip(data, rows):
             row["used_count"], row["last_used"] = q.used_count, q.last_used
-        return Response({"count": count, "page": page, "pages": pages, "page_size": size,
-                         "topics": topics, "total_approved": base.count(), "results": data})
+        return Response({"count": count, "page": page, "pages": pages, "page_size": size, "scope": scope or "",
+                         "topics": topics, "total_approved": base.count(), "counts": counts, "results": data})
+
+    # ---- the teacher's work in progress, kept on the server so she can log out and carry on later ----
+    MAX_DRAFT_BYTES = 2_000_000
+
+    @action(detail=True, methods=["get", "put", "delete"])
+    def draft(self, request, pk=None):
+        """Her own unsaved work for this exam (typed-but-unsaved questions, selection order, tab). One per teacher per exam.
+        GET -> {"data": {...} | null, "updated_at": ...}; PUT {"data": {...}} saves it; DELETE throws it away."""
+        exam = self.get_object()
+        if not _teaches(request.user, exam.subject_id):
+            raise PermissionDenied()
+        row = BuilderDraft.objects.filter(exam=exam, user=request.user).first()
+        if request.method == "GET":
+            return Response({"data": row.data if row else None, "updated_at": row.updated_at if row else None})
+        if request.method == "DELETE":
+            if row:
+                row.delete()
+            return Response(status=204)
+        data = request.data.get("data")
+        if not isinstance(data, dict):
+            raise ValidationError({"detail": "Nothing to save."})
+        if len(json.dumps(data)) > self.MAX_DRAFT_BYTES:
+            raise ValidationError({"detail": "This draft is too large to store. Save some of the questions first."})
+        row, _ = BuilderDraft.objects.update_or_create(exam=exam, user=request.user, defaults={"data": data})
+        return Response({"updated_at": row.updated_at})
 
     @action(detail=True, methods=["post"])
     def pick(self, request, pk=None):

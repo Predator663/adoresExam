@@ -11,8 +11,10 @@ import { errorLines, plain, qtypeName, QTYPES, uid } from "@/lib/staff";
  *  shows the result on each card, and puts them straight into the exam. Nothing is lost if one question has a problem:
  *  the others are saved and the problem card stays open with the reason. */
 
-type Card = { key: string; s: S; open: boolean; seen: boolean; state: "idle" | "saving" | "done" | "err"; errs: string[]; leaving?: boolean };
+export type Card = { key: string; s: S; open: boolean; seen: boolean; state: "idle" | "saving" | "done" | "err"; errs: string[]; leaving?: boolean };
 type Defaults = { form_level: number; topic: string; difficulty: string; marks: number };
+/** What is kept on the server between visits: the defaults and every card still to be saved, in order, open or folded. */
+export type BulkState = { defs: Defaults; cards: Card[] };
 
 const filled = (o: { text: string; image: string | null }) => !!(o.text.trim() || o.image);
 const mk = (subject: number, d: Defaults, qtype = "mcq_single"): Card => ({
@@ -136,37 +138,32 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
   );
 }
 
-export default function BulkCreate({ exam, onAdd, onFinished, onReview }: {
+export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial, onPersist }: {
   exam: { id: number; subject: number };
+  initial?: BulkState | null;          // the batch she was writing last time (restored with its order and folded/open cards)
+  onPersist?: (state: BulkState | null) => void;  // called on every change; null when nothing is left to keep
   onAdd: (qs: any[]) => void;          // each saved question goes straight into the exam
   onFinished: (saved: number) => void; // one toast at the end
   onReview: () => void;                // "Review & preview paper"
 }) {
-  const subject = exam.subject, storeKey = `amani_bulk_${exam.id}`;
-  const [defs, setDefs] = useState<Defaults>({ form_level: 1, topic: "", difficulty: "medium", marks: 1 });
-  const [cards, setCards] = useState<Card[]>(() => [mk(subject, { form_level: 1, topic: "", difficulty: "medium", marks: 1 })]);
+  const subject = exam.subject;
+  const [defs, setDefs] = useState<Defaults>(() => initial?.defs || { form_level: 1, topic: "", difficulty: "medium", marks: 1 });
+  const [cards, setCards] = useState<Card[]>(() => initial?.cards?.length
+    ? initial.cards.map((c) => ({ ...c, state: "idle" as const, errs: [], leaving: false, seen: !!c.open }))
+    : [mk(subject, { form_level: 1, topic: "", difficulty: "medium", marks: 1 })]);
   const [saving, setSaving] = useState(false), [progress, setProgress] = useState({ done: 0, total: 0 });
   const [summary, setSummary] = useState<{ saved: number; failed: number } | null>(null);
-  const [draft, setDraft] = useState<Card[] | null>(null);
   const [showFlag, setShowFlag] = useState(false);
-  const loaded = useRef(false), scrollTo = useRef<string | null>(null);
+  const scrollTo = useRef<string | null>(null);
 
-  // A batch you are in the middle of writing survives a closed tab or a dropped connection (on this device only).
+  // The batch she is writing is handed to the exam builder on every change; it stores it on the server (per teacher), so it
+  // survives a closed tab, a dropped connection, logging out and coming back on another device.
   useEffect(() => {
-    try { const d = localStorage.getItem(storeKey); if (d) { const c: Card[] = JSON.parse(d); if (c.some((x) => plain(x.s.prompt).trim())) setDraft(c); } } catch { /* ignore */ }
-    loaded.current = true;
-  }, [storeKey]);
-  useEffect(() => {
-    if (!loaded.current) return;
-    const t = setTimeout(() => {
-      try {
-        const keep = cards.filter((c) => c.state !== "done");
-        if (keep.some((c) => plain(c.s.prompt).trim())) localStorage.setItem(storeKey, JSON.stringify(keep.map((c) => ({ ...c, state: "idle", errs: [], leaving: false }))));
-        else localStorage.removeItem(storeKey);
-      } catch { /* storage full: nothing to do */ }
-    }, 1200);
-    return () => clearTimeout(t);
-  }, [cards, storeKey]);
+    if (!onPersist) return;
+    const keep = cards.filter((c) => c.state !== "done");
+    if (keep.some((c) => plain(c.s.prompt).trim())) onPersist({ defs, cards: keep.map((c) => ({ ...c, state: "idle", errs: [], leaving: false })) });
+    else onPersist(null);
+  }, [cards, defs]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!cards.some((c) => c.state !== "done" && plain(c.s.prompt).trim()) || saving) return;
     const h = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -225,19 +222,13 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview }: {
     await sleep(300);
     setCards((cs) => { const rest = cs.filter((c) => c.state !== "done"); return rest.length ? rest : [mk(subject, defs)]; });
     setSummary({ saved, failed }); setSaving(false);
-    if (saved) { try { localStorage.removeItem(storeKey); } catch { /* ignore */ } onFinished(saved); }
+    if (saved) onFinished(saved);
   }
 
   useEffect(() => { if (summary) setTimeout(() => document.getElementById("bk-summary")?.scrollIntoView({ behavior: "smooth", block: "center" }), 120); }, [summary]);
   const types = QTYPES;
   return (
     <div className="bk">
-      {draft && (
-        <div className="hint bk-in" role="status">A batch you had started on this device was found ({draft.length} question{draft.length === 1 ? "" : "s"}).{" "}
-          <button className="btn" onClick={() => { setCards(draft.map((c) => ({ ...c, open: false, seen: false }))); setDraft(null); }}>Restore it</button>{" "}
-          <button className="btn" onClick={() => { try { localStorage.removeItem(storeKey); } catch { /* ignore */ } setDraft(null); }}>Discard</button></div>
-      )}
-
       <div className="card bk-head">
         <div className="row"><h3 className="grow" style={{ margin: 0 }}>Create all the questions</h3></div>
         <p className="muted small">Write every question here, one after another. When you are done, save them all and they go straight into this exam. Then review the paper and submit it.</p>

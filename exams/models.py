@@ -64,6 +64,20 @@ class ExamQuestion(models.Model):
         unique_together = [("exam", "position")]
 
 
+class BuilderDraft(models.Model):
+    """A teacher's work-in-progress in the exam builder: the questions she has typed but not saved yet, the order of her
+    unsaved selection, and where she was (tab / step). One row per teacher per exam, stored on the server so she can log
+    out, change phone or computer, and carry on exactly where she stopped. Private to her: nobody else reads it."""
+
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="builder_drafts")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    data = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("exam", "user")]
+
+
 class Attempt(models.Model):
     IN_PROGRESS, SUBMITTED, AUTO_SUBMITTED = "in_progress", "submitted", "auto_submitted"
 

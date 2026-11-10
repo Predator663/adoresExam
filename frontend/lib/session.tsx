@@ -17,6 +17,11 @@ type Ctx = {
 const C = createContext<Ctx>(null as any);
 export const useSession = () => useContext(C);
 
+/** Screens holding unsaved work (the exam builder) register here; logging out waits a moment for them to save first,
+ *  while the login token is still valid, so the teacher finds her work again next time. */
+const flushers = new Set<() => Promise<unknown>>();
+export function onBeforeLogout(fn: () => Promise<unknown>) { flushers.add(fn); return () => { flushers.delete(fn); }; }
+
 const LOCAL = "amani_prefs";
 type Local = { language?: "en" | "sw"; theme?: string; text_size?: number; line_spacing?: number; dyslexia_font?: boolean; reduce_motion?: boolean; hc?: "dark" | "light" };
 const readLocal = (): Local => { try { return JSON.parse(localStorage.getItem(LOCAL) || "{}"); } catch { return {}; } };
@@ -65,6 +70,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [push]);
 
   const logout = useCallback(async (reason?: string) => {
+    if (flushers.size && getToken()) {
+      const all = Promise.all([...flushers].map((f) => f().catch(() => {})));
+      await Promise.race([all, new Promise((r) => setTimeout(r, 4000))]);
+    }
     try { if (getToken()) await api("/auth/logout/", { method: "POST", body: {} }); } catch { /* already out */ }
     await clearOfflineData();  // her downloaded results and practice questions leave the phone with her
     setToken(null); setUser(null);
