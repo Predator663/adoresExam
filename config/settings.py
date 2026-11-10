@@ -147,13 +147,14 @@ X_FRAME_OPTIONS = "DENY"
 # the preferred hasher automatically on the first successful login, and the student is
 # forced to choose a new password at that point anyway.
 PASSWORD_HASHERS = [
-    "accounts.hashers.StrongPasswordHasher",
+    "accounts.hashers.StrongPasswordHasher",  # teachers / admins
+    "accounts.hashers.FastPasswordHasher",  # students (accounts/models.py picks it): one salted MD5, no login slowdown
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",  # older hashes still verify and are upgraded
     "accounts.hashers.InitialPasswordHasher",
 ]
 
 if TESTING:  # tests create many users; the real (slow) hashers would make the suite take minutes
-    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher", "accounts.hashers.InitialPasswordHasher"]
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher", "accounts.hashers.FastPasswordHasher", "accounts.hashers.InitialPasswordHasher"]
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
@@ -183,7 +184,7 @@ ADMIN_LOGIN_USER_LIMIT = int(os.environ.get("ADMIN_LOGIN_USER_LIMIT", "1000" if 
 ADMIN_LOGIN_IP_LIMIT = int(os.environ.get("ADMIN_LOGIN_IP_LIMIT", "10000" if TESTING else "30"))  # ... per address per minute (accounts/adminguard.py)
 # Starting passwords are derived from this key (accounts/temp_password.py). Empty = use SECRET_KEY. Set it BEFORE the first codes are issued.
 TEMP_PASSWORD_KEY = os.environ.get("TEMP_PASSWORD_KEY", "")
-LOGIN_IP_THROTTLE_RATE = os.environ.get("LOGIN_IP_THROTTLE_RATE") or os.environ.get("LOGIN_THROTTLE_RATE") or ("100000/min" if TESTING else "600/min")
+LOGIN_IP_THROTTLE_RATE = os.environ.get("LOGIN_IP_THROTTLE_RATE") or os.environ.get("LOGIN_THROTTLE_RATE") or ("100000/min" if TESTING else "6000/min")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

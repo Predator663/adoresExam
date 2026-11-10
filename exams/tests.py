@@ -225,15 +225,13 @@ class AccountTests(TestCase):
         self.assertEqual(make_username("  Amina ", taken), "amina3")
         self.assertEqual(make_username("Mary Anne", taken), "maryanne")
 
-    def test_login_lockout_and_single_session(self):
+    def test_wrong_passwords_do_not_lock_and_single_session(self):
         u = User.objects.create(username="neema", role="student", password=make_password("Correct-pw-1"))
         c = APIClient()
         for _ in range(5):
             self.assertEqual(c.post("/api/auth/login/", {"username": "neema", "password": "bad"}).status_code, 400)
-        self.assertEqual(c.post("/api/auth/login/", {"username": "neema", "password": "Correct-pw-1"}).status_code, 429)
         u.refresh_from_db()
-        u.locked_until = None
-        u.save()
+        self.assertEqual((u.failed_logins, u.locked_until), (5, None))  # counted, never locked
         t1 = c.post("/api/auth/login/", {"username": "neema", "password": "Correct-pw-1"}).json()["token"]
         t2 = c.post("/api/auth/login/", {"username": "neema", "password": "Correct-pw-1"}).json()["token"]
         c.credentials(HTTP_AUTHORIZATION="Token " + t1)

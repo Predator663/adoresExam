@@ -1,6 +1,6 @@
 """Login activity: how often students use the system (administrators only).
 
-Built from the "login" entries the audit log already keeps for every successful login, so nothing new is stored and the history
+Built from the "login" entries (and "login.failed" for wrong passwords) the audit log keeps, so nothing new is stored and the history
 reaches back to the day the audit log began. Days are counted in the school's own time zone (Africa/Dar_es_Salaam).
 A login is a sign-in, not time spent: a student who stays signed in on her phone for days counts once, on the day she signed in."""
 import zoneinfo
@@ -51,6 +51,19 @@ def _students(request):
 
 def _logins(student_ids, start):
     return AuditLog.objects.filter(action="login", actor_id__in=student_ids, created_at__gte=start).order_by()
+
+
+def _failed(student_ids, start):
+    """{student id: wrong-password tries} within the window. Wrong tries never lock an account; they are only counted here."""
+    rows = AuditLog.objects.filter(action="login.failed", actor_id__in=student_ids, created_at__gte=start).order_by().values("actor_id").annotate(n=Count("id"))
+    return {r["actor_id"]: r["n"] for r in rows}
+
+
+def _failed_days(student_ids, start):
+    """{date: wrong tries that day} for the whole selection."""
+    rows = (AuditLog.objects.filter(action="login.failed", actor_id__in=student_ids, created_at__gte=start).order_by()
+            .annotate(d=TruncDate("created_at", tzinfo=TZ)).values("d").annotate(n=Count("id")))
+    return {r["d"]: r["n"] for r in rows}
 
 
 def _per_day(student_ids, start):
@@ -104,7 +117,12 @@ def overview(request):
         n = sum(1 for s in students if lo <= active_days.get(s.pk, 0) and (hi is None or active_days.get(s.pk, 0) <= hi))
         bands.append({"label": label, "count": n})
     used = len(active_days)
+    failed_by_day = _failed_days(ids, start)
+    failed = _failed(ids, start)
+    for row in daily:
+        row["failed"] = failed_by_day.get(datetime.fromisoformat(row["date"]).date(), 0)
     return Response({
+        "failed_logins": sum(failed.values()), "students_with_failed": len(failed),
         "days": days, "from": first.isoformat(), "to": today.isoformat(), "students": len(students), "active_students": used,
         "never": len(students) - used, "logins": sum(r["logins"] for r in daily),
         "avg_days_used": round(sum(active_days.values()) / used, 1) if used else 0,
@@ -122,21 +140,21 @@ def student_list(request):
     if q:
         students = [s for s in students if q in f"{_name(s)} {s.index_number}".lower()]
     ids = [s.pk for s in students]
-    per, last = _per_day(ids, start), _last_login(ids)
+    per, last, failed = _per_day(ids, start), _last_login(ids), _failed(ids, start)
     weeks = max(days / 7, 1)
     rows = []
     for s in students:
         logins, active = _summary(per.get(s.pk, {}))
         when = last.get(s.pk)
         rows.append({"id": s.pk, "name": _name(s), "index": s.index_number, "class": str(s.school_class) if s.school_class_id else "",
-                     "logins": logins, "active_days": active, "per_week": round(active / weeks, 1),
+                     "logins": logins, "failed": failed.get(s.pk, 0), "active_days": active, "per_week": round(active / weeks, 1),
                      "last_login": when.isoformat() if when else None,
                      "days_since": (today - when.astimezone(TZ).date()).days if when else None})
     sort = request.query_params.get("sort", "least")
-    key = {"least": lambda r: (r["active_days"], r["name"].lower()), "most": lambda r: (-r["active_days"], r["name"].lower()),
+    key = {"least": lambda r: (r["active_days"], r["name"].lower()), "most": lambda r: (-r["active_days"], r["name"].lower()), "failed": lambda r: (-r["failed"], r["name"].lower()),
            "recent": lambda r: (r["days_since"] is None, r["days_since"] or 0, r["name"].lower()), "name": lambda r: r["name"].lower()}.get(sort)
     if not key:
-        raise ValidationError({"detail": "sort must be least, most, recent or name."})
+        raise ValidationError({"detail": "sort must be least, most, recent, failed or name."})
     rows.sort(key=key)
     paged = paginate(request, rows)
     return Response(paged if paged is not None else rows)
@@ -149,7 +167,8 @@ def student_detail(request, student_id):
     days, first, today, start = _window(request)
     s = get_object_or_404(User.objects.select_related("school_class"), pk=student_id, role=User.Role.STUDENT)
     per = _per_day([s.pk], start).get(s.pk, {})
-    daily = [{"date": d.isoformat(), "logins": per.get(d, 0)} for d in _dates(first, today)]
+    fday = _failed_days([s.pk], start)
+    daily = [{"date": d.isoformat(), "logins": per.get(d, 0), "failed": fday.get(d, 0)} for d in _dates(first, today)]
     gap = longest = 0
     for r in daily:
         gap = 0 if r["logins"] else gap + 1
@@ -158,7 +177,7 @@ def student_detail(request, student_id):
     logins, active = _summary(per)
     return Response({
         "id": s.pk, "name": _name(s), "index": s.index_number, "class": str(s.school_class) if s.school_class_id else "",
-        "days": days, "from": first.isoformat(), "to": today.isoformat(), "logins": logins, "active_days": active,
+        "days": days, "from": first.isoformat(), "to": today.isoformat(), "logins": logins, "failed": sum(fday.values()), "active_days": active,
         "per_week": round(active / max(days / 7, 1), 1), "longest_gap_days": longest,
         "last_login": when.isoformat() if when else None, "days_since": (today - when.astimezone(TZ).date()).days if when else None,
         "daily": daily, "hours": _hours([s.pk], start),

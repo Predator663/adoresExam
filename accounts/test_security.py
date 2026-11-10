@@ -48,10 +48,9 @@ class SecurityTests(AnalyticsBase):
         Token.objects.filter(pk=tok.pk).update(created=timezone.now() - timedelta(hours=13))
         self.assertEqual(c.get("/api/me/").status_code, 401)
 
-    def test_unknown_names_lock_like_real_ones(self):
+    def test_unknown_names_get_the_same_answer_as_real_ones(self):
         codes = [self.login("no-such-girl", "x").status_code for _ in range(7)]
-        self.assertEqual(codes[0], 400)
-        self.assertEqual(codes[-1], 429)  # the same lock-out a real name gets: names cannot be told apart
+        self.assertEqual(set(codes), {400})  # no lock-out for anybody: names cannot be told apart
 
     def test_sanitiser_drops_foreign_images(self):
         from core.sanitize import clean_html
@@ -71,17 +70,19 @@ class UnlockTests(AnalyticsBase):
         super().setUp()
         cache.clear()
 
-    def lock(self, user):
-        c = APIClient()
-        for _ in range(5):
-            c.post("/api/auth/login/", {"username": user.username, "password": "wrong"}, format="json")
+    def lock(self, user):  # an account locked by an older version: the admin can still lift it
+        from django.utils import timezone
+        from datetime import timedelta
+        user.locked_until = timezone.now() + timedelta(minutes=10)
+        user.save(update_fields=["locked_until"])
 
     def login(self, username, password):
         return APIClient().post("/api/auth/login/", {"username": username, "password": password}, format="json")
 
-    def test_five_wrong_passwords_lock_the_account(self):
-        self.lock(self.amina)
-        self.assertEqual(self.login("amina", "pw-amina-1").status_code, 429)  # even the right password is refused
+    def test_wrong_passwords_do_not_lock_the_account(self):
+        for _ in range(6):
+            self.login("amina", "wrong")
+        self.assertEqual(self.login("amina", "pw-amina-1").status_code, 200)
 
     def test_unlock_keeps_the_password_and_lets_her_in(self):
         self.lock(self.amina)

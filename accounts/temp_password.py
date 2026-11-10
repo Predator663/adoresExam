@@ -14,7 +14,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 
-from .hashers import InitialPasswordHasher
+from .hashers import FastPasswordHasher
 
 ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"  # no 0/o, 1/l/i look-alikes: it is copied from paper
 LENGTH = 8
@@ -43,7 +43,7 @@ def issue(user, save=True):
     user.temp_serial = (user.temp_serial or 0) + 1
     user.temp_issued_at = timezone.now()
     code = derive(user.username, user.temp_serial)
-    user.password = make_password(code, hasher=InitialPasswordHasher.algorithm)
+    user.password = make_password(code, hasher=FastPasswordHasher.algorithm)
     user.must_change_password = True
     user.failed_logins, user.locked_until = 0, None
     if save:

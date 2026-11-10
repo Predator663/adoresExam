@@ -74,69 +74,22 @@ class LockoutTests(AnalyticsBase):
         self.assertEqual(self.ids(self.s.get("/api/lockouts/")), [self.zawadi.pk])
         self.assertEqual(self.s.get("/api/lockouts/").json()["summary"]["locked"], 1)
 
-    # ---- the real flow through the login screen
-    def test_real_lockout_then_reset_attempts_lets_her_in(self):
+    # ---- the real flow through the login screen: wrong passwords no longer lock anybody, they are only counted
+    def test_wrong_passwords_never_lock_and_are_counted(self):
         c = APIClient()
-        for _ in range(5):
+        for _ in range(8):
             self.assertEqual(c.post("/api/auth/login/", {"username": "amina", "password": "bad"}).status_code, 400)
-        good = {"username": "amina", "password": "pw-amina-1"}
-        self.assertEqual(c.post("/api/auth/login/", good).status_code, 429)
-        self.assertEqual(self.ids(self.s.get("/api/lockouts/")), [self.amina.pk])
-        r = self.s.post(f"/api/lockouts/{self.amina.pk}/reset-attempts/")
-        self.assertEqual(r.status_code, 200)
-        self.assertTrue(r.json()["was_locked"])
-        self.assertFalse(r.json()["student"]["locked"])
-        self.assertEqual(c.post("/api/auth/login/", good).status_code, 200)
+        self.assertEqual(c.post("/api/auth/login/", {"username": "amina", "password": "pw-amina-1"}).status_code, 200)  # right password still works
+        self.assertEqual(AuditLog.objects.filter(action="login.failed", actor=self.amina).count(), 8)
+        self.amina.refresh_from_db()
+        self.assertEqual((self.amina.failed_logins, self.amina.locked_until), (0, None))  # a good login resets the run
         self.assertEqual(self.ids(self.s.get("/api/lockouts/")), [])
-        log = AuditLog.objects.get(action="login.unlock")
-        self.assertEqual((log.actor_id, log.target, log.detail["username"], log.detail["was_locked"]), (self.boss.pk, str(self.amina.pk), "amina", True))
 
-    def test_reset_attempts_clears_a_warning_and_is_idempotent(self):
-        self.zawadi.failed_logins = 4
-        self.zawadi.save(update_fields=["failed_logins"])
-        r = self.s.post(f"/api/lockouts/{self.zawadi.pk}/reset-attempts/").json()
-        self.assertEqual((r["changed"], r["was_locked"], r["attempts_cleared"]), (True, False, 4))
-        self.zawadi.refresh_from_db()
-        self.assertEqual(self.zawadi.failed_logins, 0)
-        again = self.s.post(f"/api/lockouts/{self.zawadi.pk}/reset-attempts/").json()
-        self.assertFalse(again["changed"])
-        self.assertEqual(AuditLog.objects.filter(action="login.unlock").count(), 1)  # the no-op wrote nothing
-
-    def test_single_actions_refuse_super_admin_self_archived_and_unknown(self):
-        other = User.objects.create(username="boss2", role="super_admin", password=make_password("Sup3r-pass-2"))
-        for pk in (other.pk, 999999):  # another Super Admin and an unknown id are not found
-            self.assertEqual(self.s.post(f"/api/lockouts/{pk}/reset-attempts/").status_code, 404)
-            self.assertEqual(self.s.post(f"/api/lockouts/{pk}/reset-password/").status_code, 404)
-        self.assertEqual(self.s.post(f"/api/lockouts/{self.boss.pk}/reset-attempts/").status_code, 400)  # not your own account
-        self.assertEqual(self.s.post(f"/api/lockouts/{self.boss.pk}/reset-password/").status_code, 400)
-        self.amina.is_archived = True
-        self.amina.save(update_fields=["is_archived"])
-        self.assertEqual(self.s.post(f"/api/lockouts/{self.amina.pk}/reset-attempts/").status_code, 404)
-
-    # ---- teachers and admins
-    def test_locked_teachers_and_admins_are_listed_per_role(self):
-        self.lock(self.teacher)
-        self.lock(self.admin)
+    def test_old_lock_is_not_enforced_and_clears_on_login(self):
         self.lock(self.amina)
-        t = self.s.get("/api/lockouts/?role=teacher").json()
-        self.assertEqual([(x["username"], x["role"]) for x in t["results"]], [("teach", "teacher")])
-        self.assertEqual(t["summary"]["role"], "teacher")
-        self.assertEqual({k: v["locked"] for k, v in t["summary"]["roles"].items()}, {"student": 1, "teacher": 1, "admin": 1})
-        self.assertEqual(self.ids(self.s.get("/api/lockouts/?role=admin")), [self.admin.pk])
-        self.assertEqual(self.ids(self.s.get("/api/lockouts/?role=student")), [self.amina.pk])
-        self.assertEqual(self.s.get("/api/lockouts/?role=super_admin").status_code, 400)  # a Super Admin is never listed
-        self.assertEqual(self.s.get("/api/lockouts/?role=nope").status_code, 400)
-
-    def test_real_teacher_lockout_then_unlock(self):
-        c = APIClient()
-        for _ in range(5):
-            c.post("/api/auth/login/", {"username": "teach", "password": "bad"})
-        good = {"username": "teach", "password": "Teach-pass-1"}
-        self.assertEqual(c.post("/api/auth/login/", good).status_code, 429)
-        self.assertEqual(self.ids(self.s.get("/api/lockouts/?role=teacher")), [self.teacher.pk])
-        self.assertEqual(self.s.post(f"/api/lockouts/{self.teacher.pk}/reset-attempts/").status_code, 200)
-        self.assertEqual(c.post("/api/auth/login/", good).status_code, 200)
-        self.assertEqual(AuditLog.objects.get(action="login.unlock").detail["role"], "teacher")
+        self.assertEqual(APIClient().post("/api/auth/login/", {"username": "amina", "password": "pw-amina-1"}).status_code, 200)
+        self.amina.refresh_from_db()
+        self.assertIsNone(self.amina.locked_until)
 
     def test_reset_teacher_password_is_strong_random_and_unlocks(self):
         self.lock(self.teacher)

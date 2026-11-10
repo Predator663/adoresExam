@@ -3,7 +3,6 @@ import logging
 from datetime import timedelta
 
 from django.contrib.auth import authenticate
-from django.core.cache import cache
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Exists, OuterRef, Q
@@ -30,7 +29,7 @@ from . import temp_password
 from .services import (TEMPLATE_COLUMNS, create_students, generate_password, parse_upload, validate_rows,
                        validate_staff_password)
 
-MAX_FAILED = 5
+MAX_FAILED = 5  # no longer locks anyone; only used by the Locked accounts screen to flag "warning" accounts
 LOCK_MINUTES = 15
 FRIENDLY_FAIL = "Wrong username or password. Please check and try again."
 
@@ -58,27 +57,6 @@ def user_payload(u):
     }
 
 
-class _FakeLock:
-    """Same lock-out behaviour for user names that do not exist, kept in the cache (SECURITY: otherwise only real names ever
-    produce the "too many attempts" message and an attacker can list which names exist)."""
-
-    def __init__(self, username):
-        self.key = "login-fake:" + username.strip().lower()[:80]
-        self.state = cache.get(self.key) or {"n": 0, "until": 0}
-
-    def locked(self, now):
-        return self.state["until"] > now.timestamp()
-
-    def minutes_left(self, now):
-        return int((self.state["until"] - now.timestamp()) // 60) + 1
-
-    def fail(self, now):
-        self.state["n"] += 1
-        if self.state["n"] >= MAX_FAILED:
-            self.state = {"n": 0, "until": now.timestamp() + LOCK_MINUTES * 60}
-        cache.set(self.key, self.state, LOCK_MINUTES * 60 + 60)
-
-
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -89,30 +67,22 @@ class LoginView(APIView):
         password = request.data.get("password") or ""
         user = User.objects.filter(username__iexact=username).first() if username else None
         now = timezone.now()
-        if user and user.locked_until and user.locked_until > now:
-            mins = int((user.locked_until - now).total_seconds() // 60) + 1
-            return Response({"detail": f"Too many wrong attempts. Please try again in {mins} minute(s)."}, status=429)
-        fake = None if user or not username else _FakeLock(username)
-        if fake and fake.locked(now):  # a name that does not exist is "locked" too, so the message never shows which names are real
-            return Response({"detail": f"Too many wrong attempts. Please try again in {fake.minutes_left(now)} minute(s)."}, status=429)
-        authed = authenticate(request, username=user.username, password=password) if user else None
+        # No lock-out: a wrong password never blocks the account. Every wrong try is counted instead, so administrators
+        # can see them in Login activity (audit entries "login.failed"; `failed_logins` = wrong tries since the last good login).
+        authed = user if (user and user.is_active and user.check_password(password)) else None  # same user row: no second query
         if not authed:
-            if fake:
-                fake.fail(now)
             if user:
-                user.failed_logins += 1
-                if user.failed_logins >= MAX_FAILED:
-                    user.locked_until = now + timedelta(minutes=LOCK_MINUTES)
-                    user.failed_logins = 0
-                    audit(user, "login.locked", user.pk)
-                user.save(update_fields=["failed_logins", "locked_until"])
+                user.failed_logins = min(user.failed_logins + 1, 30000)
+                user.save(update_fields=["failed_logins"])
+                audit(user, "login.failed", user.pk)
             return Response({"detail": FRIENDLY_FAIL}, status=400)
         if authed.is_archived:
             return Response({"detail": FRIENDLY_FAIL}, status=400)
         if temp_password.expired(authed, now):  # a starting password nobody used in time stops working; the office issues a new one
             return Response({"detail": "Your starting password has expired. Please ask the school office for a new one."}, status=400)
-        authed.failed_logins, authed.locked_until = 0, None
-        authed.save(update_fields=["failed_logins", "locked_until"])
+        if authed.failed_logins or authed.locked_until:  # nothing to clear for most logins: skip the write
+            authed.failed_logins, authed.locked_until = 0, None
+            authed.save(update_fields=["failed_logins", "locked_until"])
         # AUTH-09: one active session. A new login replaces the old token, ending the first session.
         Token.objects.filter(user=authed).delete()
         token = Token.objects.create(user=authed)

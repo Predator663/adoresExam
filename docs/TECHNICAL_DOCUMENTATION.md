@@ -891,7 +891,7 @@ flowchart LR
   GH["GitHub repository"] --> B1["Build API: pip install, collectstatic"]
   GH --> B2["Build web app: npm ci, npm run build"]
   B1 --> PRE["Pre-deploy: migrate_schemas"]
-  PRE --> RUN["gunicorn config.wsgi --workers 3 --timeout 60"]
+  PRE --> RUN["gunicorn config.wsgi"]
   B2 --> OUT["Publish directory: frontend/out"]
   RUN --> HC["Health check: /healthz"]
   CRON1["Cron every minute: for_each_school run_scheduler"] --> DB[("PostgreSQL")]
@@ -902,7 +902,7 @@ flowchart LR
 Steps (full text in `docs/DEPLOY_RENDER.md`)
 
 1. Create PostgreSQL (1 GB). Copy the internal database URL.
-2. Create the Web Service (root directory empty). Build `pip install -r requirements.txt && python manage.py collectstatic --noinput`; pre-deploy `python manage.py migrate_schemas`; start `gunicorn config.wsgi --workers 3 --timeout 60`; health check `/healthz`; add a disk at `/var/data` and set `MEDIA_ROOT=/var/data/media`; set the environment variables above.
+2. Create the Web Service (root directory empty). Build `pip install -r requirements.txt && python manage.py collectstatic --noinput`; pre-deploy `python manage.py migrate_schemas`; start `gunicorn config.wsgi`; health check `/healthz`; add a disk at `/var/data` and set `MEDIA_ROOT=/var/data/media`; set the environment variables above.
 3. Create the Static Site: root `frontend`, build `npm ci && npm run build`, publish `out`, env `NEXT_PUBLIC_API_URL`. Add each school's address as a custom domain.
 4. Create the two cron jobs (same repository and variables).
 5. In the API shell: `python manage.py createsuperuser`, then `python manage.py create_school "School" --domain <web app address>`, then `python manage.py for_each_school golive_check`.

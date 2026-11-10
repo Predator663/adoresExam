@@ -203,6 +203,18 @@ class LoginActivityTests(AnalyticsBase):
         bands = {b["label"]: b["count"] for b in d["bands"]}
         self.assertEqual((bands["Never"], bands["1 day"], bands["2 to 3 days"]), (0, 1, 1))  # Zawadi 1 day, Amina 2 days
 
+    def test_wrong_password_tries_are_counted_for_admins(self):
+        for _ in range(3):
+            row = self.AuditLog.objects.create(actor=self.amina, action="login.failed", target=str(self.amina.pk))
+        self.login_at(self.zawadi, 0)
+        d = self.a.get("/api/analytics/logins/?days=7").json()
+        self.assertEqual((d["failed_logins"], d["students_with_failed"], d["daily"][-1]["failed"]), (3, 1, 3))
+        rows = {r["name"]: r for r in self.a.get("/api/analytics/logins/students/").json()}
+        self.assertEqual((rows["Amina Test"]["failed"], rows["Zawadi Test"]["failed"]), (3, 0))
+        top = self.a.get("/api/analytics/logins/students/?sort=failed").json()
+        self.assertEqual(top[0]["name"], "Amina Test")
+        self.assertEqual(self.a.get(f"/api/analytics/logins/students/{self.amina.pk}/").json()["failed"], 3)
+
     def test_old_logins_fall_outside_the_period_and_a_student_with_none_is_listed_as_never(self):
         self.login_at(self.amina, 40)
         d = self.a.get("/api/analytics/logins/?days=30").json()

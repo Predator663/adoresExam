@@ -31,6 +31,7 @@ function StudentView({ id, days, back }: { id: number; days: number; back: () =>
         <Stat n={`${s.active_days}/${s.days}`} label="Days she logged in" />
         <Stat n={s.per_week} label="Days per week" />
         <Stat n={s.logins} label="Logins" />
+        <Stat n={s.failed} label="Wrong password tries" />
         <Stat n={s.longest_gap_days} label="Longest break (days)" />
         <Stat n={ago(s.days_since)} label="Last login" />
       </div>
@@ -52,19 +53,19 @@ function Students({ days, cls }: { days: number; cls: string }) {
       <div className="row" style={{ flexWrap: "wrap", gap: ".6rem" }}>
         <input className="input grow" type="search" placeholder="Search name or index number" aria-label="Search students" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input" aria-label="Order" value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="least">Least active first</option><option value="most">Most active first</option><option value="recent">Latest login first</option><option value="name">Name</option>
+          <option value="least">Least active first</option><option value="most">Most active first</option><option value="recent">Latest login first</option><option value="failed">Most wrong tries first</option><option value="name">Name</option>
         </select>
       </div>
       {list.loading ? <Loading /> : list.error ? <ErrorNote error={list.error} retry={list.reload} /> : !list.rows.length ? <p className="muted">No students match.</p> : (
         <>
           <div className="tbl-wrap paged" ref={list.top} aria-busy={list.busy || undefined}><table>
-            <thead><tr><th>Student</th><th>Class</th><th>Days used</th><th>Per week</th><th>Logins</th><th>Last login</th></tr></thead>
+            <thead><tr><th>Student</th><th>Class</th><th>Days used</th><th>Per week</th><th>Logins</th><th>Wrong tries</th><th>Last login</th></tr></thead>
             <tbody>{list.rows.map((r: any) => (
               <tr key={r.id}>
                 <td><button className="btn" onClick={() => setOpen(r.id)}>{r.name}</button><br /><span className="muted small">{r.index}</span></td>
                 <td>{r.class}</td>
                 <td style={{ minWidth: 110 }}><b>{r.active_days}</b> <span className="muted small">of {days}</span><div className="bar" aria-hidden><i style={{ width: `${Math.min(100, (r.active_days / days) * 100)}%` }} /></div></td>
-                <td>{r.per_week}</td><td>{r.logins}</td>
+                <td>{r.per_week}</td><td>{r.logins}</td><td>{r.failed ? <b className="no">{r.failed}</b> : 0}</td>
                 <td>{r.days_since === null ? <span className="no">never</span> : ago(r.days_since)}</td>
               </tr>))}</tbody>
           </table></div>
@@ -101,10 +102,13 @@ export default function LoginActivity() {
                 <Stat n={`${d.active_students}/${d.students}`} label="Students who logged in" />
                 <Stat n={d.never} label="Never logged in (this period)" />
                 <Stat n={d.logins} label="Logins" />
+                <Stat n={d.failed_logins} label={`Wrong password tries (${d.students_with_failed} students)`} />
                 <Stat n={d.avg_days_used} label="Average days used (of those who logged in)" />
               </div>
               <div className="card"><h3>Students logging in each day</h3><p className="muted small">Number of different students who signed in on each day.</p>
                 <BarChart values={d.daily.map((r: any) => r.students)} labels={d.daily.map((r: any) => dm(r.date))} title="Students who logged in per day" unit="students" tickEvery={dailyTick(d.days)} /></div>
+              <div className="card"><h3>Wrong password tries each day</h3><p className="muted small">Wrong tries do not lock anyone out; they are only counted here.</p>
+                <BarChart values={d.daily.map((r: any) => r.failed)} labels={d.daily.map((r: any) => dm(r.date))} title="Wrong password tries per day" unit="tries" tickEvery={dailyTick(d.days)} /></div>
               <div className="card"><h3>How often students use it</h3><p className="muted small">Students grouped by the number of different days they logged in during this period.</p>
                 <BandChart bands={d.bands} total={d.students} /></div>
               <div className="grid2">

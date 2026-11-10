@@ -1,6 +1,9 @@
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
+
+from .hashers import FastPasswordHasher
 
 
 THEMES = {"light", "dark", "high_contrast", "colour_blind", "soft", "mw3"}  # ACC-01
@@ -44,6 +47,19 @@ class User(AbstractUser):
     dyslexia_font = models.BooleanField(default=False)
     reduce_motion = models.BooleanField(default=False)
     read_aloud = models.BooleanField(default=False)
+
+    # Students use the fast hasher so hundreds can log in at once; everybody else keeps the strong one.
+    def set_password(self, raw_password):
+        if self.role == self.Role.STUDENT and raw_password is not None:
+            self.password = make_password(raw_password, hasher=FastPasswordHasher.algorithm)
+            self._password = raw_password
+        else:
+            super().set_password(raw_password)
+
+    def check_password(self, raw_password):
+        if self.role == self.Role.STUDENT and (self.password or "").startswith(FastPasswordHasher.algorithm + "$"):
+            return check_password(raw_password, self.password)  # no setter: no re-hash and no database write on every login
+        return super().check_password(raw_password)  # an old PBKDF2 student hash is verified once, then replaced by the fast one
 
     @property
     def is_student(self):

@@ -44,7 +44,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             cls, _ = SchoolClass.objects.get_or_create(name=CLASS_NAME, stream="", defaults={"form_level": 1})
             subject, _ = Subject.objects.get_or_create(name=SUBJECT_NAME)
-            hashed = make_password(o["password"], hasher="pbkdf2_sha256_initial")  # light hash: 500 accounts in seconds
+            hashed = make_password(o["password"], hasher="fast_md5")  # light hash: 500 accounts in seconds
             have = set(User.objects.filter(username__startswith=prefix).values_list("username", flat=True))
             new = []
             for i in range(1, o["students"] + 1):

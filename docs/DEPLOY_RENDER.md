@@ -6,7 +6,7 @@
    - Build command: `pip install -r requirements.txt && python manage.py collectstatic --noinput`
    - Pre-deploy command: `python manage.py migrate_schemas`  (all schools; see docs/MULTI_SCHOOL.md)
    - Health check path: `/healthz`
-   - Start command: `gunicorn config.wsgi --workers 3 --timeout 60`
+   - Start command: `gunicorn config.wsgi` (settings are read from `gunicorn.conf.py`; tune with WEB_CONCURRENCY, GUNICORN_THREADS)
    - Disk: add a disk, mount path `/var/data`, 1 GB or more.
    - Environment: DJANGO_SECRET_KEY, DJANGO_ALLOWED_HOSTS (api address only, no https://), DJANGO_CSRF_ORIGINS (https://api address),
      CORS_ORIGINS (optional: every school address registered in the platform is allowed automatically), DATABASE_URL, CONTROLROOM_OWNERS, GUARDIAN_KEY, MEDIA_ROOT=/var/data/media, DJANGO_DEBUG=0,
