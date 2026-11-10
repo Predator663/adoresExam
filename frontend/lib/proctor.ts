@@ -36,11 +36,66 @@ export function deviceId(): string {
 let lastGeo: { code?: number; message?: string } = {};
 export const lastGeoDetail = () => lastGeo;
 
+/* ---- a steadier position: keep the readings of the last 15 s and report their weighted average ---------------------------------------
+   One phone reading can be 10-30 m off indoors and jumps from one reading to the next. While the phone lies still, readings scatter around the
+   true spot, so averaging them (the precise ones count much more, old ones fade) lands closer to it. A moving phone (speed above 0.8 m/s) or a
+   reading far from the others is never averaged. The reported accuracy only improves a little, because errors of nearby readings are alike. */
+type Sample = { t: number; lat: number; lng: number; acc: number; speed: number | null; heading: number | null };
+let samples: Sample[] = [], watchId: number | null = null, lastUse = 0;
+const WINDOW_MS = 15000, M_LAT = 111_320;
+
+function addSample(p: GeolocationPosition) {
+  samples.push({ t: Date.now(), lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading });
+  const cut = Date.now() - WINDOW_MS; samples = samples.filter((s) => s.t >= cut).slice(-30);
+}
+
+function fused(now: number): Fix | null {
+  const live = samples.filter((s) => now - s.t <= WINDOW_MS);
+  if (!live.length) return null;
+  const L = live[live.length - 1];
+  if ((L.speed ?? 0) > 0.8) return { lat: L.lat, lng: L.lng, accuracy: L.acc, speed: L.speed, heading: L.heading };
+  const cosl = Math.cos((L.lat * Math.PI) / 180);
+  const near = live.filter((s) => Math.hypot((s.lat - L.lat) * M_LAT, (s.lng - L.lng) * M_LAT * cosl) <= Math.max(2 * Math.max(s.acc, L.acc), 8));
+  let w = 0, la = 0, ln = 0, w0 = 0, best = Infinity;
+  for (const s of near) {
+    const a = Math.max(s.acc, 3), k = Math.pow(0.5, (now - s.t) / 6000) / (a * a);  // precise and recent readings count most
+    w += k; la += k * s.lat; ln += k * s.lng; w0 += 1 / (a * a); best = Math.min(best, a);
+  }
+  return { lat: la / w, lng: ln / w, accuracy: Math.max(3, 0.6 * best, 1 / Math.sqrt(w0)), speed: L.speed, heading: L.heading };
+}
+
+/** Keep listening to the phone's location while the exam page is open (stops by itself 90 s after the last use). */
+export function startWatch() {
+  if (typeof navigator === "undefined" || !navigator.geolocation || watchId != null) return;
+  lastUse = Date.now();
+  watchId = navigator.geolocation.watchPosition(
+    (p) => { lastGeo = {}; addSample(p); if (Date.now() - lastUse > 90_000) stopWatch(); },
+    (e) => { lastGeo = { code: e.code, message: e.message }; if (e.code === 1) stopWatch(); },  // a timeout here is normal; getFix reports real failures
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+  );
+}
+export function stopWatch() { if (watchId != null) navigator.geolocation?.clearWatch(watchId); watchId = null; samples = []; }
+
+/** The first good position for START and the phone check: waits up to `settleMs` for the accuracy to reach `targetM` metres. */
+export async function getBestFix(timeoutMs = 15000, targetM = 15, settleMs = 4000): Promise<Fix> {
+  startWatch();
+  let fix = await getFix(timeoutMs);
+  const until = Date.now() + settleMs;
+  while (fix.accuracy > targetM && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 600));
+    fix = (fused(Date.now()) ?? fix);
+  }
+  return fix;
+}
+
 export function getFix(timeoutMs = 15000, maxAgeMs = 0): Promise<Fix> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) { lastGeo = {}; return reject("unsupported" as FixError); }
+    lastUse = Date.now();
+    const ready = watchId != null ? fused(Date.now()) : null;
+    if (ready) return resolve(ready);  // the running watch already has readings from the last 15 s
     navigator.geolocation.getCurrentPosition(
-      (p) => { lastGeo = {}; resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading }); },
+      (p) => { lastGeo = {}; if (watchId != null) addSample(p); resolve((watchId != null ? fused(Date.now()) : null) ?? { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading }); },
       (e) => { lastGeo = { code: e.code, message: e.message }; reject((e.code === 1 ? "denied" : e.code === 3 ? "timeout" : "unavailable") as FixError); },
       { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: maxAgeMs },
     );
@@ -102,7 +157,7 @@ export function useProctor(attemptId: number | null, every = 6000) {
     if (!attemptId || stop.current || busy.current) return;
     busy.current = true;
     try {
-      const fix = await getFix(10000, 3000);
+      const fix = await getFix(10000);
       fails.current = 0; setState("ok"); setAccuracy(Math.round(fix.accuracy));
       const sensors = await readSensors();
       try { const r = await api<{ locked?: boolean; lock_reason?: string; messages?: number }>(`/attempts/${attemptId}/location/`, { body: { ...fix, sensors, device: deviceId() } }); setLocked(!!r?.locked); setLockReason(r?.locked ? r?.lock_reason || "close" : "");
@@ -122,12 +177,13 @@ export function useProctor(attemptId: number | null, every = 6000) {
     if (!attemptId) return;
     stop.current = false; fails.current = 0; setState("starting");
     startMotion().catch(() => {});  // works on Android / already-granted iOS; otherwise motion stays "unknown", which is fine
+    startWatch();  // continuous readings, averaged by getFix
     // The start request already sent a position, so the first report waits a random 1-5 s: hundreds of phones must not report in the same second.
     const first = setTimeout(tick, 1000 + Math.random() * 4000);
     const iv = setInterval(tick, every);
     const vis = () => { if (!document.hidden) tick(); };
     document.addEventListener("visibilitychange", vis);
-    return () => { stop.current = true; clearTimeout(first); clearInterval(iv); document.removeEventListener("visibilitychange", vis); };
+    return () => { stop.current = true; stopWatch(); clearTimeout(first); clearInterval(iv); document.removeEventListener("visibilitychange", vis); };
   }, [attemptId, every, tick]);
 
   /** `locked`: an administrator has to unlock this exam because the student sits too close to another one. The next report overrides `markLocked`. */

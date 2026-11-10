@@ -11,7 +11,7 @@ import { Bar, ErrorNote, Loading, Modal, useLoad, useNow } from "@/components/ui
 import { api, ApiError } from "@/lib/api";
 import { clock, eatDate, makeOffset } from "@/lib/clock";
 import { clearAttempt, dequeue, enqueue, readDraft, readQueue, saveDraft } from "@/lib/offlineQueue";
-import { getFix, readSensors, startMotion, useProctor, deviceId } from "@/lib/proctor";
+import { getBestFix, readSensors, startMotion, useProctor, deviceId } from "@/lib/proctor";
 import { useSession } from "@/lib/session";
 import type { AttemptState, ExamCard } from "@/lib/types";
 
@@ -42,7 +42,7 @@ function PreExam({ examId }: { examId: number }) {
       // Everybody taps START in the same second the exam opens. A short random wait (only in the first 30 s) spreads those requests out.
       if (n - startMs < 30_000) await new Promise((r) => setTimeout(r, Math.random() * 3000));
       let fix = phone?.fix;
-      if (!fix && !phone) { try { fix = await getFix(6000); } catch { /* Location is off or blocked: she may still start */ } }
+      if (!fix && !phone) { try { fix = await getBestFix(6000, 15, 3000); } catch { /* Location is off or blocked: she may still start */ } }
       const sensors = await readSensors();
       const st = await api<AttemptState>(`/student/exams/${examId}/start/`, { body: { agree_rules: true, accept_legal: true, ...(fix ? { location: fix } : {}), sensors, device: deviceId() } });
       location.replace(`/exam/?attempt=${st.attempt_id}`);

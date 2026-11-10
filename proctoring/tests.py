@@ -3,7 +3,7 @@ import math
 from datetime import timedelta
 
 from django.contrib.auth.hashers import make_password
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import User
@@ -11,6 +11,7 @@ from exams import services
 from exams.models import Attempt
 from exams.tests import Base
 from notifications.models import Notification
+from . import geo
 from .models import LegalAcceptance, LiveLocation, ProximityAlert
 
 LAT, LNG = -6.8, 39.25
@@ -558,3 +559,23 @@ class RelatedStudents(ProximityBase):
             self.assertEqual(self.mark([self.amina.pk, self.zawadi.pk], who=who).status_code, 403)
             self.assertEqual(self.client_for(who).get("/api/proctoring/relations/").status_code, 403)
         self.assertEqual(self.client_for(self.amina).delete("/api/proctoring/relations/1/").status_code, 403)
+
+
+class FuseTests(SimpleTestCase):
+    """geo.fuse steadies a still student's position and never hides a real move."""
+
+    def test_no_previous_position_uses_the_new_one(self):
+        self.assertEqual(geo.fuse(None, (-6.8, 39.2, 10), None), (-6.8, 39.2, 10))
+
+    def test_precise_reading_beats_rough_old_one(self):
+        lat, lng, acc = geo.fuse((-6.8, 39.2, 40), (-6.8 + 5 / 111320, 39.2, 5), 6)
+        self.assertGreater(lat, -6.8 + 3.5 / 111320)  # moved most of the way to the precise reading
+        self.assertLess(acc, 6)
+
+    def test_real_move_replaces_at_once(self):
+        new = (-6.8 + 60 / 111320, 39.2, 8)
+        self.assertEqual(geo.fuse((-6.8, 39.2, 8), new, 6), new)
+
+    def test_long_gap_uses_the_new_one(self):
+        new = (-6.8 + 2 / 111320, 39.2, 8)
+        self.assertEqual(geo.fuse((-6.8, 39.2, 8), new, 300), new)

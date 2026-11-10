@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GpsSteps } from "@/components/GpsHelp";
 import { api } from "@/lib/api";
 import { BLOCKING, diagnose, readEnv, type GpsReason, type PhoneOS } from "@/lib/gps";
-import { getFix, lastGeoDetail, startMotion, type Fix, type FixError } from "@/lib/proctor";
+import { getBestFix, lastGeoDetail, startMotion, type Fix, type FixError } from "@/lib/proctor";
 import { useSession } from "@/lib/session";
 
 /** Optional "Check my location" box. Only Location (GPS) is looked at: Wi-Fi and Bluetooth are NOT required and NOT checked.
@@ -49,7 +49,7 @@ export default function PhoneCheck({ examId, disabled, runSignal = 0, onChange }
       const env = await readEnv(); setOs(env.os);
       const t0 = Date.now();
       let fix: Fix | undefined, err: FixError | undefined;
-      try { fix = await getFix(20000); } catch (e) { err = e as FixError; }
+      try { fix = await getBestFix(20000, 15, 4000); } catch (e) { err = e as FixError; }
       await atLeast(t0, 1500);
       const reason = diagnose(err, env, lastGeoDetail(), fix?.accuracy);
       const gpsOk = !!fix && !(reason && BLOCKING.includes(reason));

@@ -19,6 +19,10 @@ MOVING_HOLD_S = 15  # how long the "moving" indicator stays on after the last si
 MIN_GAP_S = 2  # reports arriving faster than this are ignored (a phone that floods the server)
 
 
+def fusion_on():
+    return bool(getattr(settings, "LOCATION_FUSION", not getattr(settings, "TESTING", False)))
+
+
 def eval_gap():
     """Seconds between two neighbour checks for the SAME student (the position itself is still saved on every report). The neighbour
     check is the expensive part: with an alert distance of 20 m a whole hall is "near", so it is not repeated every 6 seconds per phone.
@@ -103,7 +107,9 @@ def ingest(attempt, fix, speed=None, heading=None, sensors=None, motion_moving=F
             moving_until, source = now + timedelta(seconds=MOVING_HOLD_S), "motion"
         if anchor is None or moved:
             anchor = (lat, lng)
-        fields = dict(exam=attempt.exam, student=attempt.student, lat=lat, lng=lng, accuracy=acc, speed=speed, heading=heading,
+        # The stored position is steadied with the previous one (same still student); movement, spoof and device checks keep using the raw reading.
+        slat, slng, sacc = geo.fuse(prev_fix, fix, prev_dt) if fusion_on() else fix
+        fields = dict(exam=attempt.exam, student=attempt.student, lat=slat, lng=slng, accuracy=sacc, speed=speed, heading=heading,
                       anchor_lat=anchor[0], anchor_lng=anchor[1], moving_until=moving_until, moving_source=source,
                       sensors=sensors, spoof=counters, devices=devices, updated_at=now)
         if ll:

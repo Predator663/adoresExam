@@ -34,6 +34,24 @@ def has_moved(anchor, new, accuracy, floor_m=12.0):
     return haversine_m(anchor[0], anchor[1], new[0], new[1]) > max(floor_m, accuracy)
 
 
+def fuse(prev, new, dt, drift_mps=0.15, min_acc=3.0):
+    """Blend the new position with the previous stored one while the student sits still. (lat, lng, accuracy) in, same out.
+    Each position counts by 1 / accuracy^2, and the old one grows less certain with time (the student may shift a little), so a precise new
+    reading wins over a rough old one and the other way round. A real move (further than the readings can explain) replaces the old position
+    at once. The accuracy only improves a little, since the errors of neighbouring readings are alike."""
+    if not prev or dt is None or dt < 0 or dt > 90:
+        return new
+    pl, pg, pa = prev
+    nl, ng, na = new
+    pa, na = max(pa, min_acc), max(na, min_acc)
+    if haversine_m(pl, pg, nl, ng) > 2.5 * max(pa, na):
+        return new
+    var_p, var_n = (pa + drift_mps * dt) ** 2, na ** 2
+    w = var_p / (var_p + var_n)  # weight of the new reading
+    acc = max(math.sqrt(var_p * var_n / (var_p + var_n)), 0.7 * min(pa, na), min_acc)
+    return (pl + w * (nl - pl), pg + w * (ng - pg), acc)
+
+
 def classify_pair(distance_m, acc_a, acc_b, threshold_m, max_accuracy, sure_accuracy=25.0):
     """None = not an alert. 'confirmed' = both positions are precise enough that the distance can be trusted.
     'possible' = the distance is under the limit but at least one phone reported a rough position (indoors, weak sky view).
