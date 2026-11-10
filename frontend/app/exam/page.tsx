@@ -29,7 +29,8 @@ function PreExam({ examId }: { examId: number }) {
   if (c.state === "in_progress" && c.attempt_id) { location.replace(`/exam/?attempt=${c.attempt_id}`); return <Loading />; }
 
   const n = now + makeOffset(c.server_time);
-  const diff = new Date(c.start_at).getTime() - n;
+  const startMs = new Date(c.start_at).getTime();
+  const diff = startMs - n;
   const started = diff <= 0;
   const blocked = c.state === "done" || c.state === "missed";
 
@@ -39,7 +40,7 @@ function PreExam({ examId }: { examId: number }) {
     setErr(""); setBusy(true);
     try {
       // Everybody taps START in the same second the exam opens. A short random wait (only in the first 30 s) spreads those requests out.
-      if (n - new Date(c.start_at).getTime() < 30_000) await new Promise((r) => setTimeout(r, Math.random() * 3000));
+      if (n - startMs < 30_000) await new Promise((r) => setTimeout(r, Math.random() * 3000));
       let fix = phone?.fix;
       if (!fix && !phone) { try { fix = await getFix(6000); } catch { /* Location is off or blocked: she may still start */ } }
       const sensors = await readSensors();
