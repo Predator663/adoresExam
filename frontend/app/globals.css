@@ -1315,7 +1315,7 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
    Responsive: phone first. Cards use container queries, so they adapt to the room they are given, not only to the window.
    Motion: transform / opacity / stroke-dashoffset / grid-rows only. Everything stops for "reduce motion" (bottom of this block). ======================= */
 .lm{--lm-bd:color-mix(in srgb,var(--text) 11%,transparent);--lm-bd2:color-mix(in srgb,var(--text) 20%,transparent);--lm-r:24px;--lm-ease:cubic-bezier(.2,.8,.2,1);
-  --lm-shadow:0 1px 1px rgba(10,30,22,.04);--lm-lift:0 4px 14px -10px rgba(10,30,22,.22);
+  --lm-shadow:none;--lm-lift:none;
   display:grid;gap:1rem;max-width:100%;min-width:0;grid-template-columns:minmax(0,1fr)}
 .lm>*,.acx>*{min-width:0}
 .lm .btn{min-height:42px;border-width:1px;border-color:var(--lm-bd2);border-radius:13px;font-size:.86rem;padding:.35rem .85rem;transition:transform .18s var(--lm-ease),background .25s,border-color .25s,box-shadow .25s}
@@ -1544,9 +1544,9 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 .acx-mapcol .ac-map,.lm .ac-map{position:relative;isolation:isolate;height:min(60vh,540px);min-height:300px;border-radius:26px;border:1px solid var(--lm-bd);box-shadow:var(--lm-shadow);overflow:hidden;
   background:radial-gradient(circle at 50% 42%,color-mix(in srgb,var(--lb-g) 9%,var(--surface)),var(--surface) 72%)}
 .ac-map::before{content:"";position:absolute;z-index:-1;left:50%;top:50%;width:170%;aspect-ratio:1;margin:-85% 0 0 -85%;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 78%,color-mix(in srgb,var(--lb-g) 20%,transparent) 96%,transparent);opacity:.55;animation:lm-radar 9s linear infinite;pointer-events:none}
-.ac-map::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 40px -24px color-mix(in srgb,var(--text) 18%,transparent)}
+.ac-map::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:none}
 .ac-grid line{stroke:color-mix(in srgb,var(--text) 10%,transparent);stroke-width:1}
-.ac-pt .ac-dot{stroke:var(--surface);stroke-width:2.5;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+.ac-pt .ac-dot{stroke:var(--surface);stroke-width:2.5;filter:none}
 .ac-pt.al .ac-dot{animation:lm-dotpulse 1.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
 .ac-pt .ac-ring{animation:lm-dash 1.2s linear infinite}
 .ac-pt .ac-name{font-size:11px;font-weight:700}
@@ -1592,7 +1592,7 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
    The builder lays out by its own width (data-w = xs | narrow | wide, set in ExamBuilder.tsx); the editor also works full page, so it uses media queries too.
    Nothing here uses container-type / transform on ancestors of dialogs (the Modal is not portaled and position:fixed would break). ======================= */
 .bld,.qeditor{--bx-bd:color-mix(in srgb,var(--text) 12%,transparent);--bx-bd2:color-mix(in srgb,var(--text) 22%,transparent);--bx-r:20px;--bx-ease:cubic-bezier(.2,.8,.2,1);
-  --bx-shadow:0 1px 1px rgba(10,30,22,.04);--bx-lift:0 4px 14px -10px rgba(10,30,22,.22);
+  --bx-shadow:none;--bx-lift:none;
   --bx-glass:color-mix(in srgb,var(--surface) 88%,transparent)}
 .qeditor{display:grid;gap:1rem;min-width:0;grid-template-columns:minmax(0,1fr)}.qeditor>*{min-width:0}
 .bld .card,.qeditor .card{border-radius:var(--bx-r);border:1px solid var(--bx-bd);box-shadow:var(--bx-shadow);background:var(--surface)}
