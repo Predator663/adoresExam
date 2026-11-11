@@ -177,7 +177,23 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
     const h = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     window.addEventListener("beforeunload", h); return () => window.removeEventListener("beforeunload", h);
   }, [cards, saving]);
-  useEffect(() => { if (scrollTo.current) { document.getElementById(`bk-${scrollTo.current}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); scrollTo.current = null; } }, [cards.length]);
+  // After "+ Add": wait for the other cards to fold, glide to the new card's question box and put the cursor in it, ready to type.
+  useEffect(() => {
+    const key = scrollTo.current;
+    if (!key) return;
+    scrollTo.current = null;
+    const calm = document.documentElement.classList.contains("reduce-motion") || !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const id = setTimeout(() => {
+      const field = document.getElementById(`bk-${key}`)?.querySelector<HTMLElement>('[contenteditable="true"][aria-label="Question text"]');
+      if (!field) return;
+      field.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
+      field.focus({ preventScroll: true });
+      const sel = getSelection(), r = document.createRange();
+      r.selectNodeContents(field); r.collapse(false);  // caret at the end (an empty box simply shows it at the start)
+      sel?.removeAllRanges(); sel?.addRange(r);
+    }, calm ? 30 : 420);
+    return () => clearTimeout(id);
+  }, [cards.length]);
 
   const patch = (key: string, p: Partial<Card>) => setCards((cs) => cs.map((c) => (c.key === key ? { ...c, ...p } : c)));
   const edit = (key: string, p: Partial<S>) => setCards((cs) => cs.map((c) => (c.key === key ? { ...c, s: { ...c.s, ...p }, state: c.state === "err" ? "idle" : c.state } : c)));
