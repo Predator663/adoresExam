@@ -25,7 +25,7 @@ from questions.views import QuestionSerializer
 from proctoring import services as proctoring
 from . import services
 from .sections import letters, qtype_rank
-from .models import Answer, Attempt, AttemptEvent, BuilderDraft, Exam, ExamGrant, ExamQuestion, Result
+from .models import Answer, Attempt, AttemptEvent, BuilderDraft, Exam, ExamGrant, ExamQuestion, Result, SavedQuestion
 from .services import ExamError
 
 MAX_RETAKE_BATCH = 500  # students per retake request (a whole school year group fits)
@@ -284,6 +284,12 @@ def result_review(request, attempt_id):
     attempt, err = _visible_result_or_404(request, attempt_id)
     if err:
         return err
+    return Response(_review_rows(attempt))
+
+
+def _review_rows(attempt):
+    """Every question of a finished exam with her answer, the correct answer and the explanation. Only call it for an attempt whose
+    results are visible to her (see _visible_result_or_404 / services.result_visible)."""
     answers = {a.exam_question_id: a for a in attempt.answers.all()}
     out = []
     for eq in attempt.exam.questions.all():
@@ -292,8 +298,77 @@ def result_review(request, attempt_id):
             "number": eq.position, "voided": eq.voided, "type": p["qtype"], "prompt": p["prompt"], "content": p["content"],
             "marks": p["marks"], "your_response": a.response if a else None, "skipped": bool(a and a.skipped),
             "marks_awarded": a.marks_awarded if a else 0, "correct_answer": p["answer"], "explanation": p.get("explanation", ""),
+            "topic": p.get("topic", ""),
         })
-    return Response(out)
+    return out
+
+
+def _study_card(attempt, row):
+    """One question in the shape the revision screen needs (and the same shape the offline practice packs use)."""
+    return {"key": f"{attempt.pk}:{row['number']}", "attempt_id": attempt.pk, "number": row["number"], "exam": attempt.exam.title,
+            "subject": attempt.exam.subject.name, "type": row["type"], "prompt": row["prompt"], "content": row["content"],
+            "marks": row["marks"], "answer": row["correct_answer"], "explanation": row["explanation"], "topic": row.get("topic", ""),
+            "your_response": row["your_response"], "skipped": row["skipped"], "marks_awarded": row["marks_awarded"]}
+
+
+MAX_SAVED = 300
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsStudent])
+def saved_questions(request):
+    """GET: the questions I bookmarked. POST {attempt_id, number}: bookmark one from my review (copied by the server, never by the phone)."""
+    if request.method == "GET":
+        rows = SavedQuestion.objects.filter(student=request.user).select_related("attempt__exam__subject")[:MAX_SAVED]
+        return Response([{**r.snapshot, "id": r.pk, "saved_at": r.created_at} for r in rows])
+    try:
+        attempt_id, number = int(request.data.get("attempt_id")), int(request.data.get("number"))
+    except (TypeError, ValueError):
+        raise ValidationError({"detail": "Choose a question from your review."})
+    attempt, err = _visible_result_or_404(request, attempt_id)
+    if err:
+        return err
+    row = next((r for r in _review_rows(attempt) if r["number"] == number and not r["voided"]), None)
+    if row is None:
+        raise ValidationError({"detail": "That question could not be found."})
+    if SavedQuestion.objects.filter(student=request.user).count() >= MAX_SAVED:
+        raise ValidationError({"detail": f"You can keep up to {MAX_SAVED} saved questions. Remove some first."})
+    obj, _ = SavedQuestion.objects.update_or_create(student=request.user, attempt=attempt, number=number,
+                                                    defaults={"snapshot": _study_card(attempt, row)})
+    return Response({"id": obj.pk, **obj.snapshot}, status=201)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsStudent])
+def saved_question_delete(request, pk):
+    get_object_or_404(SavedQuestion, pk=pk, student=request.user).delete()
+    return Response(status=204)
+
+
+MISTAKE_EXAMS = 8      # the most recent exams with published results
+MISTAKE_LIMIT = 150
+
+
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def my_mistakes(request):
+    """Questions I got wrong or only partly right in exams whose results are published, newest exam first (for "retry my mistakes")."""
+    now = timezone.now()
+    cards = []
+    attempts = (Attempt.objects.filter(student=request.user, result__isnull=False)
+                .select_related("exam__subject").order_by("-exam__start_at", "-id")[:MISTAKE_EXAMS * 2])
+    shown = 0
+    for a in attempts:
+        if shown >= MISTAKE_EXAMS or len(cards) >= MISTAKE_LIMIT:
+            break
+        if not services.result_visible(a, now):
+            continue
+        shown += 1
+        for row in _review_rows(a):
+            if row["voided"] or float(row["marks_awarded"] or 0) >= float(row["marks"]) - 1e-9:
+                continue
+            cards.append(_study_card(a, row))
+    return Response(cards[:MISTAKE_LIMIT])
 
 
 # =============================================================== staff side

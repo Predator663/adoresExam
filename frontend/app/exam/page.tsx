@@ -7,6 +7,7 @@ import PhoneCheck, { type PhoneResult } from "@/components/PhoneCheck";
 import QuestionView, { hasAnswer, initialValue } from "@/components/QuestionView";
 import ResultsWaiting from "@/components/ResultsWaiting";
 import Shell from "@/components/Shell";
+import Tips from "@/components/Tips";
 import { Bar, ErrorNote, Loading, Modal, useLoad, useNow } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { clock, eatDate, makeOffset } from "@/lib/clock";
@@ -70,6 +71,7 @@ function PreExam({ examId }: { examId: number }) {
       <h2>{t("exam_rules")}</h2>
       <div className="hint" style={{ whiteSpace: "pre-wrap" }}>{c.rules_text || t("default_rules")}</div>
       <div className="hint" style={{ marginTop: ".6rem" }}>🔋 {t("connection_reminder")}</div>
+      <Tips cats={["exam", "phone"]} />
 
       {blocked ? (
         <p className="no" role="alert">{c.state === "done" ? t("exam_done") : t("exam_missed")}</p>

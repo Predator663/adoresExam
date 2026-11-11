@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Listen from "@/components/Listen";
 import QuestionView, { hasAnswer, initialValue } from "@/components/QuestionView";
-import { Bar } from "@/components/ui";
+import { Bar, Confetti } from "@/components/ui";
 import { describe } from "@/lib/answers";
 import { fractionCorrect, pickQuestions, presentQuestion, type PackQuestion } from "@/lib/marking";
 import { readPack } from "@/lib/offline";
@@ -47,6 +47,7 @@ export default function OfflinePlay({ packId, count, onExit }: { packId: string;
   if (finished) {
     return (
       <div className="card hero center pop">
+        {score / qs.length >= 0.7 && <Confetti />}
         <span className="big-num" aria-hidden>🌟</span><h1>{t("practice_done")}</h1>
         <p>{t("practice_score", { a: full, b: qs.length })} · {Math.round((score / qs.length) * 100)}%</p>
         <p className="small">{t("off_xp_note")}</p>

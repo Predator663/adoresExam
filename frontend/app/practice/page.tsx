@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import Listen from "@/components/Listen";
 import OfflinePlay from "@/components/OfflinePractice";
@@ -6,7 +7,8 @@ import QuestionView, { hasAnswer, initialValue } from "@/components/QuestionView
 import Shell from "@/components/Shell";
 import Icon from "@/components/Icon";
 import { Monogram, Ring } from "@/components/student";
-import { Bar, ErrorNote, Loading, useLoad } from "@/components/ui";
+import Tips from "@/components/Tips";
+import { Bar, Confetti, CountUp, ErrorNote, Loading, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
 import { describe } from "@/lib/answers";
 import { listPacks } from "@/lib/offline";
@@ -51,7 +53,8 @@ function Play({ initial, onExit }: { initial: PState; onExit: () => void }) {
         <Ring value={m.score_percent} size={116} stroke={8} className="sx-rhero-ring" label={`${m.score_percent}%`}><span className="sx-rhero-pct">{Math.round(m.score_percent)}%</span></Ring>
         <h1>{t("practice_done")}</h1>
         <p>{t("practice_score", { a: m.fully_correct, b: m.questions })}</p>
-        <p className="sx-xpchip"><Icon n="zap" size={16} /> <b>+{m.xp_earned} XP</b></p>
+        <p className="sx-xpchip"><Icon n="zap" size={16} /> <b>+<CountUp to={m.xp_earned} /> XP</b></p>
+        {m.score_percent >= 70 && <Confetti once={`practice-${s.session_id}`} />}
         <button className="btn big" style={{ color: "var(--text)" }} onClick={onExit}>{t("back")}</button>
       </div>
     );
@@ -93,6 +96,8 @@ export default function Practice() {
       {offline ? <OfflinePlay packId={offline} count={count} onExit={() => setOffline(null)} /> : game ? <Play initial={game} onExit={() => { setGame(null); subs.reload(); }} /> : (
         <>
           <p className="muted">{t("practice_intro")}</p>
+          <p><Link className="btn" href="/saved/">🔖 {t("my_mistakes_link")}</Link></p>
+          <Tips cats={["study", "phone"]} />
           {!noSignal && <h2 className="sx-pick">{t("practice_pick")}</h2>}
           <label className="field card sx-count"><span>{t("how_many")}: <b className="sx-count-badge">{count}</b></span><input type="range" min={5} max={20} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label>
           {err && <p className="no" role="alert">⚠ {err}</p>}

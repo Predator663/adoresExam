@@ -97,6 +97,44 @@ def run_exam_notifications(now=None):
     return sent
 
 
+STREAK_REMINDER_HOUR = 17  # East Africa Time: before this a student still has the whole day to practise
+
+
+def _streak_reminder(users, now, push):
+    """Tell each student whose streak (2+ days) will break if she does nothing today. One reminder per student per day (the key)."""
+    from gamification import rules
+    from gamification.models import ActivityDay, GamificationSettings
+
+    local = timezone.localtime(now)
+    if local.hour < STREAK_REMINDER_HOUR:
+        return 0
+    today, freezes, sent = local.date(), GamificationSettings.load().freezes_per_month, 0
+    ids = [u.pk if hasattr(u, "pk") else int(u) for u in users]
+    days = defaultdict(list)
+    for uid, day in ActivityDay.objects.filter(user_id__in=ids, day__gte=today - timedelta(days=75)).values_list("user_id", "day"):
+        days[uid].append(day)
+    for uid in ids:
+        st = rules.streak_status(days.get(uid, []), today, freezes)
+        if st["current"] >= 2 and not st["active_today"]:
+            sent += notify_i18n([uid], "streak_reminder", "streak.title", "streak.body", {"n": st["current"]},
+                                key=f"streak:{today.isoformat()}", data={"url": "/practice/"}, push=push)
+    return sent
+
+
+def run_streak_reminders(now=None):
+    """Scheduler entry point (evening): remind students who practised recently but not yet today."""
+    from gamification.models import ActivityDay
+
+    now = now or timezone.now()
+    today = timezone.localtime(now).date()
+    if timezone.localtime(now).hour < STREAK_REMINDER_HOUR:
+        return 0
+    recent = set(ActivityDay.objects.filter(day__gte=today - timedelta(days=3)).values_list("user_id", flat=True))
+    done_today = set(ActivityDay.objects.filter(day=today).values_list("user_id", flat=True))
+    active = User.objects.filter(pk__in=recent - done_today, role=User.Role.STUDENT, is_active=True, is_archived=False)
+    return _streak_reminder(list(active.values_list("pk", flat=True)), now, push=True)
+
+
 def ensure_for_student(student, now=None):
     """Same rules, for one student, called when she opens her notifications. A missed cron run
     therefore never means a missed reminder."""
@@ -108,6 +146,10 @@ def ensure_for_student(student, now=None):
     for exam in qs:
         for key, kind, title_key, body_key, params, data in due_messages(exam, now):
             notify_i18n([student], kind, title_key, body_key, params, key=key, data=data, push=False)
+    try:
+        _streak_reminder([student], now, push=False)
+    except Exception:  # a reminder must never stop her opening her notifications
+        log.exception("streak reminder failed")
 
 
 def results_ready(exam):

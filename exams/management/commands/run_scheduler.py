@@ -11,7 +11,7 @@ from django.core.management.base import BaseCommand
 from exams.models import Exam
 from exams.services import sync_exam
 from gamification.services import reward_pending
-from notifications.services import run_exam_notifications
+from notifications.services import run_exam_notifications, run_streak_reminders
 
 
 class Command(BaseCommand):
@@ -32,6 +32,9 @@ class Command(BaseCommand):
             sent = run_exam_notifications()  # reminders (1 day, 1 hour), exam start
             if sent:
                 self.stdout.write(f"{sent} notification(s) created")
+            streaks = run_streak_reminders()  # evening reminder for a streak that would break today
+            if streaks:
+                self.stdout.write(f"{streaks} streak reminder(s) created")
             rewarded = reward_pending()  # XP, streaks and badges for published results (BR-10)
             if rewarded:
                 self.stdout.write(f"{rewarded} exam reward(s) processed")

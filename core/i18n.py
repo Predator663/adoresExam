@@ -67,6 +67,8 @@ MESSAGES = {
         # review
         "review.nothing": "You got everything right. There is nothing to review.",
         "review.done": "Well done for reviewing your wrong answers!",
+        "streak.title": "Keep your {n}-day streak alive 🔥",
+        "streak.body": "Do a short practice quiz today (5 questions or more) so you do not lose it.",
     },
     "sw": {
         "exam.1d.title": "Mtihani wa {subject} kesho",
@@ -112,6 +114,8 @@ MESSAGES = {
         "leaderboard.unranked": "Pata XP kidogo wiki hii ili uingie kwenye ubao wa wanaoongoza.",
         "review.nothing": "Umejibu kila swali sawasawa. Hakuna cha kupitia.",
         "review.done": "Hongera kwa kupitia majibu uliyokosea!",
+        "streak.title": "Linda mfululizo wako wa siku {n} 🔥",
+        "streak.body": "Fanya zoezi fupi leo (maswali 5 au zaidi) ili usipoteze mfululizo wako.",
     },
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import ExamSections from "@/components/ExamSections";
 import Icon from "@/components/Icon";
 import Shell from "@/components/Shell";
+import Tips from "@/components/Tips";
 import { GradeMedal, Ring, Skeleton } from "@/components/student";
 import { Bar, CountUp, ErrorNote, Modal, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -97,6 +98,8 @@ function StudentHome() {
             </ul>
           )}
         </section>
+
+        <Tips />
 
         {exams.loading ? <HomeSkeleton /> : exams.error ? <ErrorNote error={exams.error} retry={exams.reload} /> : <ExamSections cards={exams.data || []} />}
 

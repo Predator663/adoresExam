@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { AVATAR_EMOJI } from "@/lib/emoji";
 import { useSession } from "@/lib/session";
 import { enterNextEnabled, setEnterNext } from "@/lib/enterNext";
+import { dataSaverOn, setDataSaver } from "@/lib/dataSaver";
 
 function b64(s: string) {
   const pad = "=".repeat((4 - (s.length % 4)) % 4), raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
@@ -54,8 +55,8 @@ export default function Settings() {
   const { user, t, lang, savePrefs, logout } = useSession();
   const [prof, setProf] = useState<any>(null), [name, setName] = useState(""), [saved, setSaved] = useState("");
   useEffect(() => { if (user?.role === "student") api("/gamification/profile/").then((p) => { setProf(p); setName(p.display_name); }).catch(() => {}); }, [user]);
-  const [enterOn, setEnterOn] = useState(true);
-  useEffect(() => { setEnterOn(enterNextEnabled()); }, []);
+  const [enterOn, setEnterOn] = useState(true), [saverOn, setSaverOn] = useState(false);
+  useEffect(() => { setEnterOn(enterNextEnabled()); setSaverOn(dataSaverOn()); }, []);
   const patch = async (b: any) => { try { setProf(await api("/gamification/profile/", { method: "PATCH", body: b })); setSaved(t("saved")); setTimeout(() => setSaved(""), 2000); } catch (e: any) { setSaved(e.message); } };
   return (
     <Shell title={t("nav_more")}>
@@ -69,6 +70,13 @@ export default function Settings() {
       </div>
 
       <div className="card"><h2>{t("accessibility")}</h2><A11yPanel /></div>
+
+      {user?.role === "student" && (
+        <div className="card"><h2>{t("ds_title")}</h2>
+          <label className="switch"><input type="checkbox" checked={saverOn} onChange={(e) => { setSaverOn(e.target.checked); setDataSaver(e.target.checked); }} /> {t("ds_on")}</label>
+          <p className="muted small">{t("ds_hint")}</p>
+        </div>
+      )}
 
       {user && user.role !== "student" && (
         <div className="card"><h2>Writing questions</h2>
@@ -97,6 +105,7 @@ export default function Settings() {
         <Link className="btn" href="/install/">📲 {t("install_app")}</Link>
         <Link className="btn" href="/change-password/">🔑 {t("change_password")}</Link>
         <Link className="btn" href="/progress/">📈 {t("my_analytics")}</Link>
+        {user?.role === "student" && <Link className="btn" href="/saved/">🔖 {t("my_mistakes_link")}</Link>}
         <Link className="btn" href="/leaderboard/">🏆 {t("leaderboard")}</Link>
       </div>
       <p><button className="btn danger big" onClick={() => logout()}>{t("log_out")}</button></p>

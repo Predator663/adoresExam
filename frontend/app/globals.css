@@ -1839,3 +1839,24 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 @media(prefers-reduced-motion:reduce){.ia,.ia::before,.ia-ic svg{animation:none!important}.ia-steps-wrap{transition:none}}
 .reduce-motion .ia,.reduce-motion .ia::before,.reduce-motion .ia-ic svg{animation:none!important}.reduce-motion .ia-steps-wrap{transition:none}
 @media print{.ia{display:none}}
+
+/* animated tips and tricks (components/Tips.tsx) */
+.tp{position:relative;overflow:hidden;padding:1rem 1rem .7rem;border-radius:16px;border:1px solid var(--border);background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 13%,var(--surface)),var(--surface));touch-action:pan-y;margin:.8rem 0}
+.tp-prog{position:absolute;left:0;right:0;top:0;height:3px;background:color-mix(in srgb,var(--primary) 15%,transparent)}
+.tp-prog i{display:block;height:100%;width:100%;background:var(--primary);transform:scaleX(0);transform-origin:left}
+.tp-prog i.run{animation:tp-fill var(--ms,9s) linear forwards}
+.tp-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-weight:800;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--primary)}
+.tp-cat{font-weight:700;padding:.1rem .55rem;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--muted);text-transform:none;letter-spacing:0}
+.tp-body{display:flex;gap:.8rem;align-items:flex-start;min-height:5.6rem;margin-top:.7rem;animation:tp-in .45s cubic-bezier(.2,.8,.2,1)}
+.tp-body.back{animation-name:tp-in-back}
+.tp-emoji{flex:none;display:grid;place-items:center;width:3.1rem;height:3.1rem;font-size:1.8rem;border-radius:50%;background:var(--surface);border:1px solid var(--border);animation:tp-bob 2.4s ease-in-out infinite}
+.tp-t{margin:0;font-weight:800;font-size:1.02rem}.tp-b{margin:.25rem 0 0;color:var(--muted)}
+.tp-foot{display:flex;align-items:center;gap:.4rem;margin-top:.4rem}
+.tp-btn{min-width:44px;min-height:44px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:1.1rem;font-weight:800;cursor:pointer}
+.tp-btn:active{transform:scale(.92)}
+@keyframes tp-in{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@keyframes tp-in-back{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
+@keyframes tp-bob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-5px) rotate(4deg)}}
+@keyframes tp-fill{to{transform:scaleX(1)}}
+.reduce-motion .tp *,.reduce-motion .tp{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){.tp *{animation:none!important;transition:none!important}}

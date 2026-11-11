@@ -22,4 +22,7 @@ urlpatterns = [
     path("results/pending/", views.my_results_pending),
     path("results/<int:attempt_id>/", views.result_detail),
     path("results/<int:attempt_id>/review/", views.result_review),
+    path("me/saved/", views.saved_questions),
+    path("me/saved/<int:pk>/", views.saved_question_delete),
+    path("me/mistakes/", views.my_mistakes),
 ] + router.urls

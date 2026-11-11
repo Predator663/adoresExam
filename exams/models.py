@@ -78,6 +78,21 @@ class BuilderDraft(models.Model):
         unique_together = [("exam", "user")]
 
 
+class SavedQuestion(models.Model):
+    """A question a student bookmarked from her exam review. It keeps a private COPY (question, correct answer, explanation), taken
+    from the review only after her results were published, so it can never show an answer earlier than she was allowed to see it."""
+
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_questions")
+    attempt = models.ForeignKey("exams.Attempt", on_delete=models.CASCADE, related_name="+")
+    number = models.PositiveSmallIntegerField()  # the question's number in that exam
+    snapshot = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("student", "attempt", "number")]
+        ordering = ["-created_at", "-id"]
+
+
 class Attempt(models.Model):
     IN_PROGRESS, SUBMITTED, AUTO_SUBMITTED = "in_progress", "submitted", "auto_submitted"
 
