@@ -277,7 +277,7 @@ const sw: Dict = {
   lock_banner_leaves: "Umeondoka kwenye skrini ya mtihani mara nyingi sana.", lock_body_leaves: "Majibu yako ni salama. Saa inaendelea, kwa hiyo hakuna muda wa ziada. Baki kwenye skrini hii na usubiri msimamizi afungue mtihani wako.",
   lock_banner_manual: "Msimamizi amefunga mtihani wako.", lock_body_manual: "Majibu yako ni salama. Saa inaendelea, kwa hiyo hakuna muda wa ziada. Subiri msimamizi afungue mtihani wako.",
   loc_retry: "Nimewasha, endelea", loc_on: "Eneo limewashwa", loc_off: "Eneo limezimwa", loc_off_note: "Eneo limezimwa. Unaweza kuendelea na mtihani.",
-  loc_why_title: "Kwa nini eneo ni muhimu:", loc_why: "Eneo (GPS) husaidia shule kuhakikisha kila mwanafunzi anafanya mtihani wake mwenyewe, mbali na wengine, ili mtihani uwe wa haki kwa wote na matokeo yako yaaminike. Si lazima: unaweza kuanza mtihani hata kama Eneo limezimwa, lakini ni vizuri kuliwasha.", pc_optional_note: "Eneo halijawashwa, lakini bado unaweza kuanza mtihani.",
+  loc_why_title: "Kwa nini eneo ni muhimu:", loc_why: "Eneo (GPS) husaidia shule kuhakikisha kila mwanafunzi anafanya mtihani wake mwenyewe, mbali na wengine, ili mtihani uwe wa haki kwa wote na matokeo yako yaaminike.", pc_optional_note: "Eneo halijawashwa, lakini bado unaweza kuanza mtihani.",
   off_title: "Matumizi bila mtandao", off_intro: "Pakua unachohitaji ukiwa na intaneti. Baadaye kitafunguka bila mtandao.",
   off_files: "Faili za programu", off_files_d: "Kurasa, mitindo na hati, ili programu ifunguke bila mtandao.",
   off_exams: "Ratiba na kanuni za mitihani", off_exams_d: "Mitihani yako na tarehe, muda na kanuni.",
