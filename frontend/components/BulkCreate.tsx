@@ -5,6 +5,8 @@ import RichEditor from "./RichEditor";
 import SymbolPad from "./SymbolPad";
 import { api } from "@/lib/api";
 import { enterToNext } from "@/lib/enterNext";
+import { leftMark, rightTag } from "@/lib/labels";
+import { FillSettings, MatchSettings } from "./TypeSettings";
 import { errorLines, plain, qtypeName, QTYPES, uid } from "@/lib/staff";
 
 /** Write every question of the exam on one page, then save them all at once.
@@ -58,6 +60,7 @@ function problems(raw: S): string[] {
   if (s.qtype === "matching") {
     if (s.left.length < 2 || s.right.length < 2) out.push("Give at least 2 items on each side.");
     else if (s.left.some((l) => !s.pairs[l.id])) out.push("Choose the correct match for every left item.");
+    else if (s.mUnique && new Set(s.left.map((l) => s.pairs[l.id])).size !== s.left.length) out.push("Each right item can be used once only, but two left items share a match.");
   }
   if (!(Number(s.marks) > 0)) out.push("Marks must be more than 0.");
   return out;
@@ -109,19 +112,21 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
             <label className="field"><span>Numeric answer (optional)</span><input className="input" inputMode="decimal" value={s.numValue} onChange={(e) => up({ numValue: e.target.value })} /></label>
             <label className="field"><span>Allowed difference (±)</span><input className="input" inputMode="decimal" value={s.numTol} onChange={(e) => up({ numTol: e.target.value })} /></label>
           </div>
+          <details><summary>More settings (marking, unit, hint, keyboard)</summary><FillSettings s={s} up={up} /></details>
         </div>
       )}
       {s.qtype === "ordering" && <><p className="muted small">Write the items in the CORRECT order. Students see them shuffled.</p>{list("items", 2, "Item")}</>}
       {s.qtype === "matching" && (
         <>
-          <h4 className="bk-h">Left side</h4>{list("left", 2, "Left item")}
-          <h4 className="bk-h">Right side</h4>{list("right", 2, "Right item")}
+          <h4 className="bk-h">Column A (left side)</h4>{list("left", 2, "Left item")}
+          <h4 className="bk-h">Column B (right side)</h4>{list("right", 2, "Right item")}
           <h4 className="bk-h">Correct matches</h4>
           {s.left.filter(filled).map((l, i) => (
-            <div key={l.id} className="match-row"><span>{plain(l.text) || l.alt_text || `Left ${i + 1}`}</span>
+            <div key={l.id} className="match-row"><span>{leftMark(s.mLeftStyle, i)} {plain(l.text) || l.alt_text || `Left ${i + 1}`}</span>
               <select className="input" aria-label={`Match for left item ${i + 1}`} value={s.pairs[l.id] || ""} onChange={(e) => up({ pairs: { ...s.pairs, [l.id]: e.target.value } })}>
-                <option value="">Choose…</option>{s.right.filter(filled).map((r, j) => <option key={r.id} value={r.id}>{plain(r.text) || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>
+                <option value="">Choose…</option>{s.right.filter(filled).map((r, j) => <option key={r.id} value={r.id}>{rightTag(s.mRightStyle, j)}. {plain(r.text) || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>
           ))}
+          <details><summary>More settings (numbering, shuffle, marking)</summary><MatchSettings s={s} up={up} /></details>
         </>
       )}
 

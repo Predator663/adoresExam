@@ -1,3 +1,4 @@
+import { leftMark, matchLayout, rightTag } from "./labels";
 import type { Question } from "./types";
 
 const plain = (s?: string) => (s || "").replace(/<[^>]+>/g, "").trim();
@@ -12,7 +13,11 @@ export function describe(type: Question["type"], content: any, a: any, t: (k: st
     case "mcq_multi": return (Array.isArray(a) ? a : a.correct).map((id: string) => find(content.options, id)).join(", ");
     case "true_false": { const v = typeof a === "object" ? a.correct : a; return v === true || v === "true" ? t("true") : t("false"); }
     case "fill_blank": return typeof a === "object" ? [...(a.accepted || []), ...(a.numeric ? [String(a.numeric.value)] : [])].join(" / ") : String(a);
-    case "matching": { const pairs = a.pairs || a; return content.left.map((l: any) => `${label(l)} → ${pairs[l.id] ? find(content.right, pairs[l.id]) : "—"}`).join("; "); }
+    case "matching": {  // (i) Mouse → Input.   Letters are shown only when Column B is in a fixed order (otherwise each student saw her own order)
+      const pairs = a.pairs || a, lay = matchLayout(content);
+      const right = (id: string) => { const j = content.right.findIndex((x: any) => x.id === id); return `${lay.shuffle_right ? "" : rightTag(lay.right_style, j) + ". "}${find(content.right, id)}`; };
+      return content.left.map((l: any, i: number) => `${leftMark(lay.left_style, i)} ${label(l)} → ${pairs[l.id] ? right(pairs[l.id]) : "—"}`).join("; ");
+    }
     case "ordering": return (a.order || a).map((id: string, i: number) => `${i + 1}. ${find(content.items, id)}`).join("  ");
   }
   return "";

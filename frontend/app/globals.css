@@ -1860,3 +1860,18 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 @keyframes tp-fill{to{transform:scaleX(1)}}
 .reduce-motion .tp *,.reduce-motion .tp{animation:none!important;transition:none!important}
 @media(prefers-reduced-motion:reduce){.tp *{animation:none!important;transition:none!important}}
+
+/* matching: Column A (i, ii, iii) with a letter picker, Column B (A, B, C) as the reference list */
+.mt-cols{display:grid;grid-template-columns:1fr;gap:.9rem;margin-top:.4rem}
+@media(min-width:720px){.mt-cols{grid-template-columns:1.25fr 1fr;align-items:start}}
+.mt-h{margin:.2rem 0 .45rem;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--primary)}
+.mt-col{min-width:0}
+.mt-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.55rem .65rem;margin:.4rem 0;border-radius:14px;border:1px solid var(--border);background:var(--surface);transition:border-color .2s,background .2s}
+.mt-row.done{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--surface))}
+.mt-row.mt-ref{grid-template-columns:auto minmax(0,1fr)}
+.mt-mark{min-width:2.1rem;font-weight:800;color:var(--primary)}
+.mt-item{min-width:0;overflow-wrap:anywhere}
+.mt-sel{width:4.6rem;min-height:44px;font-weight:800;text-align:center;text-align-last:center}
+/* fill in the blank */
+.fb-short{flex:0 1 9rem;min-width:0}.fb-medium{flex:1 1 14rem;max-width:26rem;min-width:0}.fb-long{flex:1 1 100%;min-width:0}
+.fb-unit{font-weight:700;color:var(--muted)}.fb-hint{margin:.3rem 0 0}

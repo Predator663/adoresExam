@@ -1,8 +1,15 @@
 """Automatic marking (BR-01). Pure functions: easy to test, no database access."""
 
 
-def _norm(s):
-    return " ".join(str(s).lower().split())
+_PUNCT = str.maketrans("", "", ".,;:!?'\"’‘“”-–—()[]{}")
+
+
+def _norm(s, case_sensitive=False, ignore_punct=False):
+    s = str(s)
+    if ignore_punct:
+        s = s.translate(_PUNCT)
+    s = " ".join(s.split())
+    return s if case_sensitive else s.lower()
 
 
 def _num(s):
@@ -43,11 +50,17 @@ def fraction_correct(payload, response, partial=False):
         right = sum(1 for k, v in ans["pairs"].items() if response.get(k) == v)
         if right == len(ans["pairs"]):
             return 1.0
+        own = ans.get("partial")  # the teacher can override the exam's setting for this question
+        if own == "per_pair":
+            partial = True
+        elif own == "all":
+            partial = False
         return right / len(ans["pairs"]) if partial else 0.0
 
     if qtype == "fill_blank":
-        text = _norm(response)
-        if any(text == _norm(a) for a in ans.get("accepted", [])):
+        cs, ip = bool(ans.get("case_sensitive")), bool(ans.get("ignore_punct"))
+        text = _norm(response, cs, ip)
+        if any(text == _norm(a, cs, ip) for a in ans.get("accepted", [])):
             return 1.0
         n = ans.get("numeric")
         value = _num(response)

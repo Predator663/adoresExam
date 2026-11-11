@@ -2,6 +2,7 @@
 import { useRef } from "react";
 import { ItemContent, RichHtml } from "./Rich";
 import SymbolPad from "./SymbolPad";
+import { leftMark, matchLayout, rightMark, rightTag } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import type { Question } from "@/lib/types";
 
@@ -79,28 +80,51 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
       )}
 
       {q.type === "fill_blank" && (
-        <div className="row">
-          <input ref={answerRef} className="input grow" value={value || ""} disabled={disabled} onChange={(e) => onChange(e.target.value)}
-            aria-label={t("your_answer")} placeholder={t("type_answer")} autoComplete="off" autoCapitalize="off" spellCheck={false} inputMode="text" />
-          {!disabled && <SymbolPad target={answerRef} value={value || ""} onChange={onChange} label="Ω" aria="Symbols / Alama" small />}
+        <div>
+          <div className="row">
+            <input ref={answerRef} className={`input fb-${c.width || "medium"}`} value={value || ""} disabled={disabled} onChange={(e) => onChange(e.target.value)}
+              aria-label={t("your_answer")} placeholder={t("type_answer")} autoComplete="off" autoCapitalize="off" spellCheck={false} inputMode={c.input === "number" ? "decimal" : "text"} />
+            {c.unit && <span className="fb-unit">{c.unit}</span>}
+            {!disabled && <SymbolPad target={answerRef} value={value || ""} onChange={onChange} label="Ω" aria="Symbols / Alama" small />}
+          </div>
+          {c.hint && <p className="muted small fb-hint">{c.hint}</p>}
         </div>
       )}
 
-      {q.type === "matching" && (
-        <div className="matching">
-          <p className="muted small">{t("match_help")}</p>
-          {c.left.map((l: any) => (
-            <div key={l.id} className="match-row">
-              <div className="match-left"><ItemContent item={l} /></div>
-              <select className="input" value={(value || {})[l.id] || ""} disabled={disabled} aria-label={t("match_with")}
-                onChange={(e) => onChange({ ...(value || {}), [l.id]: e.target.value })}>
-                <option value="">{t("choose")}</option>
-                {c.right.map((r: any) => <option key={r.id} value={r.id}>{(r.text || "").replace(/<[^>]+>/g, "") || r.alt_text || r.id}</option>)}
-              </select>
+      {q.type === "matching" && (() => {
+        const lay = matchLayout(c), chosen: Record<string, string> = value || {};
+        const plainText = (it: any) => (it.text || "").replace(/<[^>]+>/g, "") || it.alt_text || "";
+        return (
+          <div className="mt">
+            <p className="muted small">{t("match_help")}</p>
+            <div className="mt-cols">
+              <section className="mt-col" aria-label={lay.left_title || t("col_a")}>
+                <h4 className="mt-h">{lay.left_title || t("col_a")}</h4>
+                {c.left.map((l: any, i: number) => {
+                  const usedElsewhere = new Set(Object.entries(chosen).filter(([k]) => k !== l.id).map(([, v]) => v));
+                  return (
+                    <div key={l.id} className={`mt-row ${chosen[l.id] ? "done" : ""}`}>
+                      <span className="mt-mark">{leftMark(lay.left_style, i)}</span>
+                      <div className="mt-item"><ItemContent item={l} /></div>
+                      <select className="input mt-sel" value={chosen[l.id] || ""} disabled={disabled} aria-label={`${leftMark(lay.left_style, i)} ${plainText(l)}: ${t("match_with")}`}
+                        onChange={(e) => onChange({ ...chosen, [l.id]: e.target.value })}>
+                        <option value="">—</option>
+                        {c.right.map((r: any, j: number) => <option key={r.id} value={r.id} disabled={lay.unique && usedElsewhere.has(r.id)}>{rightTag(lay.right_style, j)}</option>)}
+                      </select>
+                    </div>
+                  );
+                })}
+              </section>
+              <section className="mt-col" aria-label={lay.right_title || t("col_b")}>
+                <h4 className="mt-h">{lay.right_title || t("col_b")}</h4>
+                {c.right.map((r: any, j: number) => (
+                  <div key={r.id} className="mt-row mt-ref"><span className="mt-mark">{rightMark(lay.right_style, j)}</span><div className="mt-item"><ItemContent item={r} /></div></div>
+                ))}
+              </section>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {q.type === "ordering" && (
         <ol className="ordering" aria-label={t("order_help")}>

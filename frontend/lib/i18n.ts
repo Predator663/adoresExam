@@ -31,7 +31,7 @@ const en: Dict = {
   warn_minutes: "{n} minutes left", warn_one_minute: "1 minute left!", time_over: "Time is over", submitting_saved: "Your saved answers are being submitted.", exam_submitted: "Exam submitted!",
   tips_title: "Tips for next time", tip_subject: "Subject tip", tip_exam: "Exam tip", tip_motivation: "Remember",
   mark_one: "1 mark", marks_n: "{n} marks", choose_one: "Choose one answer", choose_many: "Choose all the correct answers", true_or_false: "True or false", true: "True", false: "False",
-  your_answer: "Your answer", type_answer: "Type your answer", match_help: "Match each item on the left with the right answer.", match_with: "Match with", choose: "Choose…",
+  your_answer: "Your answer", type_answer: "Type your answer", match_help: "Match each item in the first column with the correct item in the second. Pick its letter.", match_with: "Match with", choose: "Choose…",
   order_help: "Put the items in the correct order using the arrows.", move_up: "Move up", move_down: "Move down", left_side: "Left side", right_side: "Right side", listen: "Listen", stop: "Stop",
   waiting_title: "Submitted. Waiting for results", waiting_sub: "Your paper is safe and is being marked. Results appear here automatically.", results_in: "Results in", results_preparing: "Marking is being finished. This only takes a moment…", results_now_title: "Your results are ready!", results_now_sub: "Tap below to see your score, grade and review.", view_my_results: "View my results", waiting_exams: "Waiting for results", results_ready_toast: "Results ready: {title}",
   no_results: "No results yet. They appear here after each exam is marked.", results_not_ready: "Your results are not ready yet", results_at: "They will be ready at {when}.", check_again: "Check again",
@@ -156,6 +156,7 @@ const en: Dict = {
   tt10_t: "Practise with no signal", tt10_b: "Download a subject in Settings > Offline use, then practise anywhere.",
   tt11_t: "Sleep helps memory", tt11_b: "A good night's sleep before an exam helps your brain keep what you learned.",
   tt12_t: "Keep your streak", tt12_b: "Do a practice quiz of 5 or more questions each day to keep your streak alive.",
+  col_a: "Column A", col_b: "Column B",
 };
 
 const sw: Dict = {
@@ -187,7 +188,7 @@ const sw: Dict = {
   warn_minutes: "Zimebaki dakika {n}", warn_one_minute: "Imebaki dakika 1!", time_over: "Muda umeisha", submitting_saved: "Majibu yako yaliyohifadhiwa yanawasilishwa.", exam_submitted: "Mtihani umewasilishwa!",
   tips_title: "Vidokezo vya wakati ujao", tip_subject: "Kidokezo cha somo", tip_exam: "Kidokezo cha mtihani", tip_motivation: "Kumbuka",
   mark_one: "Alama 1", marks_n: "Alama {n}", choose_one: "Chagua jibu moja", choose_many: "Chagua majibu yote sahihi", true_or_false: "Kweli au si kweli", true: "Kweli", false: "Si kweli",
-  your_answer: "Jibu lako", type_answer: "Andika jibu lako", match_help: "Oanisha kila kipengee cha kushoto na jibu sahihi la kulia.", match_with: "Oanisha na", choose: "Chagua…",
+  your_answer: "Jibu lako", type_answer: "Andika jibu lako", match_help: "Oanisha kila kipengee cha safu ya kwanza na kipengee sahihi cha safu ya pili. Chagua herufi yake.", match_with: "Oanisha na", choose: "Chagua…",
   order_help: "Panga vipengee kwa mpangilio sahihi kwa kutumia mishale.", move_up: "Songa juu", move_down: "Songa chini", left_side: "Upande wa kushoto", right_side: "Upande wa kulia", listen: "Sikiliza", stop: "Simamisha",
   waiting_title: "Umewasilisha. Unasubiri matokeo", waiting_sub: "Karatasi yako iko salama na inasahihishwa. Matokeo yataonekana hapa yenyewe.", results_in: "Matokeo baada ya", results_preparing: "Kusahihisha kunakamilishwa. Itachukua muda mfupi tu…", results_now_title: "Matokeo yako yako tayari!", results_now_sub: "Gusa hapa chini kuona alama, daraja na mapitio yako.", view_my_results: "Angalia matokeo yangu", waiting_exams: "Inasubiri matokeo", results_ready_toast: "Matokeo tayari: {title}",
   no_results: "Bado hakuna matokeo. Yataonekana hapa baada ya kila mtihani kusahihishwa.", results_not_ready: "Matokeo yako bado hayajawa tayari", results_at: "Yatakuwa tayari saa {when}.", check_again: "Angalia tena",
@@ -312,6 +313,7 @@ const sw: Dict = {
   tt10_t: "Jifunze bila mtandao", tt10_b: "Pakua somo kwenye Mipangilio > Matumizi bila mtandao, kisha fanya mazoezi popote.",
   tt11_t: "Usingizi husaidia kumbukumbu", tt11_b: "Usingizi mzuri kabla ya mtihani husaidia ubongo wako kuhifadhi ulichojifunza.",
   tt12_t: "Linda mfululizo wako", tt12_b: "Fanya zoezi la maswali 5 au zaidi kila siku ili mfululizo wako uendelee.",
+  col_a: "Safu A", col_b: "Safu B",
 };
 
 export const dict: Record<"en" | "sw", Dict> = { en, sw };

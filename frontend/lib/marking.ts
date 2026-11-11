@@ -3,7 +3,14 @@ import type { Question } from "./types";
 /** One question inside an offline practice pack (answers included: practice questions are never in an upcoming exam). */
 export type PackQuestion = { id: number; type: Question["type"]; prompt: string; marks: number; content: any; answer: any; explanation: string; topic?: string };
 
-const norm = (s: any) => String(s).toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+const PUNCT = /[.,;:!?'"’‘“”\-–—()[\]{}]/g;
+/** Same as the server's _norm: extra spaces never matter; capitals and punctuation matter only if the teacher said so. */
+const norm = (s: any, caseSensitive = false, ignorePunct = false) => {
+  let t = String(s);
+  if (ignorePunct) t = t.replace(PUNCT, "");
+  t = t.split(/\s+/).filter(Boolean).join(" ");
+  return caseSensitive ? t : t.toLowerCase();
+};
 const num = (s: any): number | null => {
   const t = String(s).replace(/,/g, "").trim();
   if (!t) return null;
@@ -33,11 +40,12 @@ export function fractionCorrect(type: Question["type"], ans: any, response: any)
       const keys = Object.keys(ans.pairs || {});
       if (!keys.length) return 0;
       const right = keys.filter((k) => response[k] === ans.pairs[k]).length;
-      return right === keys.length ? 1 : right / keys.length;
+      if (right === keys.length) return 1;
+      return ans.partial === "all" ? 0 : right / keys.length;  // practice gives partial marks unless this question says all-or-nothing
     }
     case "fill_blank": {
-      const text = norm(response);
-      if ((ans.accepted || []).some((a: any) => text === norm(a))) return 1;
+      const cs = !!ans.case_sensitive, ip = !!ans.ignore_punct, text = norm(response, cs, ip);
+      if ((ans.accepted || []).some((a: any) => text === norm(a, cs, ip))) return 1;
       const n = ans.numeric, v = num(response);
       if (n && v !== null && Math.abs(v - n.value) <= n.tolerance + 1e-9) return 1;
       return 0;
@@ -65,7 +73,7 @@ function shuffled<T>(list: T[]): T[] {
 export function presentQuestion(q: PackQuestion): Question {
   const content = JSON.parse(JSON.stringify(q.content || {}));
   if ((q.type === "mcq_single" || q.type === "mcq_multi") && content.options) content.options = shuffled(content.options);
-  if (q.type === "matching" && content.right) content.right = shuffled(content.right);
+  if (q.type === "matching" && content.right && content.layout?.shuffle_right !== false) content.right = shuffled(content.right);
   if (q.type === "ordering" && content.items) {
     const right: string[] = q.answer?.order || [];
     let items = shuffled<any>(content.items);

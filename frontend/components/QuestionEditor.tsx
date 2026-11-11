@@ -8,6 +8,8 @@ import { api, mediaUrl } from "@/lib/api";
 import { errorLines, plain, QTYPES, uid } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 import { enterToNext } from "@/lib/enterNext";
+import { leftMark, matchLayout, rightTag, type LeftStyle, type RightStyle } from "@/lib/labels";
+import { FillSettings, MatchSettings } from "./TypeSettings";
 import type { Question } from "@/lib/types";
 
 export type Item = { id: string; text: string; image: string | null; alt_text: string };
@@ -16,20 +18,31 @@ export type S = {
   practice_eligible: boolean; prompt: string; explanation: string;
   options: Item[]; correct: string[]; tf: boolean | null; left: Item[]; right: Item[]; pairs: Record<string, string>;
   accepted: string; numValue: string; numTol: string; items: Item[];
+  // matching: layout and marking
+  mLeftStyle: LeftStyle; mRightStyle: RightStyle; mLeftTitle: string; mRightTitle: string; mShuffle: boolean; mUnique: boolean; mPartial: "" | "all" | "per_pair";
+  // fill in the blank: answer box and marking
+  fCase: boolean; fPunct: boolean; fUnit: string; fHint: string; fInput: "text" | "number"; fWidth: "short" | "medium" | "long";
 };
 export const blank = (n = 4): Item[] => Array.from({ length: n }, () => ({ id: uid(), text: "", image: null, alt_text: "" }));
 export const fresh = (): S => ({ subject: "", form_level: 1, topic: "", subtopic: "", difficulty: "medium", marks: 1, language: "en", qtype: "mcq_single", practice_eligible: true, prompt: "", explanation: "",
-  options: blank(4), correct: [], tf: null, left: blank(3), right: blank(3), pairs: {}, accepted: "", numValue: "", numTol: "0", items: blank(3) });
+  options: blank(4), correct: [], tf: null, left: blank(3), right: blank(3), pairs: {}, accepted: "", numValue: "", numTol: "0", items: blank(3),
+  mLeftStyle: "roman", mRightStyle: "LETTER", mLeftTitle: "", mRightTitle: "", mShuffle: true, mUnique: false, mPartial: "",
+  fCase: false, fPunct: false, fUnit: "", fHint: "", fInput: "text", fWidth: "medium" });
 const fromApi = (q: any): S => {
   const s = fresh();
   Object.assign(s, { subject: String(q.subject), form_level: q.form_level, topic: q.topic, subtopic: q.subtopic, difficulty: q.difficulty, marks: q.marks, language: q.language, qtype: q.qtype, practice_eligible: q.practice_eligible, prompt: q.prompt, explanation: q.explanation });
   const dec = (l: any[]) => l.map((o) => ({ id: o.id, text: o.text || "", image: o.image || null, alt_text: o.alt_text || "" }));
   if (q.content?.options) s.options = dec(q.content.options);
-  if (q.content?.left) { s.left = dec(q.content.left); s.right = dec(q.content.right); s.pairs = q.answer.pairs; }
+  if (q.content?.left) {
+    s.left = dec(q.content.left); s.right = dec(q.content.right); s.pairs = q.answer.pairs;
+    const lay = matchLayout(q.content);
+    Object.assign(s, { mLeftStyle: lay.left_style, mRightStyle: lay.right_style, mLeftTitle: lay.left_title, mRightTitle: lay.right_title, mShuffle: lay.shuffle_right, mUnique: lay.unique, mPartial: q.answer.partial || "" });
+  }
   if (q.content?.items) s.items = dec(q.content.items);
   if (q.qtype === "mcq_single") s.correct = [q.answer.correct]; if (q.qtype === "mcq_multi") s.correct = q.answer.correct;
   if (q.qtype === "true_false") s.tf = q.answer.correct;
-  if (q.qtype === "fill_blank") { s.accepted = (q.answer.accepted || []).join("\n"); if (q.answer.numeric) { s.numValue = String(q.answer.numeric.value); s.numTol = String(q.answer.numeric.tolerance); } }
+  if (q.qtype === "fill_blank") { s.accepted = (q.answer.accepted || []).join("\n"); if (q.answer.numeric) { s.numValue = String(q.answer.numeric.value); s.numTol = String(q.answer.numeric.tolerance); }
+    Object.assign(s, { fCase: !!q.answer.case_sensitive, fPunct: !!q.answer.ignore_punct, fUnit: q.content?.unit || "", fHint: q.content?.hint || "", fInput: q.content?.input === "number" ? "number" : "text", fWidth: q.content?.width || "medium" }); }
   return s;
 };
 /** True while nothing has been typed yet (so an untouched editor is not stored as a draft). */
@@ -44,8 +57,14 @@ export function build(s: S) {
   let content: any = {}, answer: any = {};
   if (s.qtype === "mcq_single" || s.qtype === "mcq_multi") { content = { options: enc(s.options.filter((o) => o.text.trim() || o.image)) }; answer = { correct: s.qtype === "mcq_single" ? s.correct[0] : s.correct }; }
   if (s.qtype === "true_false") answer = { correct: s.tf };
-  if (s.qtype === "matching") { content = { left: enc(s.left), right: enc(s.right) }; answer = { pairs: s.pairs }; }
-  if (s.qtype === "fill_blank") answer = { accepted: s.accepted.split("\n").map((x) => x.trim()).filter(Boolean), numeric: s.numValue !== "" ? { value: Number(s.numValue), tolerance: Number(s.numTol || 0) } : null };
+  if (s.qtype === "matching") { 
+    content = { left: enc(s.left), right: enc(s.right), layout: { left_style: s.mLeftStyle || "roman", right_style: s.mRightStyle || "LETTER", left_title: s.mLeftTitle || "", right_title: s.mRightTitle || "", shuffle_right: s.mShuffle !== false, unique: !!s.mUnique } };
+    answer = { pairs: s.pairs, partial: s.mPartial || null };
+  }
+  if (s.qtype === "fill_blank") {
+    content = { unit: s.fUnit || "", hint: s.fHint || "", input: s.fInput || "text", width: s.fWidth || "medium" };
+    answer = { accepted: s.accepted.split("\n").map((x) => x.trim()).filter(Boolean), numeric: s.numValue !== "" ? { value: Number(s.numValue), tolerance: Number(s.numTol || 0) } : null, case_sensitive: !!s.fCase, ignore_punct: !!s.fPunct };
+  }
   if (s.qtype === "ordering") { content = { items: enc(s.items) }; answer = {}; }
   return { subject: Number(s.subject), form_level: s.form_level, topic: s.topic, subtopic: s.subtopic, difficulty: s.difficulty, marks: s.marks, language: s.language, qtype: s.qtype,
     practice_eligible: s.practice_eligible, prompt: s.prompt, explanation: s.explanation, content, answer };
@@ -208,17 +227,19 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
             <label className="field"><span>Allowed difference (±)</span><input className="input" inputMode="decimal" value={s.numTol} onChange={(e) => up({ numTol: e.target.value })} /></label></div>
         </div>
       )}
+      {s.qtype === "fill_blank" && <FillSettings s={s} up={up} />}
       {s.qtype === "ordering" && <><p className="muted small">Write the items in the CORRECT order. Students see them shuffled. (2 or more items)</p>{listEditor("items", 2, Infinity, "Item")}</>}
       {s.qtype === "matching" && (
         <>
           <p className="muted small">Left items and the right items they match with. Pick the right match for each left item.</p>
-          <h3>Left side</h3>{listEditor("left", 2, Infinity, "Left item")}
-          <h3>Right side</h3>{listEditor("right", 2, Infinity, "Right item")}
+          <h3>Column A (left side)</h3>{listEditor("left", 2, Infinity, "Left item")}
+          <h3>Column B (right side)</h3>{listEditor("right", 2, Infinity, "Right item")}
           <h3>Correct matches</h3>
           {s.left.map((l, i) => (
-            <div key={l.id} className="match-row"><span>{plain(l.text) || l.alt_text || `Left ${i + 1}`}</span>
+            <div key={l.id} className="match-row"><span>{leftMark(s.mLeftStyle, i)} {plain(l.text) || l.alt_text || `Left ${i + 1}`}</span>
               <select className="input" aria-label={`Match for left item ${i + 1}`} value={s.pairs[l.id] || ""} onChange={(e) => up({ pairs: { ...s.pairs, [l.id]: e.target.value } })}>
-                <option value="">Choose…</option>{s.right.map((r, j) => <option key={r.id} value={r.id}>{plain(r.text) || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>))}
+                <option value="">Choose…</option>{s.right.map((r, j) => <option key={r.id} value={r.id}>{rightTag(s.mRightStyle, j)}. {plain(r.text) || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>))}
+          <MatchSettings s={s} up={up} />
         </>
       )}
 

@@ -8,6 +8,16 @@ from core.sanitize import clean_html
 
 TEXT_LIMIT = 2000
 
+# Layout choices a teacher can make on matching and fill-in-the-blank questions (shown to students, so they live in `content`).
+LEFT_STYLES = ("roman", "ROMAN", "number")      # (i) (ii) (iii)  /  (I) (II)  /  (1) (2)
+RIGHT_STYLES = ("LETTER", "letter", "number")   # A B C  /  a b c  /  1 2 3
+FILL_WIDTHS = ("short", "medium", "long")
+
+
+def _short(value, limit):
+    """Plain text only (no tags) for small labels such as column titles, units and hints."""
+    return re.sub(r"<[^>]+>", "", str(value or "")).strip()[:limit]
+
 
 def _items(content, key, minimum, maximum=None):
     items = content.get(key)
@@ -58,7 +68,18 @@ def validate_question(qtype, content, answer):
         lids, rids = {x["id"] for x in left}, {x["id"] for x in right}
         if not isinstance(pairs, dict) or set(pairs) != lids or not set(pairs.values()) <= rids:
             raise ValidationError({"answer": "Every item on the left must be matched to an item on the right."})
-        return {"left": left, "right": right}, {"pairs": pairs}
+        lay = content.get("layout") if isinstance(content.get("layout"), dict) else {}
+        layout = {
+            "left_style": lay.get("left_style") if lay.get("left_style") in LEFT_STYLES else "roman",
+            "right_style": lay.get("right_style") if lay.get("right_style") in RIGHT_STYLES else "LETTER",
+            "left_title": _short(lay.get("left_title"), 60), "right_title": _short(lay.get("right_title"), 60),
+            "shuffle_right": lay.get("shuffle_right") is not False,   # on unless the teacher switched it off
+            "unique": lay.get("unique") is True,                      # each right item may be used once only
+        }
+        if layout["unique"] and len(set(pairs.values())) != len(pairs):
+            raise ValidationError({"answer": "You chose 'each right item once only', but two left items have the same match."})
+        partial = answer.get("partial") if answer.get("partial") in ("all", "per_pair") else None  # None = follow the exam's setting
+        return {"left": left, "right": right, "layout": layout}, {"pairs": pairs, "partial": partial}
 
     if qtype == "fill_blank":
         accepted = [str(a).strip() for a in (answer.get("accepted") or []) if str(a).strip()]
@@ -70,7 +91,11 @@ def validate_question(qtype, content, answer):
                 raise ValidationError({"answer": "Numeric answer needs a value and a tolerance."})
         if not accepted and numeric is None:
             raise ValidationError({"answer": "Give at least one accepted answer."})
-        return {}, {"accepted": accepted, "numeric": numeric}
+        layout = {"unit": _short(content.get("unit"), 20), "hint": _short(content.get("hint"), 120),
+                  "input": "number" if content.get("input") == "number" else "text",
+                  "width": content.get("width") if content.get("width") in FILL_WIDTHS else "medium"}
+        return layout, {"accepted": accepted, "numeric": numeric,
+                        "case_sensitive": answer.get("case_sensitive") is True, "ignore_punct": answer.get("ignore_punct") is True}
 
     if qtype == "ordering":
         items = _items(content, "items", 2)  # authored in the correct order

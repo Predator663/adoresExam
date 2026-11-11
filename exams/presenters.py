@@ -20,7 +20,7 @@ def public_question(eq, seed, shuffle_options):
     qtype = p["qtype"]
     if qtype in ("mcq_single", "mcq_multi") and shuffle_options:
         content["options"] = _shuffled(content["options"], rnd)
-    if qtype == "matching":
+    if qtype == "matching" and content.get("layout", {}).get("shuffle_right", True):  # a teacher may keep Column B in a fixed order
         content["right"] = _shuffled(content["right"], rnd)
     if qtype == "ordering":  # must never arrive in the correct order
         content["items"] = _shuffled(content["items"], rnd, avoid=p["answer"]["order"])
