@@ -7,9 +7,10 @@ import { ErrorNote, Loading, useLoad } from "./ui";
 import { api, mediaUrl } from "@/lib/api";
 import { errorLines, plain, QTYPES, uid } from "@/lib/staff";
 import { useSession } from "@/lib/session";
+import { useAutofix } from "@/lib/autocorrect";
 import { enterToNext } from "@/lib/enterNext";
 import { leftMark, matchLayout, rightTag, type LeftStyle, type RightStyle } from "@/lib/labels";
-import { FillSettings, MatchSettings } from "./TypeSettings";
+import { AutofixSwitch, FillSettings, MatchSettings } from "./TypeSettings";
 import type { Question } from "@/lib/types";
 
 export type Item = { id: string; text: string; image: string | null; alt_text: string };
@@ -71,7 +72,7 @@ export function build(s: S) {
 }
 
 /** One entry (option, matching item, ordering item): text and/or an image with required description (QB-02, QB-03). */
-export function ItemRow({ it, onChange, onRemove, extra, label, canRemove }: { it: Item; onChange: (i: Item) => void; onRemove?: () => void; extra?: React.ReactNode; label: string; canRemove: boolean }) {
+export function ItemRow({ it, onChange, onRemove, extra, label, canRemove, autofix }: { autofix?: boolean; it: Item; onChange: (i: Item) => void; onRemove?: () => void; extra?: React.ReactNode; label: string; canRemove: boolean }) {
   const [err, setErr] = useState("");
   async function pick(f?: File) {
     if (!f) return;
@@ -84,7 +85,7 @@ export function ItemRow({ it, onChange, onRemove, extra, label, canRemove }: { i
       <div className="row" style={{ alignItems: "flex-start" }}>
         {extra}
         {/* answers can hold symbols, powers, subscripts, fractions, roots and chemical formulas (the server cleans the HTML) */}
-        <RichEditor compact label={label} value={it.text} onChange={(h) => onChange({ ...it, text: h })} />
+        <RichEditor compact autofix={autofix} label={label} value={it.text} onChange={(h) => onChange({ ...it, text: h })} />
         {canRemove && <button type="button" className="btn danger icon" aria-label={`Remove ${label}`} onClick={onRemove}>✕</button>}
       </div>
       <div className="row" style={{ marginTop: ".4rem" }}>
@@ -112,6 +113,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
   const [draft, setDraft] = useState<S | null>(null), [similar, setSimilar] = useState<any[]>([]), [cid, setCid] = useState<number | null>(id), [view, setView] = useState<"phone" | "computer">("phone");
   const key = `amani_qdraft_${id || "new"}`, loaded = useRef(false), accRef = useRef<HTMLTextAreaElement>(null);
   const up = (p: Partial<S>) => setS((x) => ({ ...x, ...p }));
+  const fixPref = useAutofix(), fix = fixPref && s.language === "en";  // capitals and corrections only for English questions
 
   useEffect(() => {
     if (loaded.current || existing.loading) return;
@@ -181,7 +183,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
   const listEditor = (key: "options" | "left" | "right" | "items", min: number, max: number, name: string, withCorrect?: boolean) => (
     <>
       {s[key].map((it, i) => (
-        <ItemRow key={it.id} it={it} label={`${name} ${i + 1}`} canRemove={s[key].length > min}
+        <ItemRow key={it.id} autofix={fix} it={it} label={`${name} ${i + 1}`} canRemove={s[key].length > min}
           onChange={(n) => up({ [key]: s[key].map((x) => (x.id === it.id ? n : x)) } as any)}
           onRemove={() => up({ [key]: s[key].filter((x) => x.id !== it.id), correct: s.correct.filter((c) => c !== it.id) } as any)}
           extra={withCorrect ? (s.qtype === "mcq_single"
@@ -197,6 +199,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
       <div className="row"><button className="btn" onClick={onClose}>{backLabel || "← Back to list"}</button><span className="pill">{cid ? `#${cid}` : "New"} · {status}</span></div>
       {draft && <div className="hint" role="status">An unsaved draft from this device was found. <button className="btn" onClick={() => { setS(draft); setDraft(null); }}>Restore it</button> <button className="btn" onClick={() => { localStorage.removeItem(key); setDraft(null); }}>Discard</button></div>}
       <p className="muted small">Tip: press <b>Enter</b> to jump to the next field, <b>Shift+Enter</b> for a new line (you can switch this off in Settings).</p>
+      <AutofixSwitch language={s.language} />
       {lock && <p className="hint">This question is archived (it was used in an exam).</p>}
       <div className="card">
         <div className="grid2">
@@ -213,7 +216,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
       </div>
 
       <h2>Question</h2>
-      <RichEditor label="Question text" value={s.prompt} onChange={(h) => up({ prompt: h })} />
+      <RichEditor label="Question text" autofix={fix} value={s.prompt} onChange={(h) => up({ prompt: h })} />
       {similar.length > 0 && <div className="hint" role="status">⚠ Similar questions already exist: {similar.map((q) => <div key={q.id}>#{q.id} {plain(q.prompt).slice(0, 80)}</div>)}</div>}
 
       <h2>Answer</h2>
@@ -244,7 +247,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
       )}
 
       <h2>Explanation (shown after results are published)</h2>
-      <RichEditor label="Explanation" value={s.explanation} onChange={(h) => up({ explanation: h })} minRows={2} />
+      <RichEditor label="Explanation" autofix={fix} value={s.explanation} onChange={(h) => up({ explanation: h })} minRows={2} />
 
       <h2>Preview</h2>
       <div className="chips" role="group"><button type="button" className={`chip ${view === "phone" ? "on" : ""}`} aria-pressed={view === "phone"} onClick={() => setView("phone")}>📱 Phone</button><button type="button" className={`chip ${view === "computer" ? "on" : ""}`} aria-pressed={view === "computer"} onClick={() => setView("computer")}>💻 Computer</button></div>

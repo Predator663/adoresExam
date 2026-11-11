@@ -4,9 +4,10 @@ import { blank, build, fresh, ItemRow, type S } from "./QuestionEditor";
 import RichEditor from "./RichEditor";
 import SymbolPad from "./SymbolPad";
 import { api } from "@/lib/api";
+import { useAutofix } from "@/lib/autocorrect";
 import { enterToNext } from "@/lib/enterNext";
 import { leftMark, rightTag } from "@/lib/labels";
-import { FillSettings, MatchSettings } from "./TypeSettings";
+import { AutofixSwitch, FillSettings, MatchSettings } from "./TypeSettings";
 import { errorLines, plain, qtypeName, QTYPES, uid } from "@/lib/staff";
 
 /** Write every question of the exam on one page, then save them all at once.
@@ -71,12 +72,13 @@ function Tick() {
 }
 
 function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
+  const fix = useAutofix() && c.s.language === "en";
   const accRef = useRef<HTMLTextAreaElement>(null);
   const s = c.s;
   const list = (key: "options" | "left" | "right" | "items", min: number, name: string, withCorrect?: boolean) => (
     <>
       {s[key].map((it, i) => (
-        <ItemRow key={it.id} it={it} label={`${name} ${i + 1}`} canRemove={s[key].length > min}
+        <ItemRow key={it.id} autofix={fix} it={it} label={`${name} ${i + 1}`} canRemove={s[key].length > min}
           onChange={(n) => up({ [key]: s[key].map((x) => (x.id === it.id ? n : x)) } as Partial<S>)}
           onRemove={() => up({ [key]: s[key].filter((x) => x.id !== it.id), correct: s.correct.filter((x) => x !== it.id) } as Partial<S>)}
           extra={withCorrect ? (s.qtype === "mcq_single"
@@ -95,7 +97,7 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
         <label className="field"><span>Marks</span>
           <input className="input" type="number" min={0.5} step={0.5} value={s.marks} onChange={(e) => up({ marks: Number(e.target.value) })} /></label>
       </div>
-      <RichEditor label="Question text" value={s.prompt} onChange={(h) => up({ prompt: h })} minRows={3} />
+      <RichEditor label="Question text" autofix={fix} value={s.prompt} onChange={(h) => up({ prompt: h })} minRows={3} />
 
       <h4 className="bk-h">Answer</h4>
       {(s.qtype === "mcq_single" || s.qtype === "mcq_multi") && <><p className="muted small">{s.qtype === "mcq_single" ? "Tick the one correct option." : "Tick every correct option."} Empty options are ignored.</p>{list("options", 2, "Option", true)}</>}
@@ -138,7 +140,7 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
           <label className="field"><span>Topic</span><input className="input" value={s.topic} onChange={(e) => up({ topic: e.target.value })} /></label>
           <label className="field"><span>Sub-topic</span><input className="input" value={s.subtopic} onChange={(e) => up({ subtopic: e.target.value })} /></label>
         </div>
-        <RichEditor label="Explanation (shown after results are published)" value={s.explanation} onChange={(h) => up({ explanation: h })} minRows={2} />
+        <RichEditor label="Explanation (shown after results are published)" autofix={fix} value={s.explanation} onChange={(h) => up({ explanation: h })} minRows={2} />
       </details>
     </div>
   );
@@ -238,6 +240,7 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
       <div className="card bk-head">
         <div className="row"><h3 className="grow" style={{ margin: 0 }}>Create all the questions</h3></div>
         <p className="muted small">Write every question here, one after another. When you are done, save them all and they go straight into this exam. Then review the paper and submit it. Tip: press <b>Enter</b> to jump to the next field, <b>Shift+Enter</b> for a new line (you can switch this off in Settings).</p>
+      <AutofixSwitch />
         <details className="bk-more" open={false}>
           <summary>Settings for new questions (form, topic, difficulty, marks)</summary>
           <div className="grid2">

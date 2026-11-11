@@ -1,4 +1,5 @@
 "use client";
+import { applyAutofix, undoAutofix } from "@/lib/autocorrect";
 import { useEffect, useRef, useState } from "react";
 import { api, API } from "@/lib/api";
 import { Modal } from "./ui";
@@ -66,11 +67,19 @@ const isEmptyHtml = (h: string) => !/<(img|sup|sub|span)\b/i.test(h) && h.replac
 
 /** `compact` = the small version used for one answer option, matching item or ordering item: one line, only superscript, subscript,
  *  symbols and formulas (no lists or pictures; a picture has its own button on the answer row). */
-export default function RichEditor({ value, onChange, label, minRows = 4, compact = false }: { value: string; onChange: (html: string) => void; label: string; minRows?: number; compact?: boolean }) {
+export default function RichEditor({ value, onChange, label, minRows = 4, compact = false, autofix = false }: { value: string; onChange: (html: string) => void; label: string; minRows?: number; compact?: boolean;
+  /** English auto-capitalisation and auto-correction while typing (see lib/autocorrect.ts). */ autofix?: boolean }) {
   const ref = useRef<HTMLDivElement>(null), saved = useRef<Range | null>(null), last = useRef<string>("");
   const [dlg, setDlg] = useState<"" | "formula" | "image" | "symbols">("");
 
   useEffect(() => { if (ref.current && value !== last.current) { ref.current.innerHTML = toEditor(value || ""); last.current = value || ""; } }, [value]);
+  useEffect(() => {  // a native listener: React's own onBeforeInput is not the browser's beforeinput event
+    const el = ref.current;
+    if (!el || !autofix) return;
+    const h = (e: Event) => applyAutofix(e as InputEvent, el, { capStart: !compact });
+    el.addEventListener("beforeinput", h);
+    return () => el.removeEventListener("beforeinput", h);
+  }, [autofix, compact]);
   const emit = () => { const raw = fromEditor(ref.current?.innerHTML || ""), h = compact && isEmptyHtml(raw) ? "" : raw; last.current = h; onChange(h); };
   const remember = () => { const s = getSelection(); if (s && s.rangeCount && ref.current?.contains(s.anchorNode)) saved.current = s.getRangeAt(0).cloneRange(); };
   const restore = () => { ref.current?.focus(); const s = getSelection(); if (s && saved.current) { s.removeAllRanges(); s.addRange(saved.current); } };
@@ -91,7 +100,10 @@ export default function RichEditor({ value, onChange, label, minRows = 4, compac
       </div>
       <div ref={ref} className="input rich" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label={label}
         style={{ minHeight: `${compact ? 2.4 : minRows * 1.6}rem`, marginTop: ".5rem" }} onInput={emit}
-        onKeyDown={(e) => { if (compact && e.key === "Enter" && !e.shiftKey) e.preventDefault(); }} onBlur={() => { remember(); emit(); }}
+        onKeyDown={(e) => {
+          if (autofix && e.key === "Backspace" && undoAutofix()) { e.preventDefault(); emit(); return; }  // undo the last automatic change
+          if (compact && e.key === "Enter" && !e.shiftKey) e.preventDefault();
+        }} onBlur={() => { remember(); emit(); }}
         onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }} />
       {dlg === "formula" && <FormulaDialog onInsert={insert} onClose={() => setDlg("")} />}
       {dlg === "image" && <ImageDialog onInsert={insert} onClose={() => setDlg("")} />}

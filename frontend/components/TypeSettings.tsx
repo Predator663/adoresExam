@@ -1,5 +1,17 @@
 "use client";
+import { setAutofix, useAutofix } from "@/lib/autocorrect";
 import type { S } from "./QuestionEditor";
+
+/** The on/off switch for English auto-capitalisation and auto-correction (kept on this device). */
+export function AutofixSwitch({ language }: { language?: string }) {
+  const on = useAutofix();
+  return (
+    <div style={{ margin: ".2rem 0 .6rem" }}>
+      <label className="switch"><input type="checkbox" checked={on} onChange={(e) => setAutofix(e.target.checked)} /> ✨ Auto-capitalise and correct English as I type</label>
+      {on && language && language !== "en" && <p className="muted small" style={{ margin: ".1rem 0 0" }}>Off for this question because it is not written in English.</p>}
+    </div>
+  );
+}
 
 /** Settings a teacher can choose for a matching question and for a fill-in-the-blank question.
  *  Used by the single-question editor and by "Create all". Every default keeps the question working as before. */
