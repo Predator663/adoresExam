@@ -58,7 +58,8 @@ def _exam_card(exam, student, now, retake=None):
         "id": exam.pk, "title": exam.title, "subject": exam.subject.name, "start_at": exam.start_at,
         "end_at": exam.end_at, "duration_minutes": exam.duration_minutes,
         "question_count": q_count, "total_marks": q_marks,
-        "rules_text": exam.rules_text, "state": state, "retake": bool(retake) and state == "open",
+        "rules_text": exam.rules_text or SchoolSettings.load().rules_text,  # the exam's own rules, else the school's default (Staff → Settings)
+        "state": state, "retake": bool(retake) and state == "open",
         "attempt_id": last.pk if last else None, "server_time": now,
     }
 
