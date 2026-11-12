@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useState } from "react";
 import ExamForm from "@/components/ExamForm";
 import { Pager, useClientPage } from "@/components/Pager";
 import Shell from "@/components/Shell";
@@ -49,9 +49,10 @@ function compare(sort: string) {
   }
 }
 
+const keyOf = (e: Exam) => (e.awaiting_scheduling ? "awaiting" : e.status);
 function StatusPill({ e }: { e: Exam }) {
-  if (e.awaiting_scheduling) return <span className="pill warn">⏳ Awaiting scheduling</span>;
-  return <span className={`pill ${e.status === "live" ? "live" : ""}`}>{STATUS_LABEL[e.status] || e.status}</span>;
+  const k = keyOf(e);
+  return <span className={`ex2-pill s-${k}`}><i aria-hidden />{k === "awaiting" ? "Awaiting scheduling" : STATUS_LABEL[e.status] || e.status}</span>;
 }
 
 export default function Exams() {
@@ -100,25 +101,47 @@ export default function Exams() {
   const reset = () => { setQ(""); setStatus("all"); setCls(""); setSubject(""); setTeacher(""); };
   const chips: [string, string][] = [["all", "All"], ["awaiting", "Awaiting scheduling"], ["draft", "Drafts"], ["scheduled", "Scheduled"], ["live", "Live"], ["closed", "Closed"], ["published", "Published"]];
 
+  const [fopen, setFopen] = useState(false), [view, setView] = useState<"cards" | "list">("cards");
+  const nFilters = [cls, subject, teacher].filter(Boolean).length + (sort !== "smart" ? 1 : 0);
+  const kpis: [string, string, string][] = [["live", "Live now", "🟢"], ["awaiting", "Awaiting scheduling", "⏳"], ["scheduled", "Scheduled", "🗓"], ["draft", "Drafts", "✏️"]];
+  let n = 0;
+
   return (
     <Shell bare title="Exams">
       <StaffNav />
       {edit !== null ? <ExamForm id={edit === "new" ? null : edit} onClose={() => { setEdit(null); list.reload(); }} /> : (
-        <>
-          <div className="row"><button className="btn primary" onClick={() => setEdit("new")}>+ New exam</button><span className="grow" />
-            <button className="btn" onClick={list.reload} aria-label="Refresh">↻ Refresh</button></div>
+        <div className="ex2">
+          <div className="ex2-head">
+            <div className="ex2-hint"><h2>Exams</h2><p className="muted small">{list.loading ? "Loading…" : `${all.length} exam${all.length === 1 ? "" : "s"} in total`}</p></div>
+            <button className="btn" onClick={list.reload} aria-label="Refresh">↻<span className="ex2-hide-s"> Refresh</span></button>
+            <button className="btn primary" onClick={() => setEdit("new")}>+ New exam</button>
+          </div>
 
-          {list.loading ? <Loading /> : list.error ? <ErrorNote error={list.error} retry={list.reload} /> : (
+          {list.error ? <ErrorNote error={list.error} retry={list.reload} /> : (
             <>
-              <div className="card exf">
-                <input className="input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title, subject, class or teacher" aria-label="Search exams" />
-                <div className="chips" role="group" aria-label="Status">
+              <div className="ex2-kpis" role="group" aria-label="Quick filters">
+                {kpis.map(([k, l, ico]) => (
+                  <button key={k} type="button" className={`ex2-kpi s-${k} ${status === k ? "on" : ""}`} aria-pressed={status === k} onClick={() => setStatus(status === k ? "all" : k)}>
+                    <span className="ex2-kico" aria-hidden>{ico}</span><b>{list.loading ? "–" : counts[k] ?? 0}</b><span>{l}</span>
+                  </button>))}
+              </div>
+
+              <div className="card ex2-bar">
+                <div className="ex2-search">
+                  <input className="input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title, subject, class or teacher" aria-label="Search exams" />
+                  <button type="button" className={`btn ex2-ftoggle ${nFilters ? "on" : ""}`} aria-expanded={fopen} onClick={() => setFopen(!fopen)}>⚙ Filters{nFilters ? ` (${nFilters})` : ""}</button>
+                  <div className="ex2-view" role="group" aria-label="Layout">
+                    <button type="button" className={view === "cards" ? "on" : ""} aria-pressed={view === "cards"} onClick={() => setView("cards")} title="Cards">▦</button>
+                    <button type="button" className={view === "list" ? "on" : ""} aria-pressed={view === "list"} onClick={() => setView("list")} title="List">☰</button>
+                  </div>
+                </div>
+                <div className="ex2-chips" role="group" aria-label="Status">
                   {chips.map(([k, l]) => (
-                    <button key={k} type="button" className={`chip ${status === k ? "on" : ""}`} aria-pressed={status === k} onClick={() => setStatus(k)}>
-                      {l}<span className="chip-n">{counts[k] ?? 0}</span>
+                    <button key={k} type="button" className={`ex2-chip ${status === k ? "on" : ""}`} aria-pressed={status === k} onClick={() => setStatus(k)}>
+                      {l}<span>{counts[k] ?? 0}</span>
                     </button>))}
                 </div>
-                <div className="exf-grid">
+                <div className={`ex2-filters ${fopen ? "open" : ""}`}>
                   <label className="field"><span>Class</span>
                     <select className="input" value={cls} onChange={(e) => setCls(e.target.value)}>
                       <option value="">All classes</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}<option value="none">No class chosen yet</option>
@@ -129,7 +152,7 @@ export default function Exams() {
                     </select></label>
                   {admin && <label className="field"><span>Teacher</span>
                     <select className="input" value={teacher} onChange={(e) => setTeacher(e.target.value)}>
-                      <option value="">All teachers</option>{teachers.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+                      <option value="">All teachers</option>{teachers.map(([id, nm]) => <option key={id} value={id}>{nm}</option>)}
                     </select></label>}
                   <label className="field"><span>Sort by</span>
                     <select className="input" value={sort} onChange={(e) => setSort(e.target.value)}>{SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
@@ -138,32 +161,41 @@ export default function Exams() {
                   {filtered && <button className="linkbtn" onClick={reset}>Clear filters</button>}</div>
               </div>
 
-              {!rows.length ? <div className="card"><p className="muted">{all.length ? "No exam matches these filters." : "No exams yet."}</p></div> :
-                <div ref={pg.top}>{pg.rows.map((e) => (
-                  <div key={e.id} className={`card exam-card ${e.awaiting_scheduling ? "new" : ""}`}>
-                    <div className="row">
-                      <span className="grow">
-                        <b>{e.title}</b>
-                        <span className="muted small exam-meta">
-                          {e.subject_name}
-                          {" · "}{e.class_names.length ? e.class_names.join(", ") : "No class yet"}
-                          {" · "}{e.start_at ? eatDate(e.start_at, DATETIME, lang) : "No date yet"}
-                          {" · "}{e.duration_minutes} min · {e.question_count} questions · {e.total_marks} marks
-                        </span>
-                      </span>
-                      <StatusPill e={e} />
-                      <button className="btn" onClick={() => setEdit(e.id)}>{e.awaiting_scheduling && admin ? "Review" : "Open"}</button>
-                    </div>
-                    {e.submitted_at ? (
-                      <p className="small exam-sub">📨 Submitted by <b>{e.submitted_by_name || "a teacher"}</b> · {eatDate(e.submitted_at, DATETIME, lang)} <span className="muted">({ago(e.submitted_at, lang)})</span></p>
-                    ) : e.created_by_name && e.status === "draft" ? (
-                      <p className="small muted exam-sub">✏️ Draft by {e.created_by_name} · not submitted yet</p>
-                    ) : null}
-                  </div>))}</div>}
+              {list.loading ? <div className="ex2-grid" aria-hidden>{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="ex2-skel" />)}</div>
+                : !rows.length ? (
+                  <div className="card ex2-empty">
+                    <span aria-hidden>{all.length ? "🔍" : "📝"}</span>
+                    <h3>{all.length ? "No exam matches these filters" : "No exams yet"}</h3>
+                    <p className="muted">{all.length ? "Try a different search, or clear the filters." : "Create the first exam to get started."}</p>
+                    {all.length ? <button className="btn" onClick={reset}>Clear filters</button> : <button className="btn primary" onClick={() => setEdit("new")}>+ New exam</button>}
+                  </div>
+                ) : (
+                  <div ref={pg.top} className={`ex2-grid ${view}`}>
+                    {pg.rows.map((e) => (
+                      <article key={e.id} className={`ex2-card s-${keyOf(e)}`} style={{ "--i": n++ } as CSSProperties}>
+                        <div className="ex2-id">
+                          <StatusPill e={e} />
+                          <h3 className="ex2-title">{e.title}</h3>
+                          <p className="ex2-sub"><b>{e.subject_name}</b>{e.class_names.length ? e.class_names.map((c: string) => <span key={c} className="ex2-tag">{c}</span>) : <span className="ex2-tag none">No class yet</span>}</p>
+                        </div>
+                        <dl className="ex2-stats">
+                          <div><dt>Time</dt><dd>{e.duration_minutes} min</dd></div>
+                          <div><dt>Questions</dt><dd>{e.question_count}</dd></div>
+                          <div><dt>Marks</dt><dd>{e.total_marks}</dd></div>
+                        </dl>
+                        <p className="ex2-when"><span aria-hidden>🗓</span> {e.start_at ? eatDate(e.start_at, DATETIME, lang) : "No date yet"}</p>
+                        {e.submitted_at ? (
+                          <p className="ex2-by">📨 Submitted by <b>{e.submitted_by_name || "a teacher"}</b> · {ago(e.submitted_at, lang)}</p>
+                        ) : e.created_by_name && e.status === "draft" ? (
+                          <p className="ex2-by muted">✏️ Draft by {e.created_by_name} · not submitted yet</p>
+                        ) : null}
+                        <button className={`btn ex2-open ${e.awaiting_scheduling && admin ? "primary" : ""}`} onClick={() => setEdit(e.id)}>{e.awaiting_scheduling && admin ? "Review" : "Open"} →</button>
+                      </article>))}
+                  </div>)}
               <Pager {...pg.pager} />
             </>
           )}
-        </>
+        </div>
       )}
     </Shell>
   );
