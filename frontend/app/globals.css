@@ -2108,15 +2108,15 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 /* ===== Login screen (app/login/page.tsx): animated, mobile first ===== */
 .lg{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);background:var(--bg);overflow-x:clip}
 .lg-art{display:none}
-.lg-blob{position:absolute;border-radius:50%;filter:blur(40px);opacity:.55;pointer-events:none;animation:lg-drift 14s ease-in-out infinite alternate}
-.lg-blob.b1{width:18rem;height:18rem;left:-5rem;top:-4rem;background:color-mix(in srgb,var(--primary) 70%,#fff)}
-.lg-blob.b2{width:15rem;height:15rem;right:-4rem;bottom:-3rem;background:color-mix(in srgb,var(--primary) 45%,#ffd36b);animation-duration:18s;animation-delay:-6s}
-.lg-blob.b3{width:12rem;height:12rem;left:35%;top:45%;background:color-mix(in srgb,var(--primary) 50%,#7ad7ff);animation-duration:22s;animation-delay:-3s}
+.lg-blob{position:absolute;border-radius:50%;filter:blur(40px);opacity:.35;pointer-events:none;animation:lg-drift 14s ease-in-out infinite alternate}
+.lg-blob.b1{width:18rem;height:18rem;left:-5rem;top:-4rem;background:color-mix(in srgb,var(--primary) 80%,#000)}
+.lg-blob.b2{width:15rem;height:15rem;right:-4rem;bottom:-3rem;background:color-mix(in srgb,var(--primary) 70%,#000);animation-duration:18s;animation-delay:-6s}
+.lg-blob.b3{width:12rem;height:12rem;left:35%;top:45%;background:color-mix(in srgb,var(--primary) 60%,#000);animation-duration:22s;animation-delay:-3s}
 @keyframes lg-drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.18)}}
 /* phone: a short coloured banner above the card */
 .lg-main{position:relative;display:grid;place-items:start center;padding:0 1rem 1.2rem;min-width:0}
 .lg-top{position:absolute;left:0;right:0;top:0;height:15rem;overflow:hidden;background:linear-gradient(150deg,var(--side-bg),var(--primary));border-radius:0 0 34px 34px}
-.lg-top .lg-blob{opacity:.4}
+.lg-top .lg-blob{opacity:.3}
 .lg-stack{position:relative;z-index:1;width:100%;max-width:26rem;padding-top:5rem}
 .lg-card{display:grid;gap:.15rem;padding:1.4rem 1.3rem 1.2rem;border-radius:24px;background:var(--surface);border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.08);animation:lg-rise .7s cubic-bezier(.2,.9,.3,1.1) both}
 @keyframes lg-rise{from{opacity:0;transform:translateY(28px) scale(.97)}to{opacity:1;transform:none}}
