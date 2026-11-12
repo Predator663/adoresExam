@@ -1,16 +1,17 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import ExamSections from "@/components/ExamSections";
+import { CSSProperties, useEffect, useMemo, useState } from "react";
+import HomeExams, { ExamsSkeleton } from "@/components/HomeExams";
 import Icon from "@/components/Icon";
 import Shell from "@/components/Shell";
 import Tips from "@/components/Tips";
 import { GradeMedal, Ring, Skeleton } from "@/components/student";
-import { Bar, CountUp, ErrorNote, Modal, useLoad } from "@/components/ui";
+import { Bar, CountUp, ErrorNote, Modal } from "@/components/ui";
 import { api } from "@/lib/api";
 import { eatDate, makeOffset } from "@/lib/clock";
 import { AVATAR_EMOJI, BADGE_EMOJI, TIER_MARK } from "@/lib/emoji";
 import { greetKey } from "@/lib/student";
+import { useSwr } from "@/lib/swr";
 import { useSession } from "@/lib/session";
 import type { ExamCard } from "@/lib/types";
 
@@ -46,26 +47,32 @@ function useFocusLine(cards: ExamCard[] | null, s: Summary | null) {
   }, [cards, s, t]);
 }
 
-function HomeSkeleton() {
+/** What a page-load skeleton needs to be: the same shapes as the real thing, so nothing jumps when the data arrives. */
+const rv = (i: number) => ({ "--i": i }) as CSSProperties;
+/** A cached exam card's server clock is as old as the cache: move it forward by that age so countdowns stay right. */
+const ageCards = (cards: ExamCard[], ms: number) => (Array.isArray(cards) ? cards.map((c) => ({ ...c, server_time: new Date(new Date(c.server_time).getTime() + ms).toISOString() })) : cards);
+
+function SideSkeleton() {
   return (
-    <div className="sx-skel-page" aria-busy="true">
-      <Skeleton h={150} r={22} /><Skeleton h={190} r={22} /><div className="sx-quick"><Skeleton h={84} r={16} /><Skeleton h={84} r={16} /><Skeleton h={84} r={16} /><Skeleton h={84} r={16} /></div>
+    <div className="ux-skel-side" aria-busy="true">
+      <Skeleton h={150} r={22} /><Skeleton h={110} r={22} /><Skeleton h={130} r={22} />
     </div>
   );
 }
 
 function StudentHome() {
   const { user, t, lang } = useSession();
-  const exams = useLoad(() => api<ExamCard[]>("/student/exams/"));
-  const sum = useLoad(() => api<Summary>("/gamification/me/"));
-  const res = useLoad(() => api<ResultRow[]>("/results/"));
-  const ana = useLoad(() => api<Analytics>("/student/analytics/"));
+  const uid = user?.id ?? 0;
+  const exams = useSwr<ExamCard[]>(`home:exams:${uid}`, () => api<ExamCard[]>("/student/exams/"), { age: ageCards });
+  const sum = useSwr<Summary>(`home:sum:${uid}`, () => api<Summary>("/gamification/me/"));
+  const res = useSwr<ResultRow[]>(`home:res:${uid}`, () => api<ResultRow[]>("/results/"));
+  const ana = useSwr<Analytics>(`home:ana:${uid}`, () => api<Analytics>("/student/analytics/"));
   const [celebrate, setCelebrate] = useState(false);
   const [standalone, setStandalone] = useState(true);
 
-  useEffect(() => { if (sum.data && (sum.data.level_up || sum.data.new_badges > 0)) setCelebrate(true); }, [sum.data]);
+  useEffect(() => { if (sum.data && !sum.refreshing && (sum.data.level_up || sum.data.new_badges > 0)) setCelebrate(true); }, [sum.data, sum.refreshing]);  // only from fresh data, never from the cached copy
   useEffect(() => { setStandalone(window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true); }, []);
-  const ack = () => { setCelebrate(false); api("/gamification/ack/", { method: "POST", body: {} }).catch(() => {}); };
+  const ack = () => { setCelebrate(false); if (sum.data) sum.setData({ ...sum.data, level_up: null, new_badges: 0 }); api("/gamification/ack/", { method: "POST", body: {} }).catch(() => {}); };
 
   const s = sum.data;
   const focus = useFocusLine(exams.data, s);
@@ -81,37 +88,47 @@ function StudentHome() {
   return (
     <div className="sx-home">
       <div className="sx-main">
-        <section className="sx-hero" aria-label={t(greetKey())}>
-          <Ring value={s?.level.progress_percent ?? 0} size={84} stroke={5} className="sx-hero-ring" label={s ? t("xp_progress") : undefined}>
-            <span className="sx-hero-avatar" aria-hidden>{avatar}</span>
-          </Ring>
-          <div className="sx-hero-text">
-            <p className="sx-hero-greet">{t(greetKey())}</p>
-            <h1 className="sx-hero-name">{name} <span className="wave" aria-hidden>👋</span></h1>
-            <p className="sx-hero-focus">{focus}</p>
+        <section className="ux-hero" aria-label={t(greetKey())}>
+          <i className="ux-hero-blob b1" aria-hidden /><i className="ux-hero-blob b2" aria-hidden />
+          <div className="ux-hero-row">
+            <Ring value={s?.level.progress_percent ?? 0} size={92} stroke={5} className="sx-hero-ring ux-hero-ring" label={s ? t("xp_progress") : undefined}>
+              <span className="ux-avatar" aria-hidden>{avatar}</span>
+            </Ring>
+            <div className="ux-hero-text">
+              <p className="ux-greet">{t(greetKey())}</p>
+              <h1 className="ux-name">{name} <span className="wave" aria-hidden>👋</span></h1>
+              <p className="ux-focus" key={focus}>{focus}</p>
+            </div>
           </div>
-          {s && (
-            <ul className="sx-chips" aria-label={t("my_progress")}>
-              <li className="sx-chip"><span aria-hidden className={s.streak.current > 0 ? "flame" : ""}>{s.streak.current > 0 ? "🔥" : "🕯️"}</span><b>{s.streak.current}</b> {t("streak_short")}</li>
-              <li className="sx-chip"><Icon n="medal" size={15} />{t("level_n", { n: s.level.level })} · {s.level.name}</li>
-              <li className="sx-chip"><Icon n="zap" size={15} /><b><CountUp to={s.xp} /></b> XP</li>
-            </ul>
+          {s ? (
+            <>
+              <ul className="ux-stats" aria-label={t("my_progress")}>
+                <li style={rv(0)}><span aria-hidden className={s.streak.current > 0 ? "flame" : ""}>{s.streak.current > 0 ? "🔥" : "🕯️"}</span><b><CountUp to={s.streak.current} /></b><small>{t("streak_short")}</small></li>
+                <li style={rv(1)}><Icon n="medal" size={20} /><b>{s.level.level}</b><small>{s.level.name}</small></li>
+                <li style={rv(2)}><Icon n="zap" size={20} /><b><CountUp to={s.xp} /></b><small>XP</small></li>
+              </ul>
+              <div className="ux-xp" style={rv(3)}>
+                <div className="ux-xp-bar" role="progressbar" aria-valuenow={Math.round(s.level.progress_percent)} aria-valuemin={0} aria-valuemax={100} aria-label={t("xp_progress")}><i style={{ width: `${Math.max(2, Math.min(100, s.level.progress_percent))}%` }} /></div>
+                <small>{s.level.next_name ? t("xp_to_next", { n: s.level.xp_to_next, name: s.level.next_name }) : t("top_level")}</small>
+              </div>
+            </>
+          ) : (
+            <div className="ux-stats-skel" aria-hidden><span className="ux-sk" /><span className="ux-sk" /><span className="ux-sk" /></div>
           )}
         </section>
 
         <Tips />
 
-        {exams.loading ? <HomeSkeleton /> : exams.error ? <ErrorNote error={exams.error} retry={exams.reload} /> : <ExamSections cards={exams.data || []} />}
+        {exams.loading ? <ExamsSkeleton /> : exams.error ? <ErrorNote error={exams.error} retry={exams.reload} /> : <div className="ux-fade"><HomeExams cards={exams.data || []} /></div>}
 
-        <nav className="sx-quick" aria-label={t("quick_links")}>
-          <Link href="/practice/" className="sx-tile"><span className="sx-tile-ico"><Icon n="pencil" size={22} /></span><span>{t("nav_practice")}</span></Link>
-          <Link href="/progress/" className="sx-tile"><span className="sx-tile-ico"><Icon n="trend" size={22} /></span><span>{t("my_analytics")}</span></Link>
-          <Link href="/badges/" className="sx-tile"><span className="sx-tile-ico"><Icon n="medal" size={22} /></span><span>{t("nav_badges")}</span></Link>
-          <Link href="/leaderboard/" className="sx-tile"><span className="sx-tile-ico"><Icon n="trophy" size={22} /></span><span>{t("leaderboard")}</span></Link>
+        <nav className="sx-quick ux-quick" aria-label={t("quick_links")}>
+          {([["/practice/", "pencil", t("nav_practice")], ["/progress/", "trend", t("my_analytics")], ["/badges/", "medal", t("nav_badges")], ["/leaderboard/", "trophy", t("leaderboard")]] as [string, string, string][]).map(([h, ic, l], i) => (
+            <Link key={h} href={h} className="sx-tile" style={rv(i)}><span className="sx-tile-ico"><Icon n={ic} size={22} /></span><span>{l}</span></Link>
+          ))}
         </nav>
       </div>
 
-      <aside className="sx-side">
+      <aside className="sx-side ux-side">
         {fresh.length > 0 && (
           <section>
             <div className="sx-sec"><h2>{t("results_ready")}</h2><Link href="/results/">{t("see_all")}</Link></div>
@@ -137,7 +154,7 @@ function StudentHome() {
           </section>
         )}
 
-        {sum.loading ? <Skeleton h={120} r={18} /> : s ? (
+        {sum.loading ? <SideSkeleton /> : s ? (
           <>
             <section className="card sx-level">
               <div className="row"><b>{t("level_n", { n: s.level.level })} · {s.level.name}</b><span className="grow" /><b><CountUp to={s.xp} /> XP</b></div>
