@@ -2098,6 +2098,7 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 .s-submitted{--c:var(--warn)!important}.s-approved{--c:var(--good)!important}.s-archived{--c:var(--muted)!important}
 .q2-kl{grid-area:n;font-weight:800;font-size:.92rem;line-height:1.2}
 .ex2-kpi:has(.q2-kl){grid-template-areas:"i n";min-height:52px}
+.ex2-kpi:has(.q2-kl) .q2-kl,.ex2-kpi .q2-kl.q2-kl{grid-area:n;justify-self:start;text-align:left;font-size:.9rem;font-weight:700;color:var(--text)}
 .q2-prompt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .q2-stats dd{font-size:.8rem;overflow-wrap:anywhere;line-height:1.2;padding-top:.1rem}
 .q2-flags{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
