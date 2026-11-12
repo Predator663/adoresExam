@@ -34,6 +34,6 @@ export const SITE = {
   email: "",                            // the school's own contact details come from Staff > Settings
   phone: "",
   address: "",
-  developer: `${OPERATOR.name} (call sign ${OPERATOR.callsign}) and ${PARTNER.name} (call sign ${PARTNER.callsign})`,   // the personal credit on the About page
+  developer: `${OPERATOR.name} (call sign ${OPERATOR.callsign})`,   // the personal credit on the About page
   retention: "while the student is enrolled and for the period the school keeps its academic records",
 };
