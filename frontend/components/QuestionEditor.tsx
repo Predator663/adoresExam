@@ -242,7 +242,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
           <h3>Column B (right side)</h3>{listEditor("right", 2, Infinity, "Right item")}
           <h3>Correct matches</h3>
           {s.left.map((l, i) => (
-            <div key={l.id} className="match-row"><span>{leftMark(s.mLeftStyle, i)} {plain(l.text) || l.alt_text || `Left ${i + 1}`}</span>
+            <div key={l.id} className="match-row"><span className="qe-mleft"><b>{leftMark(s.mLeftStyle, i)}</b><span>{plain(l.text) || l.alt_text || `Left ${i + 1}`}</span></span><span className="qe-arrow" aria-hidden>→</span>
               <select className="input" aria-label={`Match for left item ${i + 1}`} value={s.pairs[l.id] || ""} onChange={(e) => up({ pairs: { ...s.pairs, [l.id]: e.target.value } })}>
                 <option value="">Choose…</option>{s.right.map((r, j) => <option key={r.id} value={r.id}>{rightTag(s.mRightStyle, j)}. {plain(r.text) || r.alt_text || `Right ${j + 1}`}</option>)}</select></div>))}
           <MatchSettings s={s} up={up} />

@@ -1769,7 +1769,8 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 .qe-matches{display:grid;gap:.6rem}
 .match-row{display:grid;grid-template-columns:minmax(0,1.1fr) auto minmax(0,1fr);gap:.6rem;align-items:center;margin:0;padding:.55rem;border-radius:18px;border:1px solid var(--bx-bd);background:color-mix(in srgb,var(--soft) 45%,var(--surface));animation:bx-pop .35s var(--bx-ease) backwards}
 .qe-mleft{display:flex;align-items:center;gap:.6rem;min-width:0;overflow-wrap:anywhere;font-weight:600}
-.qe-mleft b{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:var(--primary);color:var(--on-primary);font-size:.82rem}
+.qe-mleft>span{min-width:0;overflow-wrap:anywhere}
+.qe-mleft b{flex:none;display:grid;place-items:center;min-width:30px;height:30px;padding:0 .4rem;border-radius:10px;background:var(--primary);color:var(--on-primary);font-size:.82rem;white-space:nowrap}
 .qe-arrow{color:var(--muted);font-weight:800;transition:transform .3s var(--bx-ease)}.match-row:focus-within .qe-arrow{color:var(--primary);transform:translateX(3px)}
 .match-row .input{width:100%;min-width:0}
 
@@ -1862,8 +1863,8 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 @media(prefers-reduced-motion:reduce){.tp *{animation:none!important;transition:none!important}}
 
 /* matching: Column A (i, ii, iii) with a letter picker, Column B (A, B, C) as the reference list */
-.mt-cols{display:grid;grid-template-columns:1fr;gap:.9rem;margin-top:.4rem}
-@media(min-width:720px){.mt-cols{grid-template-columns:1.25fr 1fr;align-items:start}}
+/* Two columns only when the question's own box is wide enough (not by screen width: the builder's 360px phone preview sits on a desktop screen). */
+.mt-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr));gap:.9rem;margin-top:.4rem;align-items:start}
 .mt-h{margin:.2rem 0 .45rem;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--primary)}
 .mt-col{min-width:0}
 .mt-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.55rem .65rem;margin:.4rem 0;border-radius:14px;border:1px solid var(--border);background:var(--surface);transition:border-color .2s,background .2s}
