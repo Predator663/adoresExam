@@ -2177,3 +2177,137 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 :root[data-theme=high_contrast] .lg-card{border:2px solid var(--border);box-shadow:none}
 .reduce-motion .lg *,.reduce-motion .lg *::after{animation:none!important;transition:none!important}
 @media(prefers-reduced-motion:reduce){.lg *,.lg *::after{animation:none!important;transition:none!important}}
+
+/* ===== Student home v3 (app/page.tsx, components/HomeExams.tsx): hero, countdown, lazy exam cards, quiet loading ===== */
+@keyframes ux-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes ux-pop{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
+@keyframes ux-fadein{from{opacity:0}to{opacity:1}}
+@keyframes ux-shim{to{background-position:-220% 0}}
+@keyframes ux-drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(26px,18px) scale(1.2)}}
+@keyframes ux-tick{from{opacity:0;transform:translateY(-35%)}to{opacity:1;transform:none}}
+@keyframes ux-grow{from{width:0!important}}
+@keyframes ux-sweep{0%,60%{transform:translateX(-120%)}100%{transform:translateX(220%)}}
+.ux-fade{animation:ux-fadein .45s ease both}
+.ux-sk{display:block;border-radius:10px;background:linear-gradient(100deg,var(--soft) 30%,color-mix(in srgb,var(--soft) 35%,var(--surface)) 50%,var(--soft) 70%);background-size:220% 100%;animation:ux-shim 1.3s linear infinite}
+/* hero */
+.ux-hero{position:relative;overflow:hidden;isolation:isolate;display:grid;gap:1rem;padding:1.3rem;border-radius:26px;color:var(--hero-text);background:linear-gradient(135deg,var(--hero-a),var(--hero-b));box-shadow:0 3px 12px rgba(8,50,38,.16);animation:ux-rise .6s cubic-bezier(.2,.8,.2,1) both}
+.ux-hero-blob{position:absolute;z-index:-1;border-radius:50%;filter:blur(34px);pointer-events:none;animation:ux-drift 12s ease-in-out infinite alternate}
+.ux-hero-blob.b1{width:15rem;height:15rem;right:-4rem;top:-6rem;background:rgba(255,255,255,.22)}
+.ux-hero-blob.b2{width:12rem;height:12rem;left:-3rem;bottom:-6rem;background:rgba(255,214,102,.25);animation-duration:17s;animation-delay:-5s}
+.ux-hero-row{display:flex;align-items:center;gap:1rem;min-width:0}
+.ux-hero-ring{flex:none}.ux-hero-ring .sx-ring-track{stroke:rgba(255,255,255,.26)}.ux-hero-ring .sx-ring-arc{stroke:var(--hero-text)}
+.ux-avatar{font-size:2.6rem;line-height:1;display:block;animation:ux-pop .7s .2s cubic-bezier(.3,1.5,.5,1) both}
+.ux-hero-text{min-width:0}
+.ux-greet{margin:0;font-size:.95rem;opacity:.9;animation:ux-rise .5s .1s both}
+.ux-name{margin:.05rem 0 .25rem;font-size:clamp(1.5rem,5vw,2rem);line-height:1.1;overflow-wrap:anywhere;animation:ux-rise .5s .18s both}
+.ux-focus{margin:0;font-size:.95rem;opacity:.95;animation:ux-rise .5s .26s both}
+.ux-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem;margin:0;padding:0;list-style:none}
+.ux-stats li{display:grid;justify-items:center;align-content:center;gap:.05rem;padding:.7rem .3rem;border-radius:18px;background:var(--hero-chip);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px);animation:ux-pop .55s calc(.3s + var(--i,0)*.09s) cubic-bezier(.3,1.4,.5,1) both;min-width:0}
+.ux-stats b{font-size:1.5rem;line-height:1.1;font-variant-numeric:tabular-nums}.ux-stats small{font-size:.74rem;opacity:.88;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ux-stats li>span{font-size:1.2rem;line-height:1}
+.ux-xp{display:grid;gap:.35rem;animation:ux-rise .5s .65s both}.ux-xp small{opacity:.9}
+.ux-xp-bar{position:relative;overflow:hidden;height:10px;border-radius:99px;background:rgba(255,255,255,.22)}
+.ux-xp-bar i{display:block;height:100%;border-radius:inherit;background:var(--hero-text);transition:width 1s cubic-bezier(.2,.8,.2,1);animation:ux-grow 1.1s .5s cubic-bezier(.2,.8,.2,1) both;position:relative;overflow:hidden}
+.ux-xp-bar i::after{content:"";position:absolute;inset:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);animation:ux-sweep 3.4s 1.6s ease-in-out infinite}
+.ux-stats-skel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+.ux-hero .ux-sk{height:78px;border-radius:18px;background:linear-gradient(100deg,rgba(255,255,255,.12) 30%,rgba(255,255,255,.26) 50%,rgba(255,255,255,.12) 70%);background-size:220% 100%}
+/* the big exam card */
+.ux-exams{display:grid;gap:1.1rem;min-width:0}
+.ux-next{position:relative;overflow:hidden;isolation:isolate;display:grid;gap:.7rem;padding:1.3rem;border-radius:26px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);animation:ux-rise .6s .05s cubic-bezier(.2,.8,.2,1) both}
+.ux-next::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:linear-gradient(90deg,hsl(var(--h,150) 60% var(--sj-acc-l)),hsl(calc(var(--h,150) + 40) 70% var(--sj-acc-l)))}
+.ux-glow{position:absolute;z-index:-1;right:-6rem;top:-7rem;width:20rem;height:20rem;border-radius:50%;background:radial-gradient(circle,hsl(var(--h,150) 80% 60% / .22),transparent 68%);animation:ux-drift 11s ease-in-out infinite alternate;pointer-events:none}
+.ux-next.tone-live::before{background:linear-gradient(90deg,var(--good),color-mix(in srgb,var(--good) 55%,#fff))}
+.ux-next-top{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap}
+.ux-eyebrow{display:inline-flex;align-items:center;gap:.4rem;font-size:.74rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.ux-next.tone-live .ux-eyebrow{color:var(--good)}
+.ux-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent);animation:ux-ping 1.6s ease-out infinite}
+@keyframes ux-ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent)}100%{box-shadow:0 0 0 9px transparent}}
+.ux-subj{display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .7rem .2rem .25rem;border-radius:99px;font-weight:700;font-size:.82rem;background:hsl(var(--h,150) 55% var(--sj-bg-l));color:hsl(var(--h,150) 60% var(--sj-fg-l))}
+.ux-subj .sx-mono{border-radius:99px;background:hsl(var(--h,150) 60% var(--sj-acc-l));color:#fff}
+.ux-next-title{margin:.1rem 0 0;font-size:clamp(1.35rem,4.5vw,1.8rem);line-height:1.2;overflow-wrap:anywhere}
+.ux-next-when{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:0;color:var(--muted)}
+.ux-tag{display:inline-block;padding:.05rem .55rem;border-radius:99px;font-size:.72rem;font-weight:800;color:var(--on-primary);background:var(--primary)}
+.ux-count{display:grid;gap:.35rem;margin:.3rem 0 .1rem}
+.ux-count-cap{font-size:.78rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ux-ticks{display:flex;align-items:center;gap:.35rem}
+.ux-tk{position:relative;display:grid;justify-items:center;min-width:3.4rem;flex:1 1 0;max-width:5.2rem;padding:.5rem .2rem .35rem;border-radius:16px;background:hsl(var(--h,150) 55% var(--sj-bg-l));color:hsl(var(--h,150) 60% var(--sj-fg-l));overflow:hidden}
+.ux-tk.wide{max-width:5.8rem}
+.ux-tk b{font-size:clamp(1.6rem,7vw,2.3rem);line-height:1;font-weight:800;font-variant-numeric:tabular-nums;animation:ux-tick .35s cubic-bezier(.2,.8,.2,1) both}
+.ux-tk small{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.8;margin-top:.15rem}
+.ux-colon{font-weight:800;font-size:1.4rem;color:var(--muted);opacity:.6;animation:ux-blink 1s steps(2) infinite}
+@keyframes ux-blink{50%{opacity:.15}}
+.ux-next.tone-live .ux-tk{background:color-mix(in srgb,var(--good) 14%,var(--surface));color:var(--good)}
+.ux-facts{display:flex;flex-wrap:wrap;gap:.4rem;margin:0;padding:0;list-style:none}
+.ux-facts li{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .8rem;border-radius:99px;background:var(--soft);font-size:.86rem;color:var(--muted)}.ux-facts b{color:var(--text)}
+.ux-cta{display:flex;align-items:center;justify-content:center;gap:.55rem;width:100%;min-height:54px;border-radius:16px;font-weight:800;margin-top:.2rem}
+.ux-cta .ico{transition:transform .25s}@media(hover:hover){.ux-cta:hover .ico{transform:translateX(5px)}}
+.ux-empty{display:flex;align-items:center;gap:1rem;padding:1.2rem;border-radius:24px;border:1px dashed var(--border);background:var(--surface);animation:ux-rise .5s both}
+.ux-empty p{margin:.1rem 0 0}.ux-empty-ico{display:grid;place-items:center;flex:none;width:56px;height:56px;border-radius:18px;background:var(--soft);color:var(--primary);animation:ux-bob 3s ease-in-out infinite}
+@keyframes ux-bob{50%{transform:translateY(-5px)}}
+/* section heads */
+.ux-sec{display:grid;gap:.7rem}
+.ux-sec-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.6rem}.ux-sec-head h2{margin:0;font-size:1.2rem;display:flex;align-items:center;gap:.5rem}
+.ux-count-badge{display:inline-grid;place-items:center;min-width:1.7rem;height:1.7rem;padding:0 .4rem;border-radius:99px;background:var(--soft);color:var(--primary);font-size:.8rem;font-weight:800}
+.ux-seg{display:inline-flex;padding:3px;border-radius:14px;background:var(--soft);border:1px solid var(--border);max-width:100%;overflow-x:auto}
+.ux-seg button{display:inline-flex;align-items:center;gap:.35rem;min-height:38px;padding:.25rem .75rem;border:0;border-radius:11px;background:transparent;color:var(--muted);font:inherit;font-size:.84rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:background .25s,color .25s,transform .12s}
+.ux-seg button i{font-style:normal;font-size:.72rem;padding:0 .4rem;border-radius:99px;background:color-mix(in srgb,var(--text) 10%,transparent)}
+.ux-seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.14)}.ux-seg button:active{transform:scale(.95)}
+/* exam cards */
+.ux-list{display:grid;gap:.8rem;min-width:0}
+.ux-li{min-width:0}
+.ux-card{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"date main" "act act";gap:.8rem .9rem;padding:1rem 1rem 1rem 1.2rem;border-radius:22px;background:var(--surface);border:1px solid var(--border);overflow:hidden;min-width:0;animation:ux-rise .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*90ms);transition:border-color .25s,box-shadow .25s,transform .25s}
+.ux-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:hsl(var(--h,150) 60% var(--sj-acc-l))}
+@media(hover:hover){.ux-card:not(.ux-card-skel):hover{transform:translateY(-2px);border-color:hsl(var(--h,150) 55% var(--sj-acc-l));box-shadow:0 3px 10px rgba(0,0,0,.08)}}
+.ux-date{grid-area:date;align-self:start;display:grid;justify-items:center;align-content:center;width:62px;min-height:78px;padding:.4rem .2rem;border-radius:18px;background:hsl(var(--h,150) 55% var(--sj-bg-l));color:hsl(var(--h,150) 60% var(--sj-fg-l));text-align:center;line-height:1.05}
+.ux-date b{font-size:1.65rem;font-weight:800;font-variant-numeric:tabular-nums}.ux-date small{font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
+.ux-card-main{grid-area:main;display:grid;gap:.5rem;min-width:0;align-content:start}
+.ux-csub{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:0;font-size:.82rem;font-weight:700;color:hsl(var(--h,150) 60% var(--sj-fg-l))}
+.ux-csub .sx-mono{width:22px!important;height:22px!important;font-size:.7rem!important;border-radius:8px}
+.ux-ctitle{margin:0;font-size:1.12rem;line-height:1.25;overflow-wrap:anywhere}
+.ux-chips2{display:flex;flex-wrap:wrap;gap:.35rem;margin:0;padding:0;list-style:none}
+.ux-chips2 li{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .6rem;border-radius:10px;background:var(--soft);font-size:.78rem;font-weight:600;color:var(--muted);white-space:nowrap}
+.ux-timer{display:grid;gap:.3rem;padding:.65rem .75rem;border-radius:14px;background:color-mix(in srgb,var(--soft) 60%,var(--surface));border:1px solid var(--border)}
+.ux-timer-row{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap}
+.ux-pill{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:800;color:var(--muted)}
+.ux-pill.ok{color:var(--good)}.ux-pill.no{color:var(--bad)}
+.ux-timer-num{font-size:1.15rem;font-variant-numeric:tabular-nums}
+.ux-timer.tone-live .ux-pill,.ux-timer.tone-live .ux-timer-num{color:var(--good)}.ux-timer.tone-soon .ux-pill,.ux-timer.tone-soon .ux-timer-num{color:var(--warn)}
+.ux-prox{height:6px;border-radius:99px;background:color-mix(in srgb,var(--text) 10%,transparent);overflow:hidden}
+.ux-prox i{display:block;height:100%;border-radius:inherit;background:hsl(var(--h,150) 60% var(--sj-acc-l));animation:ux-grow 1s .2s cubic-bezier(.2,.8,.2,1) both;transition:width 1s linear}
+.ux-timer.tone-live .ux-prox i{background:var(--good)}
+.ux-rules{display:grid}
+.ux-rules-btn{display:flex;align-items:center;gap:.4rem;min-height:40px;padding:0;border:0;background:none;color:var(--primary);font:inherit;font-weight:700;font-size:.86rem;cursor:pointer;text-align:left}
+.ux-rules-btn .ico:last-child{margin-left:auto;transition:transform .3s}.ux-rules.open .ux-rules-btn .ico:last-child{transform:rotate(180deg)}
+.ux-rules-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s cubic-bezier(.2,.8,.2,1)}.ux-rules.open .ux-rules-body{grid-template-rows:1fr}
+.ux-rules-body>div{overflow:hidden;min-height:0}.ux-rules-body p{margin:0 0 .2rem;padding:.6rem .8rem;border-radius:12px;background:var(--soft);font-size:.84rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.ux-card-act{grid-area:act;display:flex}.ux-card-act .btn{flex:1;display:flex;align-items:center;justify-content:center;gap:.45rem;min-height:46px;border-radius:14px;font-weight:800}
+@media(min-width:760px){
+  .ux-card{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"date main act"}
+  .ux-card-act{align-self:end}.ux-card-act .btn{flex:none;min-width:9.5rem}
+}
+/* lazy loading */
+.ux-card-skel{grid-template-areas:none;grid-template-columns:62px minmax(0,1fr)}.ux-card-skel::before{background:var(--border)}.ux-sk-col{display:grid;gap:.55rem}
+.ux-more{display:flex;flex-direction:column;align-items:center;gap:.4rem;padding:.4rem 0}
+.ux-more-btn{min-height:40px;border-radius:99px}
+.ux-none{display:grid;justify-items:center;gap:.5rem;padding:1.4rem;border-radius:20px;border:1px dashed var(--border);text-align:center}.ux-none p{margin:0}
+.ux-skel-wrap{display:grid;gap:.8rem}
+.ux-next-skel{display:block;min-height:19rem;animation:none}
+.ux-skel-side{display:grid;gap:1rem}
+/* earlier */
+.ux-done-list{display:grid;gap:.5rem;margin:0;padding:0;list-style:none}
+.ux-done-list li{animation:ux-rise .45s calc(var(--i,0)*70ms) cubic-bezier(.2,.8,.2,1) both}
+.ux-done-row{display:flex;align-items:center;gap:.8rem;min-height:56px;padding:.5rem .9rem;border-radius:16px;background:var(--surface);border:1px solid var(--border);color:var(--text);text-decoration:none;transition:border-color .2s,transform .2s}
+@media(hover:hover){a.ux-done-row:hover{border-color:var(--primary);transform:translateX(3px)}}
+/* quick links + side column */
+.ux-quick .sx-tile{animation:ux-pop .5s calc(.1s + var(--i,0)*70ms) cubic-bezier(.3,1.4,.5,1) both}
+@media(hover:hover){.ux-quick .sx-tile:hover{box-shadow:0 3px 10px rgba(0,0,0,.08)}}
+.ux-side>*{animation:ux-rise .55s cubic-bezier(.2,.8,.2,1) both}.ux-side>*:nth-child(2){animation-delay:.08s}.ux-side>*:nth-child(3){animation-delay:.16s}.ux-side>*:nth-child(4){animation-delay:.24s}.ux-side>*:nth-child(5){animation-delay:.32s}
+.ux-side .bar i{animation:ux-grow 1s .3s cubic-bezier(.2,.8,.2,1) both}
+/* themes and calm motion */
+:root[data-theme=high_contrast] .ux-hero{background:var(--surface);color:var(--text);border:2px solid var(--border);box-shadow:none}
+:root[data-theme=high_contrast] .ux-hero-blob,:root[data-theme=high_contrast] .ux-glow{display:none}
+:root[data-theme=high_contrast] .ux-hero-ring .sx-ring-track{stroke:var(--border)}:root[data-theme=high_contrast] .ux-hero-ring .sx-ring-arc{stroke:var(--text)}
+:root[data-theme=high_contrast] .ux-xp-bar{background:var(--border)}:root[data-theme=high_contrast] .ux-xp-bar i{background:var(--text)}
+:root[data-theme=high_contrast] .ux-stats li{border:2px solid var(--border);background:transparent}
+.reduce-motion :is(.ux-hero,.ux-next,.ux-exams,.ux-side,.ux-quick,.ux-fade,.ux-hero *,.ux-next *,.ux-exams *,.ux-side *,.ux-quick *){animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){:is(.ux-hero,.ux-next,.ux-exams,.ux-side,.ux-quick,.ux-fade,.ux-hero *,.ux-next *,.ux-exams *,.ux-side *,.ux-quick *){animation:none!important;transition:none!important}}
