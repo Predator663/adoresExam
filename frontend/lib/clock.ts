@@ -2,6 +2,15 @@
 export function makeOffset(serverTimeIso: string): number {
   return new Date(serverTimeIso).getTime() - Date.now();
 }
+/** The offset for one server timestamp, measured ONCE (the first time that timestamp is seen) and then kept.
+ *  `makeOffset` compares the server time with the phone's clock *right now*, so calling it again on every tick gives
+ *  "server_time" back each time and a countdown that never moves. Countdowns must use this instead. */
+const seen = new Map<string, number>();
+export function stableOffset(serverTimeIso: string): number {
+  let o = seen.get(serverTimeIso);
+  if (o === undefined) { o = makeOffset(serverTimeIso); seen.set(serverTimeIso, o); if (seen.size > 300) seen.delete(seen.keys().next().value as string); }
+  return o;
+}
 export const serverNow = (offset: number) => Date.now() + offset;
 export function pad(n: number) { return String(Math.floor(n)).padStart(2, "0"); }
 export function clock(ms: number) {

@@ -10,7 +10,7 @@ import Shell from "@/components/Shell";
 import Tips from "@/components/Tips";
 import { Bar, ErrorNote, Loading, Modal, useLoad, useNow } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { clock, eatDate, makeOffset } from "@/lib/clock";
+import { clock, eatDate, makeOffset, stableOffset } from "@/lib/clock";
 import { clearAttempt, dequeue, enqueue, readDraft, readQueue, saveDraft } from "@/lib/offlineQueue";
 import { getBestFix, readSensors, startMotion, useProctor, deviceId } from "@/lib/proctor";
 import { useSession } from "@/lib/session";
@@ -29,7 +29,7 @@ function PreExam({ examId }: { examId: number }) {
   if (!c) return <div className="card"><p>{t("exam_not_found")}</p><Link className="btn" href="/">{t("nav_home")}</Link></div>;
   if (c.state === "in_progress" && c.attempt_id) { location.replace(`/exam/?attempt=${c.attempt_id}`); return <Loading />; }
 
-  const n = now + makeOffset(c.server_time);
+  const n = now + stableOffset(c.server_time);
   const startMs = new Date(c.start_at).getTime();
   const diff = startMs - n;
   const started = diff <= 0;

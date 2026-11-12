@@ -5,7 +5,7 @@ import { examStatus } from "@/components/ExamBanner";
 import Icon from "@/components/Icon";
 import { Monogram } from "@/components/student";
 import { useNow } from "@/components/ui";
-import { eatDate, makeOffset, pad } from "@/lib/clock";
+import { eatDate, pad, stableOffset } from "@/lib/clock";
 import { hueOf } from "@/lib/student";
 import { useSession } from "@/lib/session";
 import type { ExamCard } from "@/lib/types";
@@ -41,7 +41,7 @@ export function NextUpCard({ card }: { card: ExamCard }) {
   const { t, lang } = useSession();
   const x = L[lang === "sw" ? "sw" : "en"];
   const now = useNow(1000);
-  const n = now + makeOffset(card.server_time);
+  const n = now + stableOffset(card.server_time);
   const s = examStatus(card, n, t);
   const live = s.tone === "live";
   const p = parts(live ? new Date(card.end_at).getTime() - n : ts(card) - n);
@@ -77,7 +77,7 @@ export function NextUpCard({ card }: { card: ExamCard }) {
 function Timer({ c, x }: { c: ExamCard; x: Txt }) {
   const { t, lang } = useSession();
   const now = useNow(1000);
-  const n = now + makeOffset(c.server_time);
+  const n = now + stableOffset(c.server_time);
   const s = examStatus(c, n, t);
   const start = ts(c), end = new Date(c.end_at).getTime();
   const live = s.tone === "live";
@@ -176,7 +176,7 @@ export default function HomeExams({ cards }: { cards: ExamCard[] }) {
   const earlier = useMemo(() => cards.filter((c) => c.state === "done" || c.state === "missed").sort((a, b) => ts(b) - ts(a)), [cards]);
   const featured = live[0] || upcoming[0];
   const list = useMemo(() => [...live, ...upcoming].filter((c) => c !== featured), [live, upcoming, featured]);
-  const n = now + (cards[0] ? makeOffset(cards[0].server_time) : 0);
+  const n = now + (cards[0] ? stableOffset(cards[0].server_time) : 0);
 
   const [seg, setSeg] = useState<"all" | "today" | "week">("all");
   const counts = useMemo(() => ({

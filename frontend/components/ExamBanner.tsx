@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { clock, eatDate, makeOffset } from "@/lib/clock";
+import { clock, eatDate, stableOffset } from "@/lib/clock";
 import { hueOf } from "@/lib/student";
 import { useSession } from "@/lib/session";
 import type { ExamCard } from "@/lib/types";
@@ -44,7 +44,7 @@ export function ExamMeta({ c }: { c: ExamCard }) {
 export function NextUp({ card }: { card: ExamCard }) {
   const { t, lang } = useSession();
   const now = useNow(1000);
-  const n = now + makeOffset(card.server_time);  // server time, not the phone's clock (BR-03)
+  const n = now + stableOffset(card.server_time);  // server time, not the phone's clock (BR-03)
   const s = examStatus(card, n, t);
   const days = Math.max(1, Math.ceil(s.diff / 86_400_000));
   return (
@@ -74,7 +74,7 @@ export default function ExamBanner({ cards, label }: { cards: ExamCard[]; label?
   const { t, lang } = useSession();
   const now = useNow(1000);
   if (!cards.length) return <div className="card"><p className="muted">{t("no_upcoming")}</p></div>;
-  const n = now + makeOffset(cards[0].server_time);
+  const n = now + stableOffset(cards[0].server_time);
   return (
     <div className="snap sx-xlist" role="list" aria-label={label || t("upcoming_exams")}>
       {cards.map((c) => {
