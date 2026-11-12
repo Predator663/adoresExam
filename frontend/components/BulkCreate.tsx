@@ -6,7 +6,7 @@ import SymbolPad from "./SymbolPad";
 import { api } from "@/lib/api";
 import { useAutofix } from "@/lib/autocorrect";
 import { enterToNext } from "@/lib/enterNext";
-import { leftMark, rightTag } from "@/lib/labels";
+import { leftMark, letters, rightMark, rightTag } from "@/lib/labels";
 import { AutofixSwitch, FillSettings, MatchSettings } from "./TypeSettings";
 import { errorLines, plain, qtypeName, QTYPES, uid } from "@/lib/staff";
 
@@ -78,7 +78,9 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
   const list = (key: "options" | "left" | "right" | "items", min: number, name: string, withCorrect?: boolean) => (
     <>
       {s[key].map((it, i) => (
-        <ItemRow key={it.id} autofix={fix} it={it} label={`${name} ${i + 1}`} canRemove={s[key].length > min}
+        <ItemRow key={it.id} autofix={fix} it={it} canRemove={s[key].length > min}
+          tag={key === "options" ? letters(i + 1) : key === "left" ? leftMark(s.mLeftStyle, i) : key === "right" ? rightMark(s.mRightStyle, i) : undefined}
+          label={`${name} ${key === "options" ? letters(i + 1) : key === "left" ? leftMark(s.mLeftStyle, i).replace(/[()]/g, "") : key === "right" ? rightTag(s.mRightStyle, i) : i + 1}`}
           onChange={(n) => up({ [key]: s[key].map((x) => (x.id === it.id ? n : x)) } as Partial<S>)}
           onRemove={() => up({ [key]: s[key].filter((x) => x.id !== it.id), correct: s.correct.filter((x) => x !== it.id) } as Partial<S>)}
           extra={withCorrect ? (s.qtype === "mcq_single"

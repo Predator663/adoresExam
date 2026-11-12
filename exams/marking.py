@@ -5,7 +5,7 @@ _PUNCT = str.maketrans("", "", ".,;:!?'\"’‘“”-–—()[]{}")
 
 
 def _norm(s, case_sensitive=False, ignore_punct=False):
-    s = str(s)
+    s = str(s).replace("\u2212", "-")  # the "−" from the symbol pad is the same answer as a keyboard hyphen
     if ignore_punct:
         s = s.translate(_PUNCT)
     s = " ".join(s.split())
@@ -14,7 +14,7 @@ def _norm(s, case_sensitive=False, ignore_punct=False):
 
 def _num(s):
     try:
-        return float(str(s).replace(",", "").strip())
+        return float(str(s).replace(",", "").replace("\u2212", "-").strip())
     except (TypeError, ValueError):
         return None
 

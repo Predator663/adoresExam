@@ -9,7 +9,7 @@ import { errorLines, plain, QTYPES, uid } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 import { useAutofix } from "@/lib/autocorrect";
 import { enterToNext } from "@/lib/enterNext";
-import { leftMark, matchLayout, rightTag, type LeftStyle, type RightStyle } from "@/lib/labels";
+import { leftMark, letters, matchLayout, rightMark, rightTag, type LeftStyle, type RightStyle } from "@/lib/labels";
 import { AutofixSwitch, FillSettings, MatchSettings } from "./TypeSettings";
 import type { Question } from "@/lib/types";
 
@@ -72,7 +72,7 @@ export function build(s: S) {
 }
 
 /** One entry (option, matching item, ordering item): text and/or an image with required description (QB-02, QB-03). */
-export function ItemRow({ it, onChange, onRemove, extra, label, canRemove, autofix }: { autofix?: boolean; it: Item; onChange: (i: Item) => void; onRemove?: () => void; extra?: React.ReactNode; label: string; canRemove: boolean }) {
+export function ItemRow({ it, onChange, onRemove, extra, label, canRemove, autofix, tag }: { autofix?: boolean; tag?: string; it: Item; onChange: (i: Item) => void; onRemove?: () => void; extra?: React.ReactNode; label: string; canRemove: boolean }) {
   const [err, setErr] = useState("");
   async function pick(f?: File) {
     if (!f) return;
@@ -83,6 +83,7 @@ export function ItemRow({ it, onChange, onRemove, extra, label, canRemove, autof
   return (
     <div className="card" style={{ padding: ".6rem" }}>
       <div className="row" style={{ alignItems: "flex-start" }}>
+        {tag && <span className="optletter" aria-hidden>{tag}</span>}
         {extra}
         {/* answers can hold symbols, powers, subscripts, fractions, roots and chemical formulas (the server cleans the HTML) */}
         <RichEditor compact autofix={autofix} label={label} value={it.text} onChange={(h) => onChange({ ...it, text: h })} />
@@ -183,7 +184,9 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
   const listEditor = (key: "options" | "left" | "right" | "items", min: number, max: number, name: string, withCorrect?: boolean) => (
     <>
       {s[key].map((it, i) => (
-        <ItemRow key={it.id} autofix={fix} it={it} label={`${name} ${i + 1}`} canRemove={s[key].length > min}
+        <ItemRow key={it.id} autofix={fix} it={it} canRemove={s[key].length > min}
+          tag={key === "options" ? letters(i + 1) : key === "left" ? leftMark(s.mLeftStyle, i) : key === "right" ? rightMark(s.mRightStyle, i) : undefined}
+          label={`${name} ${key === "options" ? letters(i + 1) : key === "left" ? leftMark(s.mLeftStyle, i).replace(/[()]/g, "") : key === "right" ? rightTag(s.mRightStyle, i) : i + 1}`}
           onChange={(n) => up({ [key]: s[key].map((x) => (x.id === it.id ? n : x)) } as any)}
           onRemove={() => up({ [key]: s[key].filter((x) => x.id !== it.id), correct: s.correct.filter((c) => c !== it.id) } as any)}
           extra={withCorrect ? (s.qtype === "mcq_single"

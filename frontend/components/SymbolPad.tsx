@@ -3,7 +3,7 @@ import { RefObject, useState } from "react";
 import { Modal } from "./ui";
 
 /** Characters teachers and students need in maths, science and geography answers. */
-export const SYMBOLS = "° ± × ÷ = ≠ ≈ ≤ ≥ < > π √ ∞ ∑ ∆ θ α β γ λ μ Ω ² ³ ½ ¼ ¾ → ← ⇌ ↑ ↓ ∠ ⊥ ∥ ∴ ∈ ∪ ∩ ‰ £ €".split(" ");
+export const SYMBOLS = "+ − ± × ÷ = ≠ ≈ ≤ ≥ < > π √ ∞ ∑ ∆ θ α β γ λ μ Ω ² ³ ½ ¼ ¾ → ← ⇌ ↑ ↓ ∠ ⊥ ∥ ∴ ∈ ∪ ∩ ‰ £ €".split(" ");
 
 /** A button that opens the symbol list and types the chosen symbol into a plain text box or text area, at the cursor.
  *  Only ordinary characters are inserted (no formatting), so the answer still compares correctly when it is marked. */

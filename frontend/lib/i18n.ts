@@ -157,6 +157,7 @@ const en: Dict = {
   tt11_t: "Sleep helps memory", tt11_b: "A good night's sleep before an exam helps your brain keep what you learned.",
   tt12_t: "Keep your streak", tt12_b: "Do a practice quiz of 5 or more questions each day to keep your streak alive.",
   col_a: "Column A", col_b: "Column B",
+  order_drag: "Hold ⠿ and drag an item to move it, or use the arrows.", drag_handle: "Drag item",
 };
 
 const sw: Dict = {
@@ -277,7 +278,7 @@ const sw: Dict = {
   lock_banner_leaves: "Umeondoka kwenye skrini ya mtihani mara nyingi sana.", lock_body_leaves: "Majibu yako ni salama. Saa inaendelea, kwa hiyo hakuna muda wa ziada. Baki kwenye skrini hii na usubiri msimamizi afungue mtihani wako.",
   lock_banner_manual: "Msimamizi amefunga mtihani wako.", lock_body_manual: "Majibu yako ni salama. Saa inaendelea, kwa hiyo hakuna muda wa ziada. Subiri msimamizi afungue mtihani wako.",
   loc_retry: "Nimewasha, endelea", loc_on: "Eneo limewashwa", loc_off: "Eneo limezimwa", loc_off_note: "Eneo limezimwa. Unaweza kuendelea na mtihani.",
-  loc_why_title: "Kwa nini eneo ni muhimu:", loc_why: "Eneo (GPS) husaidia shule kuhakikisha kila mwanafunzi anafanya mtihani wake mwenyewe, mbali na wengine, ili mtihani uwe wa haki kwa wote na matokeo yako yaaminike.", pc_optional_note: "Eneo halijawashwa, lakini bado unaweza kuanza mtihani.",
+  loc_why_title: "Kwa nini eneo ni muhimu:", loc_why: "Eneo (GPS) husaidia shule kuhakikisha kila mwanafunzi anafanya mtihani wake mwenyewe, mbali na wengine, ili mtihani uwe wa haki kwa wote na matokeo yako yaaminike. Si lazima: unaweza kuanza mtihani hata kama Eneo limezimwa, lakini ni vizuri kuliwasha.", pc_optional_note: "Eneo halijawashwa, lakini bado unaweza kuanza mtihani.",
   off_title: "Matumizi bila mtandao", off_intro: "Pakua unachohitaji ukiwa na intaneti. Baadaye kitafunguka bila mtandao.",
   off_files: "Faili za programu", off_files_d: "Kurasa, mitindo na hati, ili programu ifunguke bila mtandao.",
   off_exams: "Ratiba na kanuni za mitihani", off_exams_d: "Mitihani yako na tarehe, muda na kanuni.",
@@ -314,6 +315,7 @@ const sw: Dict = {
   tt11_t: "Usingizi husaidia kumbukumbu", tt11_b: "Usingizi mzuri kabla ya mtihani husaidia ubongo wako kuhifadhi ulichojifunza.",
   tt12_t: "Linda mfululizo wako", tt12_b: "Fanya zoezi la maswali 5 au zaidi kila siku ili mfululizo wako uendelee.",
   col_a: "Safu A", col_b: "Safu B",
+  order_drag: "Shikilia ⠿ na uburute kipengee ili kukihamisha, au tumia mishale.", drag_handle: "Buruta kipengee",
 };
 
 export const dict: Record<"en" | "sw", Dict> = { en, sw };

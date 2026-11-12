@@ -6,13 +6,13 @@ export type PackQuestion = { id: number; type: Question["type"]; prompt: string;
 const PUNCT = /[.,;:!?'"’‘“”\-–—()[\]{}]/g;
 /** Same as the server's _norm: extra spaces never matter; capitals and punctuation matter only if the teacher said so. */
 const norm = (s: any, caseSensitive = false, ignorePunct = false) => {
-  let t = String(s);
+  let t = String(s).replace(/\u2212/g, "-");  // the "−" from the symbol pad equals a keyboard hyphen
   if (ignorePunct) t = t.replace(PUNCT, "");
   t = t.split(/\s+/).filter(Boolean).join(" ");
   return caseSensitive ? t : t.toLowerCase();
 };
 const num = (s: any): number | null => {
-  const t = String(s).replace(/,/g, "").trim();
+  const t = String(s).replace(/,/g, "").replace(/\u2212/g, "-").trim();
   if (!t) return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : null;

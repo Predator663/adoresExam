@@ -69,3 +69,10 @@ class FillBlankTests(SimpleTestCase):
         self.assertEqual(fraction_correct(p, "email."), 1.0)
         p["answer"]["ignore_punct"] = False
         self.assertEqual(fraction_correct(p, "email"), 0.0)
+
+
+class MinusSignTests(SimpleTestCase):
+    def test_symbol_pad_minus_equals_keyboard_hyphen(self):
+        p = {"qtype": "fill_blank", "answer": {"accepted": ["-5"], "numeric": {"value": -5, "tolerance": 0}}}
+        self.assertEqual(fraction_correct(p, "\u22125"), 1.0)
+        self.assertEqual(fraction_correct({"qtype": "fill_blank", "answer": {"numeric": {"value": -5, "tolerance": 0}}}, "\u22125"), 1.0)

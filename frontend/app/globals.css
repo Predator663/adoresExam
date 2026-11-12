@@ -1875,3 +1875,66 @@ b.rr-g{display:grid;place-items:center;min-width:2.2rem;height:1.9rem;border-rad
 /* fill in the blank */
 .fb-short{flex:0 1 9rem;min-width:0}.fb-medium{flex:1 1 14rem;max-width:26rem;min-width:0}.fb-long{flex:1 1 100%;min-width:0}
 .fb-unit{font-weight:700;color:var(--muted)}.fb-hint{margin:.3rem 0 0}
+
+/* formulas: how they look in questions, answers and the editor (lib/mathHtml.ts) */
+.math{font-family:"Cambria Math","STIX Two Math","Latin Modern Math",serif;white-space:nowrap}
+.rich .math{font-style:normal}
+.mfrac{position:relative;display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 .18em;line-height:1.2;text-align:center}
+.mnum{padding:0 .3em .05em;border-bottom:.09em solid currentColor}.mden{padding:.05em .3em 0}
+.msr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.msqrt{display:inline-flex;align-items:stretch}.mrad{border-top:.09em solid currentColor;padding:0 .12em;margin-left:.02em}
+.mindex{font-size:.6em;align-self:flex-start;margin-right:-.1em}.mwhole{margin-right:.2em;font-size:1.1em;vertical-align:middle}
+/* formula builder (components/FormulaBuilder.tsx) */
+.fb-preview{display:grid;place-items:center;min-height:5.5rem;padding:.9rem;margin:.5rem 0;border-radius:16px;border:1px solid var(--border);background:radial-gradient(circle at 20% 0%,color-mix(in srgb,var(--primary) 14%,var(--surface)),var(--surface));font-size:1.9rem;overflow-x:auto}
+.fb-pop{animation:fb-pop .35s cubic-bezier(.2,.9,.3,1.4)}.fb-pop.ghost{opacity:.4}
+.fb-q{margin:.4rem 0 .3rem}
+.fb-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+@media(min-width:560px){.fb-tiles{grid-template-columns:repeat(6,1fr)}}
+.fb-tile{display:flex;flex-direction:column;align-items:center;gap:.25rem;min-height:72px;padding:.5rem .3rem;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-weight:700;font-size:.78rem;cursor:pointer;transition:transform .15s,border-color .2s,box-shadow .2s}
+.fb-tile:active{transform:scale(.95)}
+.fb-tile.on{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 22%,transparent);animation:fb-bounce .45s}
+.fb-ico{font-size:1.25rem;min-height:2.2rem;display:flex;align-items:center}.fb-tile.on .fb-ico{animation:fb-float 2.2s ease-in-out infinite}
+.fb-help{margin:.7rem 0 .2rem;animation:fb-fade .4s}
+.fb-canvas{display:flex;align-items:center;justify-content:center;gap:.6rem;flex-wrap:wrap;padding:1.4rem .5rem 1.5rem;animation:fb-slide .35s cubic-bezier(.2,.8,.2,1)}
+.fb-box{display:flex;flex-direction:column;gap:.15rem;min-width:0}.fb-cap{font-size:.68rem;color:var(--muted);font-weight:700}
+.fb-in{width:6.2rem;min-height:48px;padding:.4rem .5rem;text-align:center;font-size:1.15rem;font-family:"Cambria Math","STIX Two Math",serif;border:1.5px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+.fb-in:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 25%,transparent)}
+.fb-wide{flex:1 1 100%}.fb-wide .fb-in{width:100%;text-align:left}
+.fb-stack{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+.fb-bar{display:block;height:3px;width:100%;border-radius:3px;background:var(--primary);transform-origin:left;animation:fb-draw .5s .1s both}
+.fb-whole .fb-in{width:4rem}
+.fb-up{transform:translateY(-1.1rem)}.fb-down{transform:translateY(1.1rem)}
+.fb-up .fb-in,.fb-down .fb-in{width:4.4rem;min-height:40px;font-size:1rem}.fb-index .fb-in{width:3.6rem}
+.fb-rootsign{font-size:2.6rem;line-height:1;color:var(--primary);animation:fb-fade .4s}.fb-under .fb-in{border-top-width:4px;border-top-color:var(--primary)}
+.fb-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.2rem 0 .6rem}
+.fb-keys{display:flex;gap:.35rem;overflow-x:auto;padding:.3rem 0 .6rem;-webkit-overflow-scrolling:touch}
+.fb-key{flex:none;min-width:44px;min-height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:1.15rem;font-weight:700;cursor:pointer;transition:transform .1s,background .15s}
+.fb-key:active{transform:scale(.88);background:color-mix(in srgb,var(--primary) 18%,var(--surface))}
+.fb-actions{margin-top:.4rem;align-items:center;flex-wrap:wrap}
+.fb-ready{animation:fb-pulse 1.8s ease-in-out infinite}
+@keyframes fb-pop{from{opacity:.2;transform:scale(.9)}to{opacity:1;transform:none}}
+@keyframes fb-bounce{0%{transform:scale(.92)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+@keyframes fb-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes fb-fade{from{opacity:0}to{opacity:1}}
+@keyframes fb-slide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fb-draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes fb-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 45%,transparent)}50%{box-shadow:0 0 0 8px transparent}}
+.reduce-motion [class*="fb-"]{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){[class*="fb-"]{animation:none!important;transition:none!important}}
+
+/* A, B, C in front of each answer option while writing a question (matching: (i) and A) */
+.optletter{flex:none;display:grid;place-items:center;min-width:2rem;height:2rem;margin-top:.25rem;padding:0 .4rem;border-radius:10px;background:var(--primary);color:var(--on-primary,#fff);font-weight:800}
+
+/* ordering questions: drag and drop (components/SortList.tsx) */
+.sort .order-row{position:relative;touch-action:pan-y;transition:translate .22s cubic-bezier(.2,.8,.2,1),scale .2s,rotate .2s,box-shadow .2s,border-color .2s,background .2s}
+.sort .order-row.lifted{z-index:6;scale:1.035;rotate:1.2deg;border-color:var(--primary);box-shadow:0 16px 30px rgba(0,0,0,.28);transition:scale .2s,rotate .2s,box-shadow .2s,border-color .2s}
+.sort .order-row.lifted.settling{scale:1;rotate:0deg;box-shadow:0 2px 6px rgba(0,0,0,.18);transition:translate .22s cubic-bezier(.2,.8,.2,1),scale .2s,rotate .2s,box-shadow .2s}
+.sort.dragging{user-select:none;-webkit-user-select:none}
+.sort .order-row.room{opacity:.92}
+.sort .order-row.landed{animation:sl-land .5s cubic-bezier(.2,.9,.3,1.5)}
+.sort .grip{flex:none;min-width:44px;min-height:44px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:1.5rem;line-height:1;cursor:grab;touch-action:none}
+.sort .grip:hover{background:var(--soft);color:var(--text)}.sort .lifted .grip{cursor:grabbing;color:var(--primary)}
+.sort .num{transition:background .2s,color .2s}.sort .lifted .num{background:var(--primary);color:var(--on-primary,#fff)}
+@keyframes sl-land{0%{scale:1.05;box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 55%,transparent)}45%{scale:.975}100%{scale:1;box-shadow:0 0 0 14px transparent}}
+.reduce-motion .sort .order-row,.reduce-motion .sort .num{transition:none!important;animation:none!important;rotate:0deg!important}
+@media(prefers-reduced-motion:reduce){.sort .order-row{transition:none!important;animation:none!important;rotate:0deg!important}}

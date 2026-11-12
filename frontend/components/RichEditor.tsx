@@ -3,6 +3,7 @@ import { applyAutofix, undoAutofix } from "@/lib/autocorrect";
 import { useEffect, useRef, useState } from "react";
 import { api, API } from "@/lib/api";
 import { Modal } from "./ui";
+import FormulaBuilder from "./FormulaBuilder";
 import { SYMBOLS } from "./SymbolPad";
 
 /** QB-05: bold, italic, underline, lists, superscript/subscript, special characters, formulas and chemical formulas, images. */
@@ -14,35 +15,6 @@ export async function uploadImage(file: File, alt: string): Promise<{ url: strin
 
 const toEditor = (html: string) => html.split('src="/media').join(`src="${API}/media`);
 const fromEditor = (html: string) => html.split(`src="${API}/media`).join('src="/media');
-
-function chem(src: string) {  // "H2O" -> H<sub>2</sub>O ; "SO4^2-" -> SO<sub>4</sub><sup>2-</sup>
-  const [body, charge] = src.split("^");
-  const h = body.replace(/([A-Za-z\)])(\d+)/g, "$1<sub>$2</sub>");
-  return charge ? `${h}<sup>${charge}</sup>` : h;
-}
-
-function FormulaDialog({ onInsert, onClose }: { onInsert: (html: string) => void; onClose: () => void }) {
-  const [kind, setKind] = useState<"frac" | "power" | "sub" | "root" | "chem">("frac");
-  const [a, setA] = useState(""), [b, setB] = useState("");
-  const html = kind === "frac" ? `<span class="formula" data-formula="${a}/${b}"><sup>${a || "a"}</sup>⁄<sub>${b || "b"}</sub></span>`
-    : kind === "power" ? `${a || "x"}<sup>${b || "2"}</sup>` : kind === "sub" ? `${a || "x"}<sub>${b || "1"}</sub>`
-    : kind === "root" ? `<span class="formula" data-formula="sqrt(${a})">√(${a || "x"})</span>` : `<span class="formula" data-formula="${a}">${chem(a || "H2O")}</span>`;
-  const labels: Record<string, [string, string]> = { frac: ["Top", "Bottom"], power: ["Base", "Power"], sub: ["Base", "Subscript"], root: ["Inside the root", ""], chem: ["Formula, e.g. H2O or SO4^2-", ""] };
-  return (
-    <Modal label="Formula" onClose={onClose}>
-      <h2>Formula</h2>
-      <div className="chips" role="group" aria-label="Formula type">
-        {([["frac", "Fraction"], ["power", "Power"], ["sub", "Subscript"], ["root", "Square root"], ["chem", "Chemical"]] as const).map(([k, l]) => (
-          <button key={k} type="button" className={`chip ${kind === k ? "on" : ""}`} aria-pressed={kind === k} onClick={() => setKind(k)}>{l}</button>))}
-      </div>
-      <label className="field"><span>{labels[kind][0]}</span><input className="input" value={a} onChange={(e) => setA(e.target.value)} /></label>
-      {labels[kind][1] && <label className="field"><span>{labels[kind][1]}</span><input className="input" value={b} onChange={(e) => setB(e.target.value)} /></label>}
-      <p className="muted small">Preview</p>
-      <div className="hint prompt" dangerouslySetInnerHTML={{ __html: html }} />
-      <div className="row"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="button" className="btn primary" onClick={() => { onInsert(html); onClose(); }}>Insert</button></div>
-    </Modal>
-  );
-}
 
 function ImageDialog({ onInsert, onClose }: { onInsert: (html: string) => void; onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null), [alt, setAlt] = useState(""), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
@@ -105,7 +77,7 @@ export default function RichEditor({ value, onChange, label, minRows = 4, compac
           if (compact && e.key === "Enter" && !e.shiftKey) e.preventDefault();
         }} onBlur={() => { remember(); emit(); }}
         onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }} />
-      {dlg === "formula" && <FormulaDialog onInsert={insert} onClose={() => setDlg("")} />}
+      {dlg === "formula" && <FormulaBuilder onInsert={insert} onClose={() => setDlg("")} />}
       {dlg === "image" && <ImageDialog onInsert={insert} onClose={() => setDlg("")} />}
       {dlg === "symbols" && (
         <Modal label="Symbols" onClose={() => setDlg("")}>

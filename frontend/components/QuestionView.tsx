@@ -1,6 +1,7 @@
 "use client";
 import { useRef } from "react";
 import { ItemContent, RichHtml } from "./Rich";
+import SortList from "./SortList";
 import SymbolPad from "./SymbolPad";
 import { leftMark, matchLayout, rightMark, rightTag } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -126,23 +127,7 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
         );
       })()}
 
-      {q.type === "ordering" && (
-        <ol className="ordering" aria-label={t("order_help")}>
-          <p className="muted small">{t("order_help")}</p>
-          {order.map((id, i) => {
-            const it = items.find((x: any) => x.id === id);
-            const move = (d: number) => { const n = [...order]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; onChange(n); };
-            return (
-              <li key={id} className="order-row">
-                <span className="num">{i + 1}</span>
-                <span className="grow"><ItemContent item={it} /></span>
-                <button className="btn icon" disabled={disabled || i === 0} onClick={() => move(-1)} aria-label={t("move_up")}>↑</button>
-                <button className="btn icon" disabled={disabled || i === order.length - 1} onClick={() => move(1)} aria-label={t("move_down")}>↓</button>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      {q.type === "ordering" && <SortList order={order} items={items} onChange={onChange} disabled={disabled} />}
     </div>
   );
 }

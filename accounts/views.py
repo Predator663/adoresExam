@@ -111,8 +111,8 @@ class ChangePasswordView(APIView):
             return Response({"detail": "Your current password is not correct."}, status=400)
         if new == old:
             return Response({"detail": "Please choose a different password."}, status=400)
-        try:
-            validate_password(new, u)
+        try:  # teachers and admins follow the strong staff rule (AUTH-07) here too, not only when an administrator sets the password
+            (validate_password if u.is_student else validate_staff_password)(new, u)
         except DjangoValidationError as e:
             return Response({"detail": " ".join(e.messages)}, status=400)
         u.set_password(new)
