@@ -37,13 +37,13 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
     : [];
   return (
     <div className="question">
-      <RichHtml html={q.prompt} className="prompt" />
-      <p className="muted small">{q.marks === 1 ? t("mark_one") : t("marks_n", { n: q.marks })}</p>
+      <div data-seg="prompt"><RichHtml html={q.prompt} className="prompt" /></div>
+      <p data-seg="marks" className="muted small">{q.marks === 1 ? t("mark_one") : t("marks_n", { n: q.marks })}</p>
 
       {q.type === "mcq_single" && (
         <div role="radiogroup" aria-label={t("choose_one")} className="options">
           {c.options.map((o: any, i: number) => (
-            <label key={o.id} className={`opt keyed ${value === o.id ? "on" : ""}`}>
+            <label key={o.id} data-seg={`opt-${o.id}`} className={`opt keyed ${value === o.id ? "on" : ""}`}>
               <input type="radio" name={`q${q.id}`} checked={value === o.id} disabled={disabled} onChange={() => onChange(o.id)} />
               <span className="opt-key" aria-hidden>{KEYS[i] || i + 1}</span>
               <ItemContent item={o} />
@@ -58,7 +58,7 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
           {c.options.map((o: any, i: number) => {
             const on = (value || []).includes(o.id);
             return (
-              <label key={o.id} className={`opt keyed ${on ? "on" : ""}`}>
+              <label key={o.id} data-seg={`opt-${o.id}`} className={`opt keyed ${on ? "on" : ""}`}>
                 <input type="checkbox" checked={on} disabled={disabled}
                   onChange={() => onChange(on ? value.filter((x: string) => x !== o.id) : [...(value || []), o.id])} />
                 <span className="opt-key sq" aria-hidden>{KEYS[i] || i + 1}</span>
@@ -70,7 +70,7 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
       )}
 
       {q.type === "true_false" && (
-        <div role="radiogroup" aria-label={t("true_or_false")} className="options row2">
+        <div role="radiogroup" data-seg="tf" aria-label={t("true_or_false")} className="options row2">
           {[true, false].map((b) => (
             <label key={String(b)} className={`opt center-text ${value === b ? "on" : ""}`}>
               <input type="radio" name={`q${q.id}`} checked={value === b} disabled={disabled} onChange={() => onChange(b)} />
@@ -104,7 +104,7 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
                 {c.left.map((l: any, i: number) => {
                   const usedElsewhere = new Set(Object.entries(chosen).filter(([k]) => k !== l.id).map(([, v]) => v));
                   return (
-                    <div key={l.id} className={`mt-row ${chosen[l.id] ? "done" : ""}`}>
+                    <div key={l.id} data-seg={`opt-${l.id}`} className={`mt-row ${chosen[l.id] ? "done" : ""}`}>
                       <span className="mt-mark">{leftMark(lay.left_style, i)}</span>
                       <div className="mt-item"><ItemContent item={l} /></div>
                       <select className="input mt-sel" value={chosen[l.id] || ""} disabled={disabled} aria-label={`${leftMark(lay.left_style, i)} ${plainText(l)}: ${t("match_with")}`}
@@ -119,7 +119,7 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
               <section className="mt-col" aria-label={lay.right_title || t("col_b")}>
                 <h4 className="mt-h">{lay.right_title || t("col_b")}</h4>
                 {c.right.map((r: any, j: number) => (
-                  <div key={r.id} className="mt-row mt-ref"><span className="mt-mark">{rightMark(lay.right_style, j)}</span><div className="mt-item"><ItemContent item={r} /></div></div>
+                  <div key={r.id} data-seg={`opt-${r.id}`} className="mt-row mt-ref"><span className="mt-mark">{rightMark(lay.right_style, j)}</span><div className="mt-item"><ItemContent item={r} /></div></div>
                 ))}
               </section>
             </div>

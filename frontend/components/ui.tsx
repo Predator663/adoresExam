@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
@@ -20,8 +20,15 @@ export function Bar({ value, label }: { value: number; label?: string }) {
   const v = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;  // a goal with target 0 used to give NaN% and an empty bar
   return <div className="bar" role="progressbar" aria-valuenow={Math.round(v)} aria-valuemin={0} aria-valuemax={100} aria-label={label}><i style={{ width: `${v}%` }} /></div>;
 }
-export function Modal({ children, onClose, label }: { children: ReactNode; onClose?: () => void; label: string }) {
+const ModalClose = createContext<() => void>(() => {});
+/** Inside a Modal: the close function, so a Close button gets the same exit animation as Esc and a tap outside. */
+export const useModalClose = () => useContext(ModalClose);
+
+/** `fit` = the dialog sizes itself to the visible window (never taller than the screen, no scrolling), opens with a quick
+ *  spring animation and closes with a short fade. Without `fit` it behaves as before. */
+export function Modal({ children, onClose, label, fit }: { children: ReactNode; onClose?: () => void; label: string; fit?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [out, setOut] = useState(false);
   useEffect(() => {
     // The page behind must not scroll while a dialog is open; focus goes into the dialog and comes back to the button that opened it.
     const opener = document.activeElement as HTMLElement | null;
@@ -30,8 +37,15 @@ export function Modal({ children, onClose, label }: { children: ReactNode; onClo
     ref.current?.focus();
     return () => { document.body.style.overflow = prev; opener?.focus?.(); };
   }, []);
+  const close = useCallback(() => {
+    if (!onClose) return;
+    if (!fit) { onClose(); return; }
+    if (out) return;
+    setOut(true);
+    setTimeout(onClose, 140);
+  }, [onClose, fit, out]);
   const key = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") { onClose?.(); return; }
+    if (e.key === "Escape") { close(); return; }
     if (e.key !== "Tab" || !ref.current) return;  // keep Tab inside the dialog
     const f = Array.from(ref.current.querySelectorAll<HTMLElement>("a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex='-1'])"));
     if (!f.length) { e.preventDefault(); return; }
@@ -40,12 +54,14 @@ export function Modal({ children, onClose, label }: { children: ReactNode; onClo
     else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
   };
   return (
-    <div className="modal-back" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={ref}
-        onClick={(e) => e.stopPropagation()} onKeyDown={key}>
-        {children}
+    <ModalClose.Provider value={close}>
+      <div className={`modal-back${fit ? " fit" : ""}${out ? " out" : ""}`} onClick={close}>
+        <div className={`modal${fit ? " fit" : ""}`} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={ref}
+          onClick={(e) => e.stopPropagation()} onKeyDown={key}>
+          {children}
+        </div>
       </div>
-    </div>
+    </ModalClose.Provider>
   );
 }
 

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/session";
 import { speechSupported } from "@/lib/speech";
+import { ReadSettings } from "./Listen";
 import { nearHandle, snap } from "@/lib/stepper";
 
 export const THEME_LIST = ["light", "dark", "high_contrast", "colour_blind", "soft", "mw3"] as const;
@@ -52,6 +53,7 @@ export default function A11yPanel({ compact }: { compact?: boolean }) {
   const { user, savePrefs, t } = useSession();
   const a = user?.accessibility;
   const theme = user?.theme || (typeof document !== "undefined" ? document.documentElement.dataset.theme : "light") || "light";
+  const [reading, setReading] = useState(false);
   const hc = typeof document !== "undefined" ? document.documentElement.dataset.hc : "dark";
   return (
     <div className="a11y">
@@ -98,7 +100,8 @@ export default function A11yPanel({ compact }: { compact?: boolean }) {
       <label className="switch">
         <input type="checkbox" checked={!!a?.read_aloud} onChange={(e) => savePrefs({ read_aloud: e.target.checked })} /> {t("read_aloud")}
       </label>
-      {a?.read_aloud && !speechSupported() && <p className="muted small">{t("read_aloud_unsupported")}</p>}
+      {!speechSupported() ? <p className="muted small">{t("read_aloud_unsupported")}</p> : <button type="button" className="btn" onClick={() => setReading(true)}>🔊 {t("ra_open")}</button>}
+      {reading && <ReadSettings onClose={() => setReading(false)} />}
     </div>
   );
 }

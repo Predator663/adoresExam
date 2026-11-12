@@ -82,7 +82,7 @@ export default function SortList({ order, items, onChange, disabled }: { order: 
       {order.map((id, i) => {
         const it = items.find((x: any) => x.id === id), mine = drag?.id === id;
         return (
-          <li key={id} ref={(el) => { rows.current[id] = el; }}
+          <li key={id} data-seg={`opt-${id}`} ref={(el) => { rows.current[id] = el; }}
             className={`order-row ${mine ? `lifted ${settling ? "settling" : ""}` : ""} ${drag && !mine ? "room" : ""} ${landed === id ? "landed" : ""}`}
             style={{ translate: `0 ${shift(i)}px` }}>
             <button type="button" className="grip" disabled={disabled} aria-label={`${t("drag_handle")} ${i + 1}`} aria-roledescription="sortable item"
