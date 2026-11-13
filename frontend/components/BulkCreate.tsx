@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { blank, build, fresh, ItemRow, type S } from "./QuestionEditor";
+import { blank, build, formName, fresh, ItemRow, useFormLevels, type S } from "./QuestionEditor";
 import RichEditor from "./RichEditor";
 import SymbolPad from "./SymbolPad";
 import { api } from "@/lib/api";
@@ -72,6 +72,7 @@ function Tick() {
 }
 
 function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
+  const levels = useFormLevels(c.s.form_level);
   const fix = useAutofix() && c.s.language === "en";
   const accRef = useRef<HTMLTextAreaElement>(null);
   const s = c.s;
@@ -137,7 +138,7 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
       <details className="bk-more">
         <summary>More details (topic, difficulty, explanation)</summary>
         <div className="grid2">
-          <label className="field"><span>Form</span><select className="input" value={s.form_level} onChange={(e) => up({ form_level: Number(e.target.value) })}>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>Form {n}</option>)}</select></label>
+          <label className="field"><span>Form</span><select className="input" value={s.form_level} onChange={(e) => up({ form_level: Number(e.target.value) })}>{levels.map((n) => <option key={n} value={n}>{formName(n)}</option>)}</select></label>
           <label className="field"><span>Difficulty</span><select className="input" value={s.difficulty} onChange={(e) => up({ difficulty: e.target.value })}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
           <label className="field"><span>Topic</span><input className="input" value={s.topic} onChange={(e) => up({ topic: e.target.value })} /></label>
           <label className="field"><span>Sub-topic</span><input className="input" value={s.subtopic} onChange={(e) => up({ subtopic: e.target.value })} /></label>
@@ -148,8 +149,9 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
   );
 }
 
-export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial, onPersist }: {
+export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial, onPersist, existing = 0 }: {
   exam: { id: number; subject: number };
+  existing?: number;                   // questions already in the exam: new cards are numbered after them (7 saved -> first card is 8)
   initial?: BulkState | null;          // the batch she was writing last time (restored with its order and folded/open cards)
   onPersist?: (state: BulkState | null) => void;  // called on every change; null when nothing is left to keep
   onAdd: (qs: any[]) => void;          // each saved question goes straight into the exam
@@ -157,6 +159,7 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
   onReview: () => void;                // "Review & preview paper"
 }) {
   const subject = exam.subject;
+  const formOpts = useFormLevels();
   const [defs, setDefs] = useState<Defaults>(() => initial?.defs || { form_level: 1, topic: "", difficulty: "medium", marks: 1 });
   const [cards, setCards] = useState<Card[]>(() => initial?.cards?.length
     ? initial.cards.map((c) => ({ ...c, state: "idle" as const, errs: [], leaving: false, seen: !!c.open }))
@@ -164,6 +167,8 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
   const [saving, setSaving] = useState(false), [progress, setProgress] = useState({ done: 0, total: 0 });
   const [summary, setSummary] = useState<{ saved: number; failed: number } | null>(null);
   const [showFlag, setShowFlag] = useState(false);
+  // Cards already saved in this batch are counted in `existing` too, so they are taken off to avoid counting them twice.
+  const base = Math.max(0, existing - cards.filter((c) => c.state === "done").length);
   const scrollTo = useRef<string | null>(null);
 
   // The batch she is writing is handed to the exam builder on every change; it stores it on the server (per teacher), so it
@@ -262,7 +267,7 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
         <details className="bk-more" open={false}>
           <summary>Settings for new questions (form, topic, difficulty, marks)</summary>
           <div className="grid2">
-            <label className="field"><span>Form</span><select className="input" value={defs.form_level} onChange={(e) => setDefs({ ...defs, form_level: Number(e.target.value) })}>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>Form {n}</option>)}</select></label>
+            <label className="field"><span>Form</span><select className="input" value={defs.form_level} onChange={(e) => setDefs({ ...defs, form_level: Number(e.target.value) })}>{formOpts.map((n) => <option key={n} value={n}>{formName(n)}</option>)}</select></label>
             <label className="field"><span>Difficulty</span><select className="input" value={defs.difficulty} onChange={(e) => setDefs({ ...defs, difficulty: e.target.value })}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
             <label className="field"><span>Topic</span><input className="input" value={defs.topic} onChange={(e) => setDefs({ ...defs, topic: e.target.value })} /></label>
             <label className="field"><span>Marks for each</span><input className="input" type="number" min={0.5} step={0.5} value={defs.marks} onChange={(e) => setDefs({ ...defs, marks: Number(e.target.value) })} /></label>
@@ -278,9 +283,9 @@ export default function BulkCreate({ exam, onAdd, onFinished, onReview, initial,
             <article key={c.key} id={`bk-${c.key}`}
               className={`bk-card ${c.leaving ? "out" : ""} ${c.state} ${c.open ? "open" : ""}`} aria-busy={c.state === "saving" || undefined}>
               <header className="bk-top">
-                <span className={`bk-num ${c.state === "done" ? "ok" : ok ? "ready" : ""}`} aria-hidden>{c.state === "done" ? <Tick /> : c.state === "saving" ? <i className="fx-spin" /> : i + 1}</span>
+                <span className={`bk-num ${c.state === "done" ? "ok" : ok ? "ready" : ""}`} aria-hidden>{c.state === "done" ? <Tick /> : c.state === "saving" ? <i className="fx-spin" /> : base + i + 1}</span>
                 <button type="button" className="bk-title" aria-expanded={c.open} onClick={() => toggle(c.key)}>
-                  <b>{title ? title.slice(0, 90) : `Question ${i + 1}`}</b>
+                  <b>{title ? title.slice(0, 90) : `Question ${base + i + 1}`}</b>
                   <span className="muted small">{qtypeName(c.s.qtype)} · {c.s.marks} mark{Number(c.s.marks) === 1 ? "" : "s"} · {c.state === "done" ? "Saved ✓" : c.state === "saving" ? "Saving…" : ok ? "Ready" : !title && !showFlag ? "Not written yet" : `Needs: ${pr[0].replace(/\.$/, "")}`}</span>
                 </button>
                 <span className="bk-tools">

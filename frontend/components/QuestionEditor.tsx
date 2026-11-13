@@ -5,7 +5,7 @@ import RichEditor, { uploadImage } from "./RichEditor";
 import SymbolPad from "./SymbolPad";
 import { ErrorNote, Loading, useLoad } from "./ui";
 import { api, mediaUrl } from "@/lib/api";
-import { errorLines, plain, QTYPES, uid } from "@/lib/staff";
+import { errorLines, formLevels, plain, QTYPES, uid } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 import { useAutofix } from "@/lib/autocorrect";
 import { enterToNext } from "@/lib/enterNext";
@@ -102,9 +102,18 @@ export function ItemRow({ it, onChange, onRemove, extra, label, canRemove, autof
 
 /** `subject` + `onCreated` make it the embedded editor inside the exam builder: the subject is fixed, and the
  *  question is saved, approved and handed back so the builder can add it to the current exam. */
+/** The forms this school really has (from its classes, e.g. Form 0 to 3), always including `keep` so a saved question's own form never vanishes from the picker. */
+export function useFormLevels(keep?: number | number[]): number[] {
+  const classes = useLoad(() => api<{ form_level: number }[]>("/classes/"));
+  const extra = keep === undefined ? [] : Array.isArray(keep) ? keep : [keep];
+  return [...new Set([...formLevels(classes.data), ...extra])].sort((a, b) => a - b);
+}
+export const formName = (n: number) => (n === 0 ? "Form 0 (Pre-Form One)" : `Form ${n}`);
+
 export default function QuestionEditor({ id, onClose, subject, onCreated, backLabel, initial, onDraft }: { id: number | null; onClose: () => void; subject?: number; onCreated?: (q: any) => void; backLabel?: string;
   /** Embedded in the exam builder: the question she was typing last time, and where to report every change so it is kept on the server. */
   initial?: S | null; onDraft?: (s: S) => void }) {
+  const levels = useFormLevels();
   const { user } = useSession();
   const admin = user?.role === "admin" || user?.role === "super_admin";
   const subjects = useLoad(() => api<any[]>("/subjects/"));
@@ -207,7 +216,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
       <div className="card">
         <div className="grid2">
           <label className="field"><span>Subject</span><select className="input" value={s.subject} disabled={!!subject} onChange={(e) => up({ subject: e.target.value })}><option value="">Choose…</option>{mySubjects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-          <label className="field"><span>Form</span><select className="input" value={s.form_level} onChange={(e) => up({ form_level: Number(e.target.value) })}>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>Form {n}</option>)}</select></label>
+          <label className="field"><span>Form</span><select className="input" value={s.form_level} onChange={(e) => up({ form_level: Number(e.target.value) })}>{[...new Set([...levels, s.form_level])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{formName(n)}</option>)}</select></label>
           <label className="field"><span>Topic</span><input className="input" value={s.topic} onChange={(e) => up({ topic: e.target.value })} /></label>
           <label className="field"><span>Sub-topic</span><input className="input" value={s.subtopic} onChange={(e) => up({ subtopic: e.target.value })} /></label>
           <label className="field"><span>Difficulty</span><select className="input" value={s.difficulty} onChange={(e) => up({ difficulty: e.target.value })}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>

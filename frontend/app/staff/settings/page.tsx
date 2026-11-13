@@ -147,7 +147,7 @@ function Setup() {
       <div className="card"><h3>Classes</h3>
         <PagedList as="div" className="" items={(classes.data || []).filter((x: any) => hit(`${x.name} form ${x.form_level} ${x.stream || ""}`))} size={10} render={(x: any) => <div key={x.id} className="row"><span className="grow">{x.name} (Form {x.form_level}{x.stream ? `, stream ${x.stream}` : ""})</span><button className="btn danger" onClick={() => confirm(`Delete ${x.name}?`) && run(() => api(`/classes/${x.id}/`, { method: "DELETE" }), classes.reload)}>Delete</button></div>} />
         <div className="row" style={{ marginTop: ".6rem" }}><input className="input grow" placeholder="Name, e.g. Form 1A" aria-label="Class name" value={c.name} onChange={(e) => setC({ ...c, name: e.target.value })} />
-          <select className="input" style={{ width: 100 }} aria-label="Form" value={c.form_level} onChange={(e) => setC({ ...c, form_level: Number(e.target.value) })}>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>Form {n}</option>)}</select>
+          <select className="input" style={{ width: 100 }} aria-label="Form" value={c.form_level} onChange={(e) => setC({ ...c, form_level: Number(e.target.value) })}>{[0, 1, 2, 3, 4].map((n) => <option key={n} value={n}>{n === 0 ? "Form 0 (Pre-Form)" : `Form ${n}`}</option>)}</select>
           <input className="input" style={{ width: 90 }} placeholder="Stream" aria-label="Stream" value={c.stream} onChange={(e) => setC({ ...c, stream: e.target.value })} />
           <button className="btn primary" disabled={!c.name} onClick={() => run(() => api("/classes/", { body: c }), () => { setC({ name: "", form_level: 1, stream: "" }); classes.reload(); })}>Add</button></div></div>
       <div className="card"><h3>Subjects and practice mode</h3>
