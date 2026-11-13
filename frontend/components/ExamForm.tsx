@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import ExamBuilder from "./ExamBuilder";
+import ExamWindowPicker from "./ExamWindowPicker";
 import { useToast } from "./SubmitFlow";
 import { ErrorNote, Loading, useLoad } from "./ui";
 import { api, downloadFile } from "@/lib/api";
@@ -99,8 +100,7 @@ export default function ExamForm({ id, onClose }: { id: number | null; onClose: 
           <>
             <fieldset><legend>Who sits this exam (classes)</legend><div className="chips">{classes.data?.map((c) => { const on = f.classes.includes(c.id); return <label key={c.id} className={`chip ${on ? "on" : ""}`}><input type="checkbox" checked={on} disabled={!editable} onChange={() => up({ classes: on ? f.classes.filter((x) => x !== c.id) : [...f.classes, c.id] })} />{on ? "✓ " : ""}{classLabel(c)}</label>; })}</div></fieldset>
             <div className="grid2">
-              <label className="field"><span>Starts (East Africa Time)</span><input className="input" type="datetime-local" value={f.start} disabled={!editable} onChange={(ev) => up({ start: ev.target.value })} /></label>
-              <label className="field"><span>Window ends</span><input className="input" type="datetime-local" value={f.end} disabled={!editable} onChange={(ev) => up({ end: ev.target.value })} /></label>
+              <ExamWindowPicker start={f.start} end={f.end} duration={f.duration} disabled={!editable} onChange={(w) => up(w)} />
               {num("duration", "Duration (minutes)", { min: 1 })}{num("pass", "Pass mark (%)", { min: 0, max: 100 })}
               <label className="field"><span>Late-entry window (min; empty = school setting)</span><input className="input" type="number" min={0} value={f.late} disabled={!editable} onChange={(ev) => up({ late: ev.target.value })} /></label>
               <label className="field"><span>Time warnings (minutes before end)</span><input className="input" value={f.warnings} disabled={!editable} placeholder="10, 5, 1" onChange={(ev) => up({ warnings: ev.target.value })} /></label>

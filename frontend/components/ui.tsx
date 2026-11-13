@@ -114,7 +114,7 @@ export function Dropdown({ button, children, label, align = "right" }: { button:
 }
 
 /** Underlined tab bar with arrow-key support. Replaces the old chip rows. */
-export function Tabs({ tabs, value, onChange }: { tabs: string[][]; value: string; onChange: (k: string) => void }) {
+export function Tabs({ tabs, value, onChange, badges }: { tabs: string[][]; value: string; onChange: (k: string) => void; badges?: Record<string, { text: string | number; warn?: boolean } | undefined> }) {
   const move = (e: React.KeyboardEvent, i: number) => {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!d) return;
@@ -127,7 +127,7 @@ export function Tabs({ tabs, value, onChange }: { tabs: string[][]; value: strin
     <div className="tabs" role="tablist">
       {tabs.map(([k, l], i) => (
         <button key={k} id={`tab-${k}`} type="button" role="tab" aria-selected={value === k} tabIndex={value === k ? 0 : -1}
-          className={`tab ${value === k ? "on" : ""}`} onClick={() => onChange(k)} onKeyDown={(e) => move(e, i)}>{l}</button>
+          className={`tab ${value === k ? "on" : ""}`} onClick={() => onChange(k)} onKeyDown={(e) => move(e, i)}>{l}{badges?.[k] && <span className={`tab-badge ${badges[k]!.warn ? "warn" : ""}`}>{badges[k]!.text}</span>}</button>
       ))}
     </div>
   );

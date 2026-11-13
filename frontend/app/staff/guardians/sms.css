@@ -1,0 +1,135 @@
+/* Parents / SMS screen. Uses the theme variables, so dark, high-contrast and colour-blind themes follow automatically. */
+.sms{--sms-ease:cubic-bezier(.2,.8,.2,1)}
+.sms .grow{flex:1 1 auto;min-width:0}
+
+/* status strip */
+.sms-strip{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.65rem .9rem;margin:0 0 .8rem;border-radius:14px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow);animation:sms-drop .4s var(--sms-ease) both}
+.sms-strip.on{border-color:var(--good)}.sms-strip.off{border-color:var(--warn);background:linear-gradient(90deg,var(--soft),var(--surface))}
+.sms-dot{position:relative;width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
+.on .sms-dot{background:var(--good)}.on .sms-dot::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--good);animation:sms-ping 1.8s ease-out infinite}
+.off .sms-dot{background:var(--warn)}
+.sms-strip .btn{min-height:40px}
+
+/* stats */
+.sms-stat{position:relative;overflow:hidden;transition:transform .2s var(--sms-ease),box-shadow .2s;animation:sms-rise .45s var(--sms-ease) both}
+.sms-stat:nth-child(2){animation-delay:.06s}.sms-stat:nth-child(3){animation-delay:.12s}
+@media(hover:hover){.sms-stat:hover{transform:translateY(-3px)}}
+.sms-stat i{display:block;font-style:normal;font-size:1.3rem;margin-bottom:.1rem}
+.sms-stat b small{font-size:.9rem;font-weight:600;color:var(--muted)}
+.sms-stat.good b{color:var(--good)}.sms-stat.bad b{color:var(--bad)}.sms-stat.warn b{color:var(--warn)}
+
+/* tabs with a badge */
+.tab-badge{display:inline-grid;place-items:center;min-width:1.35rem;height:1.35rem;padding:0 .35rem;margin-left:.4rem;border-radius:999px;background:var(--primary);color:var(--on-primary);font-size:.72rem;font-weight:800;animation:sms-pop .35s var(--sms-ease)}
+.tab-badge.warn{background:var(--warn);color:#fff}
+.tab{position:relative}
+.tab.on{animation:sms-tab .3s var(--sms-ease)}
+.sms-pane{animation:sms-rise .35s var(--sms-ease) both}
+
+/* table rows */
+.sms-row{animation:sms-row-in .35s var(--sms-ease) both;animation-delay:calc(var(--i,0) * 28ms);transition:background .15s}
+.sms-row:hover{background:var(--soft)}
+.sms-row.picked{background:var(--soft);box-shadow:inset 3px 0 0 var(--primary)}
+.sms-av{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;color:#fff;font-weight:800;font-size:.85rem;flex:none;margin-right:.6rem;vertical-align:middle}
+.sms-who{display:flex;align-items:center}
+.sms-st.st-sending{animation:sms-breathe 1.2s ease-in-out infinite}
+.sms-st.st-delivered,.sms-st.st-sent{animation:sms-pop .4s var(--sms-ease)}
+
+/* floating selection bar */
+.sms-sel{position:sticky;bottom:.8rem;z-index:5;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.7rem .9rem;margin-top:.8rem;border-radius:14px;background:var(--primary);color:var(--on-primary);box-shadow:0 10px 30px rgba(0,0,0,.28);animation:sms-up .35s var(--sms-ease) both}
+.sms-sel .btn{min-height:42px;background:var(--on-primary);color:var(--primary);border-color:var(--on-primary)}
+.sms-sel .btn.ghost{background:transparent;color:var(--on-primary);border-color:var(--on-primary)}
+
+/* skeleton + empty */
+.sms-skel{display:grid;gap:.5rem}
+.sms-skel div{display:grid;grid-template-columns:2fr 1.2fr 1fr;gap:.8rem;padding:.9rem;border-radius:12px;border:1px solid var(--border);background:var(--surface);animation:sms-rise .4s var(--sms-ease) both}
+.sms-skel i{height:14px;border-radius:8px;background:linear-gradient(90deg,var(--soft) 25%,var(--border) 50%,var(--soft) 75%);background-size:200% 100%;animation:sms-shimmer 1.3s linear infinite}
+.sms-empty{text-align:center;padding:2rem 1rem;animation:sms-rise .4s var(--sms-ease) both}
+.sms-empty-ic{font-size:2.6rem;animation:sms-float 3s ease-in-out infinite}
+.sms-empty .row{justify-content:center;margin-top:.8rem;flex-wrap:wrap}
+
+/* upload */
+.sms-steps{display:flex;gap:.4rem;margin:0 0 .8rem;padding:0;list-style:none}
+.sms-steps li{flex:1;display:flex;align-items:center;gap:.45rem;padding:.5rem .6rem;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-weight:700;font-size:.85rem;transition:all .3s var(--sms-ease)}
+.sms-steps li b{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--soft);font-size:.8rem;transition:all .3s}
+.sms-steps li.on{color:var(--text);border-color:var(--primary);box-shadow:var(--shadow)}.sms-steps li.on b{background:var(--primary);color:var(--on-primary)}
+.sms-steps li.done b{background:var(--good);color:var(--on-primary)}
+@media(max-width:520px){.sms-steps li span{display:none}}
+.sms-drop{display:grid;place-items:center;gap:.2rem;text-align:center;padding:1.6rem 1rem;border:2px dashed var(--border);border-radius:16px;background:var(--surface);cursor:pointer;transition:all .2s var(--sms-ease)}
+.sms-drop:hover,.sms-drop:focus-within{border-color:var(--primary);background:var(--soft)}
+.sms-drop.over{border-color:var(--primary);background:var(--soft);transform:scale(1.015)}
+.sms-drop .ic{font-size:2rem;transition:transform .3s var(--sms-ease)}.sms-drop.over .ic{transform:translateY(-6px) scale(1.15)}
+.sms-drop.has{border-style:solid;border-color:var(--good)}
+.sms-bar{height:6px;border-radius:6px;background:var(--soft);overflow:hidden;margin:.5rem 0}
+.sms-bar i{display:block;height:100%;width:40%;border-radius:6px;background:var(--primary);animation:sms-slide 1.1s ease-in-out infinite}
+.sms-bad td{background:color-mix(in srgb,var(--bad) 9%,transparent)}
+
+/* send */
+.sms-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.3rem 0}
+.sms-chip{display:inline-flex;align-items:center;gap:.3rem;min-height:38px;padding:.25rem .8rem;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .15s var(--sms-ease)}
+.sms-chip:hover{border-color:var(--primary);transform:translateY(-1px)}
+.sms-chip.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.sms-chip button{border:0;background:none;color:inherit;cursor:pointer;padding:0 .1rem;font:inherit}
+.sms-chip .n{opacity:.75;font-weight:800}
+.sms-meter{height:6px;border-radius:6px;background:var(--soft);overflow:hidden}
+.sms-meter i{display:block;height:100%;border-radius:6px;background:var(--primary);transition:width .25s var(--sms-ease),background .25s}
+.sms-meter.hot i{background:var(--warn)}.sms-meter.full i{background:var(--bad)}
+.sms-count{display:flex;justify-content:space-between;gap:.5rem;font-size:.82rem;color:var(--muted);margin-top:.25rem}
+.sms-plan{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,260px);gap:1rem;align-items:start;animation:sms-rise .35s var(--sms-ease) both}
+@media(max-width:700px){.sms-plan{grid-template-columns:1fr}}
+.sms-phone{margin:0;padding:.7rem;border-radius:22px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow)}
+.sms-phone figcaption{font-size:.75rem;font-weight:800;text-align:center;color:var(--muted);margin-bottom:.4rem}
+.sms-bubble{white-space:pre-wrap;overflow-wrap:anywhere;padding:.6rem .8rem;border-radius:18px 18px 18px 4px;background:var(--soft);border:1px solid var(--border);font-size:.9rem;line-height:1.4;transform-origin:left bottom;animation:sms-bubble .4s var(--sms-ease) both}
+.sms-meta{font-size:.72rem;color:var(--muted);margin-top:.35rem}
+.sms-live{position:relative;overflow:hidden;padding:.9rem 1rem;border-radius:16px;border:1px solid var(--primary);background:var(--surface);box-shadow:var(--shadow);margin-bottom:.9rem;animation:sms-drop .4s var(--sms-ease) both}
+.sms-live.paused{border-color:var(--warn)}
+.sms-live .track{height:12px;border-radius:12px;background:var(--soft);overflow:hidden;margin:.55rem 0;position:relative}
+.sms-live .track i{display:block;height:100%;border-radius:12px;background:var(--primary);transition:width .8s var(--sms-ease);position:relative;overflow:hidden}
+.sms-live .track i::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);animation:sms-sweep 1.6s linear infinite}
+.sms-live.paused .track i{background:var(--warn)}.sms-live.paused .track i::after{animation:none}
+.sms-dist{display:flex;height:12px;border-radius:12px;overflow:hidden;background:var(--soft)}
+.sms-dist i{display:block;height:100%;transition:width .8s var(--sms-ease)}
+.sms-dist .g,.sms-legend .g{background:var(--good)}.sms-dist .w,.sms-legend .w{background:var(--muted);opacity:.55}.sms-dist .r,.sms-legend .r{background:var(--bad)}
+.sms-legend{display:flex;gap:.9rem;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-top:.35rem}
+.sms-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem}
+.sms-stale{font-size:.75rem;color:var(--muted)}
+.sms-refresh{display:inline-block;animation:spin 1s linear infinite}
+
+/* phone tab */
+.sms-hero{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.sms-radar{position:relative;display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:var(--soft);font-size:1.7rem;flex:none}
+.sms-radar::before,.sms-radar::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--good);opacity:0;animation:sms-radar 2.4s ease-out infinite}
+.sms-radar::after{animation-delay:1.2s}
+.sms-radar.off::before,.sms-radar.off::after{border-color:var(--warn);animation:none}
+.sms-check{list-style:none;margin:.6rem 0 0;padding:0;display:grid;gap:.3rem}
+.sms-check li{display:flex;gap:.5rem;align-items:center;font-weight:600;color:var(--muted);transition:color .3s}
+.sms-check li b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);font-size:.75rem;transition:all .3s var(--sms-ease)}
+.sms-check li.ok{color:var(--text)}.sms-check li.ok b{background:var(--good);border-color:var(--good);color:var(--on-primary);animation:sms-pop .4s var(--sms-ease)}
+.sms-rate{font-size:.85rem;color:var(--muted)}
+
+/* toasts + confirm */
+.sms-toasts{position:fixed;left:50%;bottom:1rem;transform:translateX(-50%);z-index:60;display:grid;gap:.5rem;width:min(92vw,440px);pointer-events:none}
+.sms-toast{pointer-events:auto;display:flex;align-items:center;gap:.6rem;padding:.7rem .8rem;border-radius:14px;background:var(--text);color:var(--bg);box-shadow:0 12px 32px rgba(0,0,0,.3);animation:sms-up .35s var(--sms-ease) both;font-weight:600;font-size:.92rem}
+.sms-toast.err{background:var(--bad);color:var(--bg)}
+.sms-toast-ic{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.22);font-weight:800;flex:none}
+.sms-toast button{border:0;background:none;color:inherit;cursor:pointer;font:inherit;opacity:.8;min-width:32px;min-height:32px}
+.sms-confirm-body{margin:.4rem 0 .9rem}
+
+/* keyframes */
+@keyframes sms-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes sms-drop{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes sms-up{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes sms-row-in{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+@keyframes sms-pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes sms-tab{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:none}}
+@keyframes sms-ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(3);opacity:0}}
+@keyframes sms-radar{0%{transform:scale(.8);opacity:.8}100%{transform:scale(1.9);opacity:0}}
+@keyframes sms-breathe{50%{opacity:.5}}
+@keyframes sms-shimmer{to{background-position:-200% 0}}
+@keyframes sms-float{50%{transform:translateY(-6px)}}
+@keyframes sms-slide{0%{margin-left:-40%}100%{margin-left:100%}}
+@keyframes sms-sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+@keyframes sms-bubble{from{opacity:0;transform:scale(.7) translateY(8px)}to{opacity:1;transform:none}}
+
+/* less motion: the system setting, or the app's own "reduce motion" switch */
+@media(prefers-reduced-motion:reduce){.sms *,.sms-toasts *{animation:none!important;transition:none!important}}
+.reduce-motion .sms *,.reduce-motion .sms-toasts *{animation:none!important;transition:none!important}
