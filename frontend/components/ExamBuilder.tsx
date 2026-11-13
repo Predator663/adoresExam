@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { onBeforeLogout } from "@/lib/session";
 import { DATETIME, eatDate } from "@/lib/clock";
 import { canonicalOrder, groupSections } from "@/lib/sections";
-import { errorLines, plain, qtypeName, QTYPES } from "@/lib/staff";
+import { errorLines, formLevels, plain, qtypeName, QTYPES } from "@/lib/staff";
 import type { Question } from "@/lib/types";
 
 type Q = { id: number; subject: number; form_level: number; topic: string; subtopic: string; difficulty: string; marks: number; qtype: string; prompt: string; content: any; answer: any; explanation: string; used_count?: number; last_used?: string | null; created_by_name?: string; is_mine?: boolean; can_edit?: boolean; status?: string };
@@ -48,6 +48,8 @@ const Diff = ({ d }: { d: string }) => <span className={`dpill d-${d}`}>{d}</spa
 function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, onShelf, onEdit, onPublish }: { exam: any; scope: Shelf; selIds: Set<number>; onToggle: (q: Q) => void; onAddMany: (qs: Q[]) => void; onCreate: () => void; onCounts: (c: { mine: number; others: number }) => void; onShelf: (s: Shelf) => void; onEdit: (id: number) => void; onPublish: (q: Q) => Promise<void> }) {
   const [f, setF] = useState<Filters>(F0), [text, setText] = useState("");
   const [res, setRes] = useState<any>(null), [busy, setBusy] = useState(true), [err, setErr] = useState(""), [open, setOpen] = useState<number | null>(null);
+  const [schoolClasses, setSchoolClasses] = useState<{ form_level: number }[]>([]);  // the Form filter lists the forms the school really has
+  useEffect(() => { let live = true; api<any[]>("/classes/").then((r) => { if (live) setSchoolClasses(r); }).catch(() => {}); return () => { live = false; }; }, []);
   const [pubBusy, setPubBusy] = useState<number | null>(null), [reload, setReload] = useState(0);
   const top = useRef<HTMLDivElement>(null);
   const publish = async (q: Q) => { setPubBusy(q.id); try { await onPublish(q); setReload((n) => n + 1); } catch (e: any) { setErr(e.message || "Could not approve the question."); } finally { setPubBusy(null); } };
@@ -91,7 +93,7 @@ function Bank({ exam, scope, selIds, onToggle, onAddMany, onCreate, onCounts, on
           <label className="field"><span>Topic</span><select className="input" value={f.topic} onChange={(e) => set({ topic: e.target.value })}><option value="">All topics</option>{res?.topics.map((t: string) => <option key={t}>{t}</option>)}</select></label>
           <label className="field"><span>Difficulty</span><select className="input" value={f.difficulty} onChange={(e) => set({ difficulty: e.target.value })}><option value="">Any</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
           <label className="field"><span>Type</span><select className="input" value={f.qtype} onChange={(e) => set({ qtype: e.target.value })}><option value="">Any</option>{QTYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-          <label className="field"><span>Form</span><select className="input" value={f.form_level} onChange={(e) => set({ form_level: e.target.value })}><option value="">Any</option>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>Form {n}</option>)}</select></label>
+          <label className="field"><span>Form</span><select className="input" value={f.form_level} onChange={(e) => set({ form_level: e.target.value })}><option value="">Any</option>{formLevels(schoolClasses).map((n) => <option key={n} value={n}>Form {n}</option>)}</select></label>
           <label className="field"><span>Sort</span><select className="input" value={f.sort} onChange={(e) => set({ sort: e.target.value })}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="topic">Topic A–Z</option></select></label>
           <label className="field"><span>Per page</span><select className="input" value={f.size} onChange={(e) => set({ size: Number(e.target.value) })}>{[10, 20, 50].map((n) => <option key={n}>{n}</option>)}</select></label>
         </div>

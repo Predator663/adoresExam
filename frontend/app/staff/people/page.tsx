@@ -5,7 +5,7 @@ import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
 import { Modal, ErrorNote, Loading, useLoad, Tabs } from "@/components/ui";
 import { api, downloadFile } from "@/lib/api";
-import { errorLines } from "@/lib/staff";
+import { classLabel, errorLines } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 
 function Errs({ errs, ok }: { errs: string[]; ok?: string }) {
@@ -43,7 +43,7 @@ function Staff({ kind }: { kind: "teachers" | "admins" }) {
           <label className="field"><span>Status</span><select className="input" value={flt.active} onChange={(e) => setFlt({ ...flt, active: e.target.value })}><option value="">All</option><option value="1">Active</option><option value="0">Inactive</option></select></label>
           {kind === "teachers" && <>
             <label className="field"><span>Teaches subject</span><select className="input" value={flt.subject} onChange={(e) => setFlt({ ...flt, subject: e.target.value })}><option value="">Any subject</option>{subjects.data?.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-            <label className="field"><span>Teaches class</span><select className="input" value={flt.class} onChange={(e) => setFlt({ ...flt, class: e.target.value })}><option value="">Any class</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+            <label className="field"><span>Teaches class</span><select className="input" value={flt.class} onChange={(e) => setFlt({ ...flt, class: e.target.value })}><option value="">Any class</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select></label>
           </>}
         </div>
         <div className="row"><span className="grow muted small" aria-live="polite">{list.loading ? "Searching…" : `${list.count} ${label}${list.count === 1 ? "" : "s"}${filtered ? " found" : ""}`}</span>
@@ -53,7 +53,7 @@ function Staff({ kind }: { kind: "teachers" | "admins" }) {
         <div key={t.id} className={`card ${t.is_active ? "" : "unread"}`}>
           <div className="row"><span className="grow"><b>{t.first_name} {t.last_name}</b> <span className="muted small">@{t.username}</span>{!t.is_active && <span className="pill">inactive</span>}</span>
             {kind === "teachers" && <button className="btn" onClick={() => setOpen(open === t.id ? null : t.id)}>{open === t.id ? "Close" : "Subjects & classes"}</button>}</div>
-          {kind === "teachers" && <p className="muted small">{t.assignments.length ? t.assignments.map((a: any) => `${a.subject_name}${a.school_class ? ` (${classes.data?.find((c) => c.id === a.school_class)?.name})` : " (all classes)"}`).join(", ") : "No subjects assigned yet"}</p>}
+          {kind === "teachers" && <p className="muted small">{t.assignments.length ? t.assignments.map((a: any) => `${a.subject_name}${a.school_class ? ` (${classLabel(classes.data?.find((c) => c.id === a.school_class) || { name: "?" })})` : " (all classes)"}`).join(", ") : "No subjects assigned yet"}</p>}
           <div className="row">
             <button className="btn" onClick={() => run(() => api(`/${kind}/${t.id}/reset-password/`, { body: {} }), ((r: any) => `Temporary password (shown once): ${r.temporary_password}`) as any)}>Reset password</button>
             {t.is_active ? <button className="btn danger" onClick={() => confirm(`Deactivate ${t.username}? Their questions and exams stay.`) && run(() => api(`/${kind}/${t.id}/`, { method: "DELETE" }), "Deactivated.")}>Deactivate</button>
@@ -64,7 +64,7 @@ function Staff({ kind }: { kind: "teachers" | "admins" }) {
               {t.assignments.map((a: any) => <div key={a.id} className="row"><span className="grow">{a.subject_name} · {a.school_class ? classes.data?.find((c) => c.id === a.school_class)?.name : "all classes"}</span><button className="btn danger" onClick={() => run(() => api(`/assignments/${a.id}/`, { method: "DELETE" }), "Removed.")}>Remove</button></div>)}
               <div className="grid2" style={{ marginTop: ".5rem" }}>
                 <select className="input" aria-label="Subject" value={as.subject} onChange={(e) => setAs({ ...as, subject: e.target.value })}><option value="">Subject…</option>{subjects.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-                <select className="input" aria-label="Class" value={as.school_class} onChange={(e) => setAs({ ...as, school_class: e.target.value })}><option value="">All classes</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                <select className="input" aria-label="Class" value={as.school_class} onChange={(e) => setAs({ ...as, school_class: e.target.value })}><option value="">All classes</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select>
               </div>
               <button className="btn primary" disabled={!as.subject} onClick={() => run(() => api("/assignments/", { body: { teacher: t.id, subject: Number(as.subject), school_class: as.school_class ? Number(as.school_class) : null } }), "Assigned.", () => setAs({ subject: "", school_class: "" }))}>Assign</button>
             </div>
@@ -94,7 +94,7 @@ function Students() {
       <div className="card">
         <div className="grid2">
           <label className="field"><span>Search</span><input className="input" placeholder="Name, username or index number" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} /></label>
-          <label className="field"><span>Class</span><select className="input" value={f.class} onChange={(e) => setF({ ...f, class: e.target.value })}><option value="">All</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="field"><span>Class</span><select className="input" value={f.class} onChange={(e) => setF({ ...f, class: e.target.value })}><option value="">All</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select></label>
           <label className="field"><span>Show</span><select className="input" value={f.archived + f.active} onChange={(e) => { const v = e.target.value; setF({ ...f, archived: v[0], active: v.slice(1) }); }}><option value="0">Current students</option><option value="01">Active only</option><option value="00">Deactivated or graduated</option><option value="1">Archived (deleted)</option></select></label>
           <div className="row" style={{ alignItems: "flex-end" }}><button className="btn primary" onClick={() => setAdd(true)}>+ Add a student</button>
             <button className="btn" onClick={() => downloadFile(`/students/credentials/?file=pdf${f.class ? `&class=${f.class}` : ""}`, "credentials.pdf").catch((e) => setErrs([e.message]))}>⬇ Username sheet</button>
@@ -105,7 +105,7 @@ function Students() {
       {sel.length > 0 && !archived && (
         <div className="card hint" role="region" aria-label="Bulk actions"><b>{sel.length} selected</b>
           <div className="row" style={{ marginTop: ".4rem" }}>
-            <select className="input" style={{ width: 160 }} aria-label="Move to class" value={bulkClass} onChange={(e) => setBulkClass(e.target.value)}><option value="">Class…</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            <select className="input" style={{ width: 160 }} aria-label="Move to class" value={bulkClass} onChange={(e) => setBulkClass(e.target.value)}><option value="">Class…</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select>
             <button className="btn" disabled={!bulkClass} onClick={() => bulk("change_class", { school_class: Number(bulkClass) }, "Class changed.")}>Change class</button>
             <button className="btn" onClick={() => confirm("Give the selected students new random starting passwords? They are signed out and must choose a new password. Print the new ones from \"Username sheet\".") && bulk("reset_passwords", {}, "New starting passwords issued. Print them from \"Username sheet\".")}>Reset passwords</button>
             <button className="btn" onClick={() => confirm("Deactivate the selected students?") && bulk("deactivate", {}, "Deactivated.")}>Deactivate</button>
@@ -154,7 +154,7 @@ function StudentForm({ student, classes, onClose, onSaved }: { student?: any; cl
         <label className="field"><span>First name</span><input className="input" value={f.first_name} onChange={(e) => setF({ ...f, first_name: e.target.value })} /></label>
         <label className="field"><span>Last name</span><input className="input" value={f.last_name} onChange={(e) => setF({ ...f, last_name: e.target.value })} /></label>
         <label className="field"><span>Index number</span><input className="input" value={f.index_number} onChange={(e) => setF({ ...f, index_number: e.target.value })} /></label>
-        <label className="field"><span>Class</span><select className="input" value={f.school_class} onChange={(e) => setF({ ...f, school_class: e.target.value })}><option value="">None</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+        <label className="field"><span>Class</span><select className="input" value={f.school_class} onChange={(e) => setF({ ...f, school_class: e.target.value })}><option value="">None</option>{classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select></label>
       </div>
       {student && <p className="muted small">Username: {student.username} (cannot be changed)</p>}
       <Errs errs={errs} />

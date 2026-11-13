@@ -8,6 +8,7 @@ import { ErrorNote, Loading, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
 import { DATETIME, ago, eatDate } from "@/lib/clock";
 import { useSession } from "@/lib/session";
+import { classLabel, personName } from "@/lib/staff";
 
 /** EXM-03 / EXM-07: every exam with filters (status, class, subject, teacher, search) and sorting.
     Default order: papers teachers have just submitted (drafts waiting for an administrator) come first, newest on top,
@@ -62,6 +63,7 @@ export default function Exams() {
   const list = useLoad(() => api<Exam[]>("/exams/"));
   const classes = useLoad(() => api<any[]>("/classes/"));
   const subjects = useLoad(() => api<any[]>("/subjects/"));
+  const staffList = useLoad(() => (admin ? api<any[]>("/teachers/") : Promise.resolve([])), [admin]);  // the Teacher filter lists every teacher account, not only those who already wrote an exam
   const [q, setQ] = useState(""), [status, setStatus] = useState("all"), [cls, setCls] = useState(""), [subject, setSubject] = useState(""), [teacher, setTeacher] = useState("");
   const [sort, setSort] = useState("smart");
 
@@ -74,9 +76,10 @@ export default function Exams() {
   const all: Exam[] = list.data || [];
   const teachers = useMemo(() => {
     const m = new Map<string, string>();
-    all.forEach((e) => { const id = e.submitted_by || e.created_by; const n = e.submitted_by_name || e.created_by_name; if (id && n) m.set(String(id), n); });
+    (staffList.data || []).forEach((t: any) => m.set(String(t.id), personName(t)));
+    all.forEach((e) => { const id = e.submitted_by || e.created_by; const n = e.submitted_by_name || e.created_by_name; if (id && n && !m.has(String(id))) m.set(String(id), n); });  // an administrator who wrote an exam is listed too
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [all]);
+  }, [all, staffList.data]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: all.length, awaiting: 0, draft: 0, scheduled: 0, live: 0, closed: 0, published: 0 };
@@ -144,7 +147,7 @@ export default function Exams() {
                 <div className={`ex2-filters ${fopen ? "open" : ""}`}>
                   <label className="field"><span>Class</span>
                     <select className="input" value={cls} onChange={(e) => setCls(e.target.value)}>
-                      <option value="">All classes</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}<option value="none">No class chosen yet</option>
+                      <option value="">All classes</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}<option value="none">No class chosen yet</option>
                     </select></label>
                   <label className="field"><span>Subject</span>
                     <select className="input" value={subject} onChange={(e) => setSubject(e.target.value)}>

@@ -99,7 +99,7 @@ def student_device_check(request, exam_id):
     """The optional location check did not pass, or location is only rough: remember WHY, so a teacher who is helping
     the student can see it in the audit log (action device.check.failed). The same reason is kept once every 5 minutes, so
     pressing "Check again" ten times writes one line. Nothing is stored when location works. Wi-Fi and Bluetooth are not checked."""
-    exam = get_object_or_404(Exam, pk=exam_id)
+    exam = get_object_or_404(services.exams_for_student(request.user), pk=exam_id)  # only an exam that is hers (her class, or given to her by name)
     data = request.data if hasattr(request.data, "get") else {}
     pick = lambda key, allowed, other: (str(data.get(key) or "")[:20] if str(data.get(key) or "")[:20] in allowed else other)
     gps, os_ = pick("gps", _GPS_WORDS, "unknown"), pick("os", _OS_WORDS, "other")

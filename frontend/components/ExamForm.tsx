@@ -5,7 +5,7 @@ import { useToast } from "./SubmitFlow";
 import { ErrorNote, Loading, useLoad } from "./ui";
 import { api, downloadFile } from "@/lib/api";
 import { DATETIME, eatDate } from "@/lib/clock";
-import { errorLines, fromIso, plain, toIso } from "@/lib/staff";
+import { classLabel, errorLines, fromIso, plain, toIso } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 
 type F = { title: string; subject: string; term: string; classes: number[]; start: string; end: string; duration: number; pass: number; rules: string;
@@ -97,7 +97,7 @@ export default function ExamForm({ id, onClose }: { id: number | null; onClose: 
         </div>
         {admin ? (
           <>
-            <fieldset><legend>Who sits this exam (classes)</legend><div className="chips">{classes.data?.map((c) => { const on = f.classes.includes(c.id); return <label key={c.id} className={`chip ${on ? "on" : ""}`}><input type="checkbox" checked={on} disabled={!editable} onChange={() => up({ classes: on ? f.classes.filter((x) => x !== c.id) : [...f.classes, c.id] })} />{on ? "✓ " : ""}{c.name}</label>; })}</div></fieldset>
+            <fieldset><legend>Who sits this exam (classes)</legend><div className="chips">{classes.data?.map((c) => { const on = f.classes.includes(c.id); return <label key={c.id} className={`chip ${on ? "on" : ""}`}><input type="checkbox" checked={on} disabled={!editable} onChange={() => up({ classes: on ? f.classes.filter((x) => x !== c.id) : [...f.classes, c.id] })} />{on ? "✓ " : ""}{classLabel(c)}</label>; })}</div></fieldset>
             <div className="grid2">
               <label className="field"><span>Starts (East Africa Time)</span><input className="input" type="datetime-local" value={f.start} disabled={!editable} onChange={(ev) => up({ start: ev.target.value })} /></label>
               <label className="field"><span>Window ends</span><input className="input" type="datetime-local" value={f.end} disabled={!editable} onChange={(ev) => up({ end: ev.target.value })} /></label>

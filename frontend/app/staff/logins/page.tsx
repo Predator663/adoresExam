@@ -7,6 +7,7 @@ import StaffNav from "@/components/StaffNav";
 import { ErrorNote, Loading, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { classLabel } from "@/lib/staff";
 
 const PERIODS: [number, string][] = [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"], [180, "Last 6 months"], [365, "Last year"]];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -92,7 +93,7 @@ export default function LoginActivity() {
           <div className="card">
             <div className="row" style={{ flexWrap: "wrap", gap: ".6rem" }}>
               <label className="field grow"><span>Period</span><select className="input" value={days} onChange={(e) => setDays(Number(e.target.value))}>{PERIODS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></label>
-              <label className="field grow"><span>Class</span><select className="input" value={cls} onChange={(e) => setCls(e.target.value)}><option value="">All classes</option>{(classes.data || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+              <label className="field grow"><span>Class</span><select className="input" value={cls} onChange={(e) => setCls(e.target.value)}><option value="">All classes</option>{(classes.data || []).map((c: any) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select></label>
             </div>
             <p className="muted small">Counts every time a student signs in, by school day in Tanzania time. A student who stays signed in on her phone counts on the day she signed in, not for every day she keeps the app open.</p>
           </div>

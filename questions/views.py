@@ -136,6 +136,12 @@ class QuestionViewSet(viewsets.ModelViewSet):
         else:
             instance.delete()
 
+    @action(detail=False, methods=["get"])
+    def topics(self, request):
+        """Every topic that exists in the questions this person may see: fills the Topic filter. Narrowed by ?subject= and ?form_level= when they are chosen."""
+        qs = self.get_queryset().exclude(topic="")
+        return Response(sorted(set(qs.values_list("topic", flat=True)), key=str.lower))
+
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         q = self.get_object()

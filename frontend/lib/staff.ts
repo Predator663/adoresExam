@@ -12,6 +12,15 @@ export const plain = (html: string) => (html || "").replace(/<[^>]+>/g, " ").rep
 export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 export const unesc = (s: string) => plain(s);
 export const uid = () => Math.random().toString(36).slice(2, 10);
+/** A class as the school knows it: name + stream ("Form 1 A"). The same text the server prints (SchoolClass.__str__), so two streams of one form never look alike in a list or a picker. */
+export const classLabel = (c: { name: string; stream?: string | null }) => `${c.name} ${c.stream || ""}`.trim();
+/** The forms this school actually has (1, 2, 3 ... from its classes in the database). Until the classes load, or if the school has none yet, the usual Form 1 to 4 so a filter is never empty. */
+export const formLevels = (classes?: { form_level: number }[] | null): number[] => {
+  const s = [...new Set((classes || []).map((c) => c.form_level))].sort((a, b) => a - b);
+  return s.length ? s : [1, 2, 3, 4];
+};
+/** A staff member's name for a list or filter: "Mary Kimaro", or the username when no name was entered. */
+export const personName = (u: { first_name?: string; last_name?: string; username: string }) => `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username;
 export const QTYPES: [string, string][] = [
   ["mcq_single", "Multiple choice (one answer)"], ["mcq_multi", "Multiple choice (several answers)"], ["true_false", "True or false"],
   ["matching", "Matching"], ["fill_blank", "Fill in the blank"], ["ordering", "Ordering"],

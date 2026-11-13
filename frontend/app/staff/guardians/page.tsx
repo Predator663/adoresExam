@@ -5,6 +5,7 @@ import Shell from "@/components/Shell";
 import { ErrorNote, Loading, Modal, Tabs, useLoad } from "@/components/ui";
 import { api, apiBase, downloadFile } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { classLabel } from "@/lib/staff";
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { timeZone: "Africa/Dar_es_Salaam", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 const ICON: Record<string, string> = { queued: "⏳", sending: "📤", sent: "✓", delivered: "✓✓", failed: "✗", cancelled: "⊘" };
@@ -36,7 +37,7 @@ function Parents({ summary, classes, reload }: { summary: any; classes: any[]; r
       <div className="card">
         <div className="row" style={{ flexWrap: "wrap", gap: ".6rem" }}>
           <input className="input grow" type="search" placeholder="Search parent, child or phone" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-          <select className="input" aria-label="Class" value={cls} onChange={(e) => setCls(e.target.value)}><option value="">All classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <select className="input" aria-label="Class" value={cls} onChange={(e) => setCls(e.target.value)}><option value="">All classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select>
           <button className="btn primary" onClick={() => setAdd(true)}>+ Add a parent</button>
         </div>
         <Msg {...msg} />
@@ -235,7 +236,7 @@ function Send({ summary, classes, reload }: { summary: any; classes: any[]; relo
         {!summary.phone_online && <p className="warn" role="status">⚠ No school phone is online. Messages will wait until the phone app is open (see the Phone tab).</p>}
         <div className="grid2">
           <label className="field"><span>Send to</span><select className="input" value={scope} onChange={(e) => { setScope(e.target.value); setPlan(null); }}><option value="all">All parents</option><option value="class">Parents of one class</option></select></label>
-          {scope === "class" && <label className="field"><span>Class</span><select className="input" value={cls} onChange={(e) => { setCls(e.target.value); setPlan(null); }}><option value="">Choose…</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
+          {scope === "class" && <label className="field"><span>Class</span><select className="input" value={cls} onChange={(e) => { setCls(e.target.value); setPlan(null); }}><option value="">Choose…</option>{classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select></label>}
         </div>
         <label className="row" style={{ marginTop: ".4rem" }}><input type="checkbox" checked={includeLogin} onChange={(e) => { setIncludeLogin(e.target.checked); setPlan(null); }} /> <b>Include the login details</b> (child's user name and a new password). Untick to send only your own message.</label>
         {includeLogin && (

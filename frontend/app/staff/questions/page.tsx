@@ -6,7 +6,7 @@ import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
 import { ErrorNote, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
-import { plain, qtypeName } from "@/lib/staff";
+import { formLevels, plain, qtypeName } from "@/lib/staff";
 import { useSession } from "@/lib/session";
 
 /** QB-09, QB-10: searchable question bank filtered by subject, topic, difficulty, type and status; Draft -> Submitted -> Approved.
@@ -18,8 +18,10 @@ export default function Questions() {
   const { user } = useSession();
   const admin = user?.role === "admin" || user?.role === "super_admin";
   const [edit, setEdit] = useState<number | "new" | null>(null);
-  const [f, setF] = useState({ scope: admin ? "" : "mine", subject: "", topic: "", difficulty: "", qtype: "", status: "", q: "" });
+  const [f, setF] = useState({ scope: admin ? "" : "mine", subject: "", form_level: "", topic: "", difficulty: "", qtype: "", status: "", q: "" });
   const allSubjects = useLoad(() => api<any[]>("/subjects/"));
+  const classes = useLoad(() => api<any[]>("/classes/"));  // the Form filter lists the forms the school really has
+  const topics = useLoad(() => api<string[]>(`/questions/topics/?subject=${f.subject}&form_level=${f.form_level}`), [f.subject, f.form_level]);  // and the Topic filter the topics really in the bank
   const assigned = useLoad(() => (admin ? Promise.resolve(null) : api<any[]>("/assignments/")), [admin]);
   // A teacher only gets the subjects she is assigned to; an administrator gets all of them.
   const subjects = useMemo(() => {
@@ -47,9 +49,10 @@ export default function Questions() {
     try { await api(`/questions/${id}/`, { method: "DELETE" }); list.reload(); } catch (e: any) { setMsg(e.message); }
   }
   const [fopen, setFopen] = useState(false), [view, setView] = useState<"cards" | "list">("cards");
-  const nFilters = [f.subject, f.topic, f.difficulty, f.qtype].filter(Boolean).length;
-  const filtered = !!(f.q || f.subject || f.topic || f.difficulty || f.qtype || f.status || f.scope !== (admin ? "" : "mine"));
-  const reset = () => setF({ scope: admin ? "" : "mine", subject: "", topic: "", difficulty: "", qtype: "", status: "", q: "" });
+  const nFilters = [f.subject, f.form_level, f.topic, f.difficulty, f.qtype].filter(Boolean).length;
+  const filtered = !!(f.q || f.subject || f.form_level || f.topic || f.difficulty || f.qtype || f.status || f.scope !== (admin ? "" : "mine"));
+  const reset = () => setF({ scope: admin ? "" : "mine", subject: "", form_level: "", topic: "", difficulty: "", qtype: "", status: "", q: "" });
+  const topicOptions = useMemo(() => { const t = topics.data || []; return f.topic && !t.includes(f.topic) ? [f.topic, ...t] : t; }, [topics.data, f.topic]);
   const scopes = ([...(admin ? [["", "All questions"]] : []), ["mine", "My questions"], ["others", admin ? "Other teachers" : "Other teachers (approved)"]]) as [string, string][];
   const statuses: [string, string][] = [["", "Any status"], ["draft", "Drafts"], ["submitted", "Submitted"], ["approved", "Approved"], ["archived", "Archived"]];
   let n = 0;
@@ -88,7 +91,8 @@ export default function Questions() {
             </div>
             <div className={`ex2-filters ${fopen ? "open" : ""}`}>
               <label className="field"><span>Subject</span><select className="input" value={f.subject} onChange={(e) => set("subject", e.target.value)}><option value="">{admin ? "All subjects" : "All my subjects"}</option>{subjects.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-              <label className="field"><span>Topic</span><input className="input" value={f.topic} onChange={(e) => set("topic", e.target.value)} placeholder="Any topic" /></label>
+              <label className="field"><span>Form</span><select className="input" value={f.form_level} onChange={(e) => set("form_level", e.target.value)}><option value="">All forms</option>{formLevels(classes.data).map((n) => <option key={n} value={n}>Form {n}</option>)}</select></label>
+              <label className="field"><span>Topic</span><select className="input" value={f.topic} onChange={(e) => set("topic", e.target.value)}><option value="">All topics</option>{topicOptions.map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
               <label className="field"><span>Difficulty</span><select className="input" value={f.difficulty} onChange={(e) => set("difficulty", e.target.value)}><option value="">All difficulties</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
               <label className="field"><span>Type</span><select className="input" value={f.qtype} onChange={(e) => set("qtype", e.target.value)}><option value="">All types</option>{["mcq_single", "mcq_multi", "true_false", "matching", "fill_blank", "ordering"].map((k) => <option key={k} value={k}>{qtypeName(k)}</option>)}</select></label>
             </div>

@@ -4,6 +4,7 @@ import AntiCheat from "@/components/AntiCheat";
 import Icon from "@/components/Icon";
 import { Modal } from "@/components/ui";
 import { api } from "@/lib/api";
+import { classLabel } from "@/lib/staff";
 
 /* Live monitor. One request for the whole school, polled every 6 s while the tab is visible.
    Phone first: every text box can shrink and wrap (min-width:0, overflow-wrap:anywhere), parents' numbers sit in their own panel, tabs and
@@ -359,11 +360,19 @@ export default function LiveBoard({ admin: adminProp }: { admin?: boolean }) {
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", vis); };
   }, [load]);
 
+  // The class filter lists every class in the school (from the database, in form/stream order), not only the classes of the exams on the board right now.
+  const [dbClasses, setDbClasses] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    api<any[]>("/classes/").then((r) => { if (live) setDbClasses(r.map(classLabel)); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   const classes = useMemo(() => {
-    const s = new Set<string>();
+    if (dbClasses.length) return dbClasses;
+    const s = new Set<string>(); // the list could not be loaded: fall back to the classes seen on the board
     board?.exams.forEach((e) => e.classes.forEach((c) => s.add(c)));
     return [...s].sort();
-  }, [board]);
+  }, [board, dbClasses]);
   const admin = adminProp ?? (!board?.exams.length || !!board.exams[0].in_progress_students);
   const openAlerts = (board?.exams ?? []).reduce((n, x) => n + (x.proximity_alerts ?? 0), 0);
   const exams = (board?.exams ?? []).filter((e) => (show === "all" || (show === "live") === (e.status === "live")) && (!cls || e.classes.includes(cls)));

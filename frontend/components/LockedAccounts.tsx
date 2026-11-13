@@ -5,7 +5,7 @@ import { Pager, usePaged } from "./Pager";
 import { CountUp, ErrorNote, Loading, Modal, Tabs, useLoad, useNow } from "./ui";
 import { api } from "@/lib/api";
 import { ago, clock, eatDate, makeOffset } from "@/lib/clock";
-import { errorLines } from "@/lib/staff";
+import { classLabel, errorLines } from "@/lib/staff";
 
 /** Super Admin: every locked account (students, teachers, admins), live. Clear the wrong-attempt counter (the lock goes with it), or give a new starting
  *  password. Backend: accounts/lockouts.py. The list refreshes itself every 15 seconds and counts each lock down to its automatic end. */
@@ -189,7 +189,7 @@ export default function LockedAccounts() {
 
       <div className="card lk-tools" role="search">
         <input className="input grow" type="search" placeholder={role === "student" ? "Search name, username or index number" : "Search name or username"} aria-label="Search accounts" autoComplete="off" value={qBox} onChange={(e) => setQBox(e.target.value)} />
-        {role === "student" && <select className="input" aria-label="Class" value={cls} onChange={(e) => setCls(e.target.value)}><option value="">All classes</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}
+        {role === "student" && <select className="input" aria-label="Class" value={cls} onChange={(e) => setCls(e.target.value)}><option value="">All classes</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select>}
         <button type="button" className="btn" onClick={() => list.reload()} aria-label="Refresh now"><span className={list.busy || list.loading ? "lk-spin" : ""}><Icon n="refresh" size={16} /></span>Refresh</button>
         <span className="lk-live small muted" aria-live="off"><i aria-hidden />Live · updated {ago(new Date(stamp).toISOString())}</span>
         {filtered && <button type="button" className="btn ghost" onClick={() => { setQBox(""); setQ(""); setCls(""); }}>Clear</button>}
