@@ -133,3 +133,24 @@
 /* less motion: the system setting, or the app's own "reduce motion" switch */
 @media(prefers-reduced-motion:reduce){.sms *,.sms-toasts *{animation:none!important;transition:none!important}}
 .reduce-motion .sms *,.reduce-motion .sms-toasts *{animation:none!important;transition:none!important}
+
+/* filters for the message list */
+.sms-filters{display:grid;gap:.6rem;margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border)}
+.sms-ftoggle{display:inline-flex;align-items:center;gap:.4rem}.sms-ftoggle.on{border-color:var(--primary);background:var(--soft)}
+.sms-ftoggle .n{display:inline-grid;place-items:center;min-width:1.3rem;height:1.3rem;padding:0 .3rem;border-radius:99px;background:var(--primary);color:var(--on-primary);font-size:.75rem;font-weight:800;animation:sms-fpop .3s cubic-bezier(.2,.8,.2,1)}
+.sms-fpanel{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s cubic-bezier(.2,.8,.2,1)}
+.sms-fpanel.open{grid-template-rows:1fr}
+.sms-fpanel-in{overflow:hidden;min-height:0;display:grid;gap:.7rem;opacity:0;transition:opacity .25s}
+.sms-fpanel.open .sms-fpanel-in{opacity:1;transition-delay:.1s;padding:.2rem 0 .3rem}
+.sms-fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.7rem}
+.sms-range{margin:0;padding:0;border:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.7fr);gap:.4rem}
+.sms-range legend{padding:0;margin-bottom:.2rem;font-weight:700;font-size:.85rem}
+.sms-range .input{min-height:44px;min-width:0}
+.sms-active{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem}
+.sms-fchip{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .3rem .2rem .7rem;border-radius:99px;background:var(--soft);border:1px solid var(--border);font-size:.82rem;font-weight:700;animation:sms-fpop .3s cubic-bezier(.2,.8,.2,1)}
+.sms-fchip button{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:50%;background:none;color:inherit;cursor:pointer;font:inherit;font-size:.8rem}
+.sms-fchip button:hover{background:var(--border)}
+@keyframes sms-fpop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+@media(max-width:520px){.sms-fgrid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.sms-fpanel,.sms-fpanel-in{transition:none}.sms-fchip,.sms-ftoggle .n{animation:none}}
+.reduce-motion .sms-fpanel,.reduce-motion .sms-fpanel-in{transition:none}.reduce-motion .sms-fchip,.reduce-motion .sms-ftoggle .n{animation:none}

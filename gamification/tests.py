@@ -144,6 +144,32 @@ class PracticeTests(AnalyticsBase):
         self.assertEqual(state["summary"]["xp_earned"], 20)
         self.assertEqual(Result.objects.count(), 0)
 
+    def test_finishing_a_quiz_reports_what_to_celebrate(self):
+        _, _, last = self.run_quiz("b")  # five right answers
+        r = last["rewards"]
+        self.assertEqual(r["streak"]["current"], 1)
+        self.assertIsNone(r["level_up"])
+        self.assertIn("flawless", {b["code"] for b in r["badges"]})
+        self.assertIn("sharpshooter", {b["code"] for b in r["badges"]})  # 5 correct in a row
+
+    def test_practice_badges_count_quizzes_subjects_and_runs(self):
+        self.run_quiz("b")
+        m = services.compute_metrics(self.amina, services.config())
+        self.assertEqual((m["practice_quizzes"], m["questions_answered"], m["flawless_quizzes"], m["strong_quizzes"], m["answer_run"], m["practice_subjects"]),
+                         (1, 5, 1, 1, 5, 1))
+        self.run_quiz("a")  # a wrong quiz breaks the run but never lowers a badge
+        m = services.compute_metrics(self.amina, services.config())
+        self.assertEqual((m["flawless_quizzes"], m["answer_run"], m["questions_answered"]), (1, 5, 10))
+
+    def test_subjects_show_her_own_progress_and_the_overview_the_next_badge(self):
+        self.run_quiz("b")
+        row = next(r for r in self.c.get("/api/practice/subjects/").json() if r["id"] == self.maths.pk)
+        self.assertEqual((row["stats"]["quizzes"], row["stats"]["best_percent"], row["in_progress"]), (1, 100, None))
+        o = self.c.get("/api/practice/overview/").json()
+        self.assertEqual((o["quizzes_today"], o["total_quizzes"], o["xp_per_quiz"]), (1, 1, 20))
+        self.assertTrue(o["next_badge"]["progress"] < o["next_badge"]["target"])
+        self.assertEqual(self.client_for(self.teacher).get("/api/practice/overview/").status_code, 403)
+
     def test_daily_xp_limit(self):
         s = services.GamificationSettings.load()
         s.practice_daily_xp_quizzes = 1

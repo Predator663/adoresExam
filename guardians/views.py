@@ -1,9 +1,10 @@
 import csv
 import hashlib
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db import connection
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -252,6 +253,19 @@ def send(request):
     return Response({"dry_run": False, "queued": n, **info}, status=201)
 
 
+def _moment(text, end=False):
+    """'2026-11-14' or '2026-11-14T08:30' in school time. A date alone means the whole day: the start for "from", the end of it for "to"."""
+    text = text.strip()
+    try:
+        if "T" in text:
+            m = datetime.strptime(text[:16], "%Y-%m-%dT%H:%M")
+            return timezone.make_aware(m) + (timedelta(minutes=1) if end else timedelta(0))  # "to 17:00" includes 17:00
+        d = datetime.strptime(text[:10], "%Y-%m-%d")
+        return timezone.make_aware(d) + (timedelta(days=1) if end else timedelta(0))
+    except ValueError:
+        return None
+
+
 @api_view(["GET"])
 @permission_classes([IsAdminRole])
 def jobs(request):
@@ -259,6 +273,19 @@ def jobs(request):
     qs = SmsJob.objects.select_related("guardian", "device").order_by("-id")
     if p.get("status"):
         qs = qs.filter(status=p["status"])
+    if p.get("class"):  # messages to parents who have a child in this class
+        qs = qs.filter(guardian__links__student__school_class_id=p["class"]).distinct()
+    if p.get("kind") in ("login", "custom"):
+        qs = qs.filter(login=p["kind"] == "login")
+    if (p.get("q") or "").strip():
+        q = p["q"].strip()
+        qs = qs.filter(Q(guardian__name__icontains=q) | Q(summary__icontains=q) | Q(note__icontains=q))
+    for key, lookup, end in (("from", "created_at__gte", False), ("to", "created_at__lt", True)):
+        if p.get(key):
+            moment = _moment(p[key], end)
+            if moment is None:
+                return _err("Use a date like 2026-11-14 (and optionally a time like 08:30) for the date filter.")
+            qs = qs.filter(**{lookup: moment})
     def row(j):
         sent_raw = crypto.decrypt(j.to_enc)
         sent_to, now_raw = mask(sent_raw), (j.guardian.phone if j.guardian else "")

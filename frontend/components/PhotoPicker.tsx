@@ -63,7 +63,7 @@ function paint(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, z: number,
 
 function Cropper({ file, tx, onCancel, onSaved }: { file: File; tx: (typeof TXT)["en"]; onCancel: () => void; onSaved: (p: any) => void }) {
   const [src, setSrc] = useState<HTMLCanvasElement | null>(null), [z, setZ] = useState(1), [o, setO] = useState<Off>({ x: 0, y: 0 }), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
-  const cv = useRef<HTMLCanvasElement>(null), pts = useRef(new Map<number, { x: number; y: number }>()), pinch = useRef<{ d: number; z: number } | null>(null), last = useRef<Off | null>(null);
+  const cv = useRef<HTMLCanvasElement>(null), stage = useRef<HTMLDivElement>(null), pts = useRef(new Map<number, { x: number; y: number }>()), pinch = useRef<{ d: number; z: number } | null>(null), last = useRef<Off | null>(null);
   useEffect(() => {
     const url = URL.createObjectURL(file), img = new Image();
     img.onload = () => { try { setSrc(shrink(img)); } catch { setErr(tx.bad); } URL.revokeObjectURL(url); };
@@ -84,7 +84,7 @@ function Cropper({ file, tx, onCancel, onSaved }: { file: File; tx: (typeof TXT)
     if (!src || !pts.current.has(e.pointerId)) return;
     pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.current.size === 2 && pinch.current) { const [a, b] = [...pts.current.values()]; zoomTo(pinch.current.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.current.d)); return; }
-    if (last.current) { const dx = e.clientX - last.current.x, dy = e.clientY - last.current.y; last.current = { x: e.clientX, y: e.clientY }; setO((p) => limit(src, z, { x: p.x + dx, y: p.y + dy })); }
+    if (last.current) { const k = V / (stage.current?.clientWidth || V), dx = (e.clientX - last.current.x) * k, dy = (e.clientY - last.current.y) * k; last.current = { x: e.clientX, y: e.clientY }; setO((p) => limit(src, z, { x: p.x + dx, y: p.y + dy })); }
   };
   const up = (e: React.PointerEvent) => { pts.current.delete(e.pointerId); pinch.current = null; last.current = pts.current.size ? [...pts.current.values()][0] : null; };
   const key = (e: React.KeyboardEvent) => {
@@ -105,14 +105,14 @@ function Cropper({ file, tx, onCancel, onSaved }: { file: File; tx: (typeof TXT)
     } catch (e: any) { setErr(e.message || tx.bad); setBusy(false); }
   }
   return (
-    <Modal label={tx.title} onClose={busy ? undefined : onCancel}>
+    <Modal fit label={tx.title} onClose={busy ? undefined : onCancel}>
       <div className="pp-crop">
         <h2>{tx.title}</h2>
         {!src && !err && <div className="pp-load" role="status"><i className="spinner" aria-hidden />{tx.reading}</div>}
         {src && (
           <>
-            <div className="pp-stage" tabIndex={0} role="group" aria-label={tx.drag} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel} onKeyDown={key}>
-              <canvas ref={cv} style={{ width: V, height: V }} />
+            <div ref={stage} className="pp-stage" tabIndex={0} role="group" aria-label={tx.drag} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel} onKeyDown={key}>
+              <canvas ref={cv} />
               <span className="pp-hand" aria-hidden>✥</span>
             </div>
             <p className="muted small pp-tip">{tx.drag}</p>

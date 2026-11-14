@@ -178,6 +178,12 @@ def practice_subjects(request):
     return Response(services.practice_subjects(request.user))
 
 
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def practice_overview(request):
+    return Response(services.practice_overview(request.user))
+
+
 @api_view(["POST"])
 @permission_classes([IsStudent])
 def practice_start(request):

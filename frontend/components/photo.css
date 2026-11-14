@@ -22,13 +22,15 @@
 .pp-priv{margin:.2rem 0 0}
 .pp-msg{margin:0;font-weight:800;animation:pp-rise .35s cubic-bezier(.2,.8,.2,1) both}
 
-.pp-crop{display:grid;gap:.7rem;justify-items:center;animation:pp-fade .25s both}
-.pp-crop h2{margin:0}
+.pp-crop{display:grid;gap:clamp(.4rem,1.6dvh,.7rem);justify-items:center;width:100%;max-width:420px;margin:0 auto;animation:pp-fade .25s both}
+.pp-crop h2{margin:0;font-size:clamp(1.05rem,2.6dvh,1.3rem)}
+@media(max-height:560px){.pp-tip{display:none}.pp-load{padding:1.5rem 0}}
+.pp-crop .row{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--surface) 30%);padding-top:.4rem}
 .pp-crop .row{width:100%}
 .pp-load{display:flex;gap:.6rem;align-items:center;padding:3rem 0}
-.pp-stage{position:relative;width:288px;max-width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;touch-action:none;cursor:grab;outline-offset:4px;box-shadow:0 12px 34px rgba(0,0,0,.28);animation:pp-pop .45s cubic-bezier(.3,1.4,.5,1) both}
+.pp-stage{position:relative;width:min(320px,100%,calc(100dvh - 350px));min-width:150px;aspect-ratio:1;flex:none;border-radius:50%;overflow:hidden;touch-action:none;cursor:grab;outline-offset:4px;box-shadow:0 12px 34px rgba(0,0,0,.28);animation:pp-pop .45s cubic-bezier(.3,1.4,.5,1) both}
 .pp-stage:active{cursor:grabbing}
-.pp-stage canvas{display:block;max-width:100%;height:auto!important;aspect-ratio:1}
+.pp-stage canvas{display:block;width:100%;height:100%}
 .pp-hand{position:absolute;left:50%;top:50%;translate:-50% -50%;font-size:2rem;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none;animation:pp-hint 2.6s .4s ease both}
 .pp-tip{margin:0;text-align:center}
 .pp-tools{display:flex;align-items:center;gap:.7rem;width:100%;max-width:320px}

@@ -218,7 +218,9 @@ def audit_log(request):
     if not IsAdminRole().has_permission(request, None):
         return Response({"detail": "Not allowed."}, status=403)
     p = request.query_params
-    qs = AuditLog.objects.select_related("actor")
+    qs = AuditLog.objects.select_related("actor__school_class")
+    if p.get("class"):  # what students of this class did (staff have no class)
+        qs = qs.filter(actor__school_class_id=p["class"])
     if p.get("actor"):
         qs = qs.filter(actor__username__iexact=p["actor"])
     if p.get("action"):
@@ -251,7 +253,8 @@ def audit_log(request):
         **({"page": page, "pages": pages, "page_size": limit} if page else {}),
         "results": [
             {"at": r.created_at, "actor": getattr(r.actor, "username", None), "action": r.action,
-             "target": r.target, "detail": r.detail}
+             "target": r.target, "detail": r.detail,
+             "class": str(r.actor.school_class) if r.actor and r.actor.school_class_id else ""}
             for r in qs[offset:offset + limit]
         ],
     })

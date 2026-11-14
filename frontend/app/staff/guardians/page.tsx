@@ -251,7 +251,26 @@ function Send({ summary, classes, reload, toast, ask }: { summary: any; classes:
   const [filter, setFilter] = useState("");
   const [mine, setMine] = useState<string[]>([]);
   useEffect(() => setMine(loadTemplates()), []);
-  const jobs = usePaged<any>("/guardians/jobs/", { status: filter }, { size: 20 });
+  const [fq, setFq] = useState(""), [fqIn, setFqIn] = useState(""), [fcls, setFcls] = useState(""), [fkind, setFkind] = useState(""), [open_, setOpen_] = useState(false);
+  const [d1, setD1] = useState(""), [t1, setT1] = useState(""), [d2, setD2] = useState(""), [t2, setT2] = useState("");
+  useEffect(() => { const h = setTimeout(() => setFq(fqIn.trim()), 300); return () => clearTimeout(h); }, [fqIn]);
+  const from = d1 ? d1 + (t1 ? `T${t1}` : "") : "", to = d2 ? d2 + (t2 ? `T${t2}` : "") : "";
+  const jobs = usePaged<any>("/guardians/jobs/", { status: filter, q: fq, class: fcls, kind: fkind, from, to }, { size: 20 });
+  const dayStr = (back: number) => new Date(Date.now() - back * 864e5).toLocaleDateString("sv-SE", { timeZone: "Africa/Dar_es_Salaam" });
+  const preset = (a: number, b: number) => { setD1(dayStr(a)); setD2(dayStr(b)); setT1(""); setT2(""); };
+  const monthStart = () => { setD1(dayStr(0).slice(0, 8) + "01"); setD2(dayStr(0)); setT1(""); setT2(""); };
+  const clearDates = () => { setD1(""); setD2(""); setT1(""); setT2(""); };
+  const clsName = (id: string) => { const c = classes.find((x) => String(x.id) === id); return c ? classLabel(c) : "Class"; };
+  const dayLabel = (d: string, t: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + (t ? ` ${t}` : "");
+  const active: { k: string; label: string; off: () => void }[] = [
+    ...(fq ? [{ k: "q", label: `“${fq}”`, off: () => { setFq(""); setFqIn(""); } }] : []),
+    ...(fcls ? [{ k: "c", label: clsName(fcls), off: () => setFcls("") }] : []),
+    ...(fkind ? [{ k: "t", label: fkind === "login" ? "Login details" : "Custom message", off: () => setFkind("") }] : []),
+    ...(d1 || d2 ? [{ k: "d", label: d1 && d2 ? (d1 === d2 && !t1 && !t2 ? dayLabel(d1, "") : `${dayLabel(d1, t1)} → ${dayLabel(d2, t2)}`) : d1 ? `From ${dayLabel(d1, t1)}` : `Until ${dayLabel(d2, t2)}`, off: clearDates }] : []),
+    ...(filter ? [{ k: "s", label: FILTERS.find((x) => x[0] === filter)?.[1] || filter, off: () => setFilter("") }] : []),
+  ];
+  const clearAll = () => { setFq(""); setFqIn(""); setFcls(""); setFkind(""); clearDates(); setFilter(""); };
+  const rangeBad = !!(from && to && from > to);
   const cfg = useLoad(() => api<any>("/guardians/config/"));
   const body = { scope, class_id: scope === "class" ? Number(cls) : undefined, resend: includeLogin && resend, note: note.trim(), include_login: includeLogin,
     ...(includeLogin ? { message_sw: text("sw"), message_en: text("en") } : {}) };
@@ -372,8 +391,41 @@ function Send({ summary, classes, reload, toast, ask }: { summary: any; classes:
           {FILTERS.map(([k, n]) => <button key={k} type="button" className={`sms-chip ${filter === k ? "on" : ""}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{n}{shown(k) !== undefined && <span className="n">{shown(k)}</span>}</button>)}
           {stamp && <span className="sms-stale" role="status">Updated {stamp.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
         </div>
+        <div className="sms-filters">
+          <div className="row" style={{ flexWrap: "wrap" }}>
+            <input className="input grow" type="search" aria-label="Search messages" placeholder="Search parent, child or message…" value={fqIn} onChange={(e) => setFqIn(e.target.value)} style={{ minWidth: 180 }} />
+            <button type="button" className={`btn sms-ftoggle ${open_ ? "on" : ""}`} aria-expanded={open_} onClick={() => setOpen_((v) => !v)}>⚙ Filters{active.length > 0 && <span className="n">{active.length}</span>}</button>
+          </div>
+          <div className={`sms-fpanel ${open_ ? "open" : ""}`}><div className="sms-fpanel-in">
+            <div className="sms-fgrid">
+              <label className="field"><span>Class</span><select className="input" value={fcls} onChange={(e) => setFcls(e.target.value)}><option value="">All classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</select></label>
+              <label className="field"><span>Type</span><select className="input" value={fkind} onChange={(e) => setFkind(e.target.value)}><option value="">All messages</option><option value="login">Login details</option><option value="custom">Custom message only</option></select></label>
+            </div>
+            <div className="sms-chips" role="group" aria-label="Quick dates">
+              <span className="muted small" style={{ alignSelf: "center" }}>Date:</span>
+              <button type="button" className={`sms-chip ${d1 === dayStr(0) && d2 === dayStr(0) ? "on" : ""}`} onClick={() => preset(0, 0)}>Today</button>
+              <button type="button" className={`sms-chip ${d1 === dayStr(1) && d2 === dayStr(1) ? "on" : ""}`} onClick={() => preset(1, 1)}>Yesterday</button>
+              <button type="button" className={`sms-chip ${d1 === dayStr(6) && d2 === dayStr(0) ? "on" : ""}`} onClick={() => preset(6, 0)}>Last 7 days</button>
+              <button type="button" className="sms-chip" onClick={monthStart}>This month</button>
+              {(d1 || d2) && <button type="button" className="sms-chip" onClick={clearDates}>Any date ✕</button>}
+            </div>
+            <div className="sms-fgrid">
+              <fieldset className="sms-range"><legend>From</legend><input className="input" type="date" aria-label="From date" value={d1} max={d2 || undefined} onChange={(e) => setD1(e.target.value)} /><input className="input" type="time" aria-label="From time" value={t1} disabled={!d1} onChange={(e) => setT1(e.target.value)} /></fieldset>
+              <fieldset className="sms-range"><legend>To</legend><input className="input" type="date" aria-label="To date" value={d2} min={d1 || undefined} onChange={(e) => setD2(e.target.value)} /><input className="input" type="time" aria-label="To time" value={t2} disabled={!d2} onChange={(e) => setT2(e.target.value)} /></fieldset>
+            </div>
+            {rangeBad && <p className="warn small" role="alert">⚠ The “From” time is after the “To” time, so nothing can match.</p>}
+            <small className="muted">Times are school time (East Africa). Leave the time empty to include the whole day. The class filter shows messages to parents who have a child in that class.</small>
+          </div></div>
+          {active.length > 0 && (
+            <div className="sms-active" role="status" aria-live="polite">
+              {active.map((f) => <span key={f.k} className="sms-fchip">{f.label}<button type="button" aria-label={`Remove filter ${f.label}`} onClick={f.off}>✕</button></span>)}
+              <button type="button" className="btn ghost" style={{ minHeight: 32 }} onClick={clearAll}>Clear all</button>
+              {!jobs.loading && !jobs.error && <span className="muted small grow" style={{ textAlign: "right" }}><b>{jobs.count}</b> message{jobs.count === 1 ? "" : "s"} match</span>}
+            </div>
+          )}
+        </div>
       </div>
-      {jobs.loading ? <SkeletonRows /> : jobs.error ? <ErrorNote error={jobs.error} retry={jobs.reload} /> : !jobs.rows.length ? <Empty icon="💬" title={filter ? "Nothing with this status" : "No messages yet"}>{filter ? <div className="row"><button className="btn" onClick={() => setFilter("")}>Show all</button></div> : "Messages you queue above will appear here, and update by themselves while they are sent."}</Empty> : (
+      {jobs.loading ? <SkeletonRows /> : jobs.error ? <ErrorNote error={jobs.error} retry={jobs.reload} /> : !jobs.rows.length ? <Empty icon="💬" title={active.length ? "No messages match these filters" : "No messages yet"}>{active.length ? <div className="row"><button className="btn" onClick={clearAll}>Clear filters</button></div> : "Messages you queue above will appear here, and update by themselves while they are sent."}</Empty> : (
         <><div className="tbl-wrap paged" ref={jobs.top} aria-busy={jobs.busy || undefined}><table><thead><tr><th>Parent</th><th>Children</th><th>Status</th><th>Time</th><th></th></tr></thead><tbody>
           {jobs.rows.map((j, ix) => (<tr key={j.id} className="sms-row" style={delay(ix)}><td><div className="sms-who"><Avatar name={j.parent} /><div><b>{j.parent}</b><br /><span className="mono small">{j.phone}</span></div></div>{j.old_number && <div className="warn small">⚠ Number changed since. Now {j.current_phone}</div>}</td><td className="small">{j.summary.replace("Login details for ", "") || (j.note ? `“${j.note.slice(0, 60)}${j.note.length > 60 ? "…" : ""}”` : "")}</td>
             <td><Status s={j.status} />{j.error && <div className="no small">{j.error}</div>}{j.attempts > 1 && <div className="muted small">tries: {j.attempts}</div>}</td><td className="small">{when(j.sent_at || j.created_at)}</td>

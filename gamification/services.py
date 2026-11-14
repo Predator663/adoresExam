@@ -198,7 +198,35 @@ def compute_metrics(student, cfg, today=None):
 
     m["best_streak"] = rules.streak_status(activity_days(student), today, cfg["freezes"])["best"]
     m["reviewed_exams"] = ReviewProgress.objects.filter(attempt__student=student, completed=True).count()
-    m["practice_quizzes"] = PracticeSession.objects.filter(user=student, status=PracticeSession.COMPLETED).count()
+    m.update(_practice_metrics(student))
+    m["total_xp"] = total_xp(student)
+    return m
+
+
+def _practice_metrics(student):
+    """Numbers for the practice badges, from her finished quizzes (oldest first, so 'in a row' follows the order she answered)."""
+    sessions = list(PracticeSession.objects.filter(user=student, status=PracticeSession.COMPLETED).order_by("started_at")
+                    .only("subject_id", "answers", "question_count", "correct_score", "started_at", "completed_at"))
+    m = {"practice_quizzes": len(sessions), "questions_answered": 0, "flawless_quizzes": 0, "strong_quizzes": 0, "answer_run": 0,
+         "morning_quizzes": 0, "weekend_days": 0}
+    run, weekend = 0, set()
+    for s in sessions:
+        n = s.question_count or len(s.answers)
+        m["questions_answered"] += len(s.answers)
+        if n and s.correct_score >= n - 1e-6:
+            m["flawless_quizzes"] += 1
+        if n and s.correct_score / n >= 0.8 - 1e-9:
+            m["strong_quizzes"] += 1
+        for a in s.answers:
+            run = run + 1 if a.get("fraction", 0) >= 0.9999 else 0
+            m["answer_run"] = max(m["answer_run"], run)
+        done = timezone.localtime(s.completed_at or s.started_at)
+        if done.hour < 8:
+            m["morning_quizzes"] += 1
+        if done.weekday() >= 5:
+            weekend.add(done.date())
+    m["weekend_days"] = len(weekend)
+    m["practice_subjects"] = len({s.subject_id for s in sessions})
     return m
 
 
@@ -469,12 +497,51 @@ def practice_why_not(student, subject):
 
 
 def practice_subjects(student):
+    """The subjects she can practise, each with her own progress there (for the rings on the practice page)."""
+    done = defaultdict(list)
+    for r in (PracticeSession.objects.filter(user=student, status=PracticeSession.COMPLETED).order_by("started_at")
+              .values("subject_id", "correct_score", "question_count", "completed_at")):
+        n = r["question_count"] or 1
+        done[r["subject_id"]].append((round(r["correct_score"] / n * 100), r["completed_at"]))
+    current = {s.subject_id: s for s in PracticeSession.objects.filter(user=student, status=PracticeSession.IN_PROGRESS).only("subject_id", "answers", "question_count")}
     out = []
     for s in Subject.objects.filter(practice_enabled=True):
         n = practice_pool(student, s).count()
+        rows, cur = done.get(s.pk, []), current.get(s.pk)
+        recent = [p for p, _ in rows[-5:]]
         out.append({"id": s.pk, "name": s.name, "available_questions": n, "can_start": n >= PRACTICE_MIN,
-                    "reason": "" if n >= PRACTICE_MIN else practice_why_not(student, s)})
+                    "reason": "" if n >= PRACTICE_MIN else practice_why_not(student, s),
+                    "stats": {"quizzes": len(rows), "best_percent": max((p for p, _ in rows), default=None),
+                              "recent_percent": round(sum(recent) / len(recent)) if recent else None,
+                              "last_at": rows[-1][1] if rows else None},
+                    "in_progress": {"answered": len(cur.answers), "total": cur.question_count} if cur else None})
     return out
+
+
+def practice_overview(student, now=None):
+    """The practice page header: today's goal, her streak, level and the badge she is closest to."""
+    now = now or timezone.now()
+    cfg, lang, today = config(), lang_of(student), timezone.localdate(now)
+    metrics = compute_metrics(student, cfg, today)
+    streak = rules.streak_status(activity_days(student), today, cfg["freezes"])
+    xp_quizzes = XPEvent.objects.filter(user=student, kind="practice", created_at__date=today).count()
+    closest = None
+    for b in catalog.BADGES:
+        if b["metric"] not in catalog.PRACTICE_METRICS:
+            continue
+        value, th = metrics.get(b["metric"], 0), cfg["tiers"][b["code"]]
+        tier, target = rules.tier_for(value, th), rules.next_target(value, th)
+        if tier >= 3 or not target:
+            continue
+        ratio = value / target
+        if closest is None or ratio > closest[0]:
+            closest = (ratio, {"code": b["code"], "name": catalog.badge_name(b["code"], lang, tier + 1), "unit": catalog.badge_unit(b["code"], lang),
+                               "progress": value, "target": target, "tier": catalog.tier_key(tier + 1), "tier_label": catalog.tier_label(tier + 1, lang)})
+    return {"xp_per_quiz": cfg["xp"]["practice_quiz"], "daily_cap": cfg["practice_cap"], "xp_quizzes_today": xp_quizzes,
+            "quizzes_today": PracticeSession.objects.filter(user=student, status=PracticeSession.COMPLETED, completed_at__date=today).count(),
+            "total_quizzes": metrics["practice_quizzes"], "questions_answered": metrics["questions_answered"],
+            "streak": {"current": streak["current"], "best": streak["best"], "at_risk": bool(streak["at_risk"])},
+            "level": level_payload(total_xp(student), cfg, lang), "next_badge": closest[1] if closest else None}
 
 
 PACK_MAX_QUESTIONS = 60  # one offline pack per subject
@@ -600,15 +667,20 @@ def answer_practice(session_id, student, question_id, response, now=None):
         if len(s.answers) >= len(s.items):
             s.status, s.completed_at, just_finished = PracticeSession.COMPLETED, now, True
         s.save()
+    out = {"feedback": _practice_feedback(s, len(s.answers) - 1, lang)}
     if just_finished:
-        _finish_practice(s, student, now)
-    return {"feedback": _practice_feedback(s, len(s.answers) - 1, lang), "next": practice_state(s)}
+        out["rewards"] = _finish_practice(s, student, now)
+    out["next"] = practice_state(s)  # after the rewards, so the summary shows the XP just earned
+    return out
 
 
 def _finish_practice(session, student, now):
-    """XP (up to the daily limit), a learning day for the streak, and badge checks."""
+    """XP (up to the daily limit), a learning day for the streak, and badge checks.
+    Returns what to celebrate on the summary screen: new badges, a new level, and the streak."""
     cfg = config()
+    lang = lang_of(student)
     today = timezone.localdate(now)
+    level_before = level_payload(total_xp(student), cfg, lang)["level"]
     earned_today = XPEvent.objects.filter(user=student, kind="practice", created_at__date=today).count()
     if earned_today < cfg["practice_cap"]:
         ev = award_xp(student, "practice", cfg["xp"]["practice_quiz"], f"practice:{session.pk}")
@@ -616,8 +688,13 @@ def _finish_practice(session, student, now):
             session.xp_awarded = ev.points
             session.save(update_fields=["xp_awarded"])
     record_activity(student, today, "practice", cfg)  # a quiz is at least PRACTICE_MIN questions, so it counts
-    evaluate_badges(student, cfg)
+    new = evaluate_badges(student, cfg)
     check_level(student, cfg)
+    level_after = level_payload(total_xp(student), cfg, lang)
+    streak = rules.streak_status(activity_days(student), today, cfg["freezes"])
+    return {"badges": [badge_brief(n["code"], n["scope"], n["tier"], lang) for n in new],
+            "level_up": level_after if level_after["level"] > level_before else None,
+            "streak": {"current": streak["current"], "best": streak["best"]}}
 
 
 # ---------------------------------------------------------------- leaderboard (SRS 5.6)

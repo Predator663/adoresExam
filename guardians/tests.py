@@ -487,3 +487,42 @@ class ResendTests(GuardianBase):
         old.refresh_from_db()
         self.assertEqual((old.status, old.body_enc), (SmsJob.CANCELLED, ""))
         self.assertEqual(SmsJob.objects.filter(guardian=self.mama, status=SmsJob.QUEUED).count(), 1)
+
+
+class JobFilterTests(GuardianBase):
+    def test_messages_can_be_filtered_by_status_text_kind_class_and_time(self):
+        self.load()
+        self.a.post("/api/guardians/send/", {"scope": "all", "dry_run": False}, format="json")
+        self.a.post("/api/guardians/send/", {"scope": "all", "dry_run": False, "include_login": False, "note": "Meeting Friday"}, format="json")
+        get = lambda q: self.a.get(f"/api/guardians/jobs/?page=1&{q}").json()
+        total = get("")["count"]
+        self.assertGreaterEqual(total, 3)
+        self.assertEqual(get("kind=custom")["count"] + get("kind=login")["count"], total)
+        self.assertEqual(get("status=queued")["count"], total)
+        self.assertEqual(get("status=sent")["count"], 0)
+        name = SmsJob.objects.first().guardian.name
+        self.assertTrue(all(name in r["parent"] for r in get(f"q={name}")["results"]))
+        self.assertEqual(get("q=zzzznobody")["count"], 0)
+        today = timezone.localdate().isoformat()
+        self.assertEqual(get(f"from={today}&to={today}")["count"], total)  # a single date means that whole day
+        self.assertEqual(get("from=2999-01-01")["count"], 0)
+        self.assertEqual(get("to=2000-01-01")["count"], 0)
+        self.assertEqual(get(f"from={today}T23:59&to={today}T23:59")["count"] <= total, True)
+        self.assertEqual(self.a.get("/api/guardians/jobs/?page=1&from=not-a-date").status_code, 400)
+        cls = self.amina.school_class_id
+        self.assertGreaterEqual(get(f"class={cls}")["count"], 1)
+        self.assertEqual(get("class=999999")["count"], 0)
+
+
+class AuditClassTests(GuardianBase):
+    def test_the_audit_log_shows_and_filters_by_the_class_of_a_student(self):
+        from core.models import audit
+        audit(self.amina, "practice.finish", 1)
+        audit(self.zawadi, "practice.finish", 2)
+        audit(self.admin, "student.create", 3)
+        rows = self.a.get("/api/audit-log/?page=1").json()["results"]
+        by = {r["actor"]: r["class"] for r in rows}
+        self.assertEqual(by[self.amina.username], str(self.amina.school_class))
+        self.assertEqual(by[self.admin.username], "")  # staff have no class
+        only = self.a.get(f"/api/audit-log/?page=1&class={self.amina.school_class_id}").json()["results"]
+        self.assertTrue(only and all(r["actor"] == self.amina.username for r in only))

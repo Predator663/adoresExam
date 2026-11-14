@@ -60,7 +60,43 @@ BADGES = [
      "name": ("Practice Pro", "Bingwa wa Mazoezi"),
      "desc": ("Complete 50 practice quizzes.", "Maliza maswali ya mazoezi 50."),
      "unit": ("practice quizzes", "mazoezi")},
+    # ---- more badges, mostly for practice mode (no exam marks are involved in any of them)
+    {"code": "quiz_crusher", "metric": "questions_answered", "tiers": [100, 500, 1500],
+     "name": ("Question Crusher", "Mshindi wa Maswali"),
+     "desc": ("Answer 100 questions in practice quizzes.", "Jibu maswali 100 katika mazoezi."),
+     "unit": ("questions", "maswali")},
+    {"code": "flawless", "metric": "flawless_quizzes", "tiers": [1, 5, 15],
+     "name": ("Flawless", "Bila Kosa"),
+     "desc": ("Get every answer right in a practice quiz.", "Pata majibu yote sahihi katika zoezi moja."),
+     "unit": ("perfect quizzes", "mazoezi kamili")},
+    {"code": "sharp_mind", "metric": "strong_quizzes", "tiers": [3, 10, 30],
+     "name": ("Sharp Mind", "Akili Kali"),
+     "desc": ("Score 80 percent or more in a practice quiz.", "Pata asilimia 80 au zaidi katika zoezi la mazoezi."),
+     "unit": ("strong quizzes", "mazoezi mazuri")},
+    {"code": "sharpshooter", "metric": "answer_run", "tiers": [5, 10, 20],
+     "name": ("Sharpshooter", "Mdunguaji"),
+     "desc": ("Answer 5 practice questions correctly in a row.", "Jibu maswali 5 ya mazoezi sahihi mfululizo."),
+     "unit": ("correct in a row", "sahihi mfululizo")},
+    {"code": "explorer", "metric": "practice_subjects", "tiers": [2, 3, 5],
+     "name": ("Explorer", "Mgunduzi"),
+     "desc": ("Finish practice quizzes in 2 different subjects.", "Maliza mazoezi ya masomo 2 tofauti."),
+     "unit": ("subjects", "masomo")},
+    {"code": "early_bird", "metric": "morning_quizzes", "tiers": [3, 10, 25],
+     "name": ("Early Bird", "Ndege wa Asubuhi"),
+     "desc": ("Finish 3 practice quizzes before 8:00 in the morning.", "Maliza mazoezi 3 kabla ya saa 2:00 asubuhi."),
+     "unit": ("morning quizzes", "mazoezi ya asubuhi")},
+    {"code": "weekend_warrior", "metric": "weekend_days", "tiers": [2, 6, 15],
+     "name": ("Weekend Warrior", "Shujaa wa Wikendi"),
+     "desc": ("Do a practice quiz on 2 different Saturdays or Sundays.", "Fanya zoezi la mazoezi siku 2 tofauti za Jumamosi au Jumapili."),
+     "unit": ("weekend days", "siku za wikendi")},
+    {"code": "xp_hunter", "metric": "total_xp", "tiers": [500, 2000, 5000],
+     "name": ("XP Hunter", "Mwindaji wa XP"),
+     "desc": ("Collect 500 XP from exams and practice.", "Kusanya XP 500 kutoka mitihani na mazoezi."),
+     "unit": ("XP", "XP")},
 ]
+
+PRACTICE_METRICS = ("practice_quizzes", "questions_answered", "flawless_quizzes", "strong_quizzes", "answer_run",
+                    "practice_subjects", "morning_quizzes", "weekend_days")
 
 BY_CODE = {b["code"]: b for b in BADGES}
 

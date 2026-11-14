@@ -99,7 +99,7 @@ export default function StaffOverview() {
         <section className="card">
           <div className="row"><h2 className="grow">🧾 Recent activity</h2><Link className="btn" href="/staff/audit/">Audit log</Link></div>
           {!d.recent_activity?.length ? <p className="muted">Nothing recorded yet.</p> : <ul className="list">{d.recent_activity.map((a: any) => (
-            <li key={a.id} className="row small"><span className="grow"><b>{a.actor}</b> · {nice(a.action)}{a.target ? ` #${a.target}` : ""}</span><span className="muted">{ago(a.at, lang)}</span></li>))}</ul>}
+            <li key={a.id} className="row small"><span className="grow"><b>{a.actor}</b>{a.class && <> <span className="pill">{a.class}</span></>} · {nice(a.action)}{a.target ? ` #${a.target}` : ""}</span><span className="muted">{ago(a.at, lang)}</span></li>))}</ul>}
         </section>
       )}
     </div>

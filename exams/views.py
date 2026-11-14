@@ -1049,6 +1049,6 @@ def staff_overview(request):
             totals["proximity_alerts"] = 0
         out["recent_activity"] = [
             {"id": a.pk, "actor": _person(a.actor) if a.actor_id else "System", "action": a.action, "target": a.target,
-             "at": a.created_at}
-            for a in AuditLog.objects.select_related("actor").order_by("-created_at")[:10]]
+             "class": str(a.actor.school_class) if a.actor_id and a.actor.school_class_id else "", "at": a.created_at}
+            for a in AuditLog.objects.select_related("actor__school_class").order_by("-created_at")[:10]]
     return Response(out)

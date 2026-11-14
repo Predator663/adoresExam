@@ -16,6 +16,7 @@ urlpatterns = [
     path("results/<int:attempt_id>/review/seen/", views.review_seen),
     # practice mode
     path("practice/subjects/", views.practice_subjects),
+    path("practice/overview/", views.practice_overview),
     path("practice/start/", views.practice_start),
     path("practice/pack/<int:subject_id>/", views.practice_pack),
     path("practice/<int:session_id>/", views.practice_current),
