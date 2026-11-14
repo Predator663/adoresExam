@@ -5,6 +5,7 @@ import { api, API } from "@/lib/api";
 import { Modal } from "./ui";
 import FormulaBuilder from "./FormulaBuilder";
 import { SYMBOLS } from "./SymbolPad";
+import { useDictation, VoiceBar, VoiceButton } from "./VoiceDictate";
 
 /** QB-05: bold, italic, underline, lists, superscript/subscript, special characters, formulas and chemical formulas, images. */
 export async function uploadImage(file: File, alt: string): Promise<{ url: string; alt_text: string }> {
@@ -57,6 +58,18 @@ export default function RichEditor({ value, onChange, label, minRows = 4, compac
   const restore = () => { ref.current?.focus(); const s = getSelection(); if (s && saved.current) { s.removeAllRanges(); s.addRange(saved.current); } };
   const cmd = (c: string) => { restore(); document.execCommand(c); emit(); };
   const insert = (html: string) => { restore(); document.execCommand("insertHTML", false, html); emit(); };
+  const lastSaid = useRef(0);
+  const voice = useDictation({
+    oneLine: compact,
+    before: () => { const el = ref.current, s = getSelection(); if (!el) return ""; if (s && s.rangeCount && el.contains(s.anchorNode)) { const r = s.getRangeAt(0).cloneRange(); r.setStart(el, 0); return r.toString().slice(-4); } return (el.textContent || "").slice(-4); },
+    insert: (text) => {
+      const el = ref.current; if (!el) return;
+      restore(); if (!getSelection()?.rangeCount || !el.contains(getSelection()!.anchorNode)) { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = getSelection(); s?.removeAllRanges(); s?.addRange(r); }
+      text.split(/(\n+)/).forEach((part) => { if (!part) return; if (part[0] === "\n") document.execCommand(part.length > 1 ? "insertParagraph" : "insertLineBreak"); else document.execCommand("insertText", false, part); });
+      lastSaid.current = text.length; remember(); emit();
+    },
+    undo: () => { restore(); for (let i = 0; i < lastSaid.current; i++) document.execCommand("delete"); lastSaid.current = 0; remember(); emit(); },
+  });
   const Btn = ({ c, children, title }: { c: string; children: React.ReactNode; title: string }) => (
     <button type="button" className="btn icon" title={title} aria-label={title} onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => cmd(c)}>{children}</button>);
 
@@ -68,11 +81,14 @@ export default function RichEditor({ value, onChange, label, minRows = 4, compac
         <Btn c="superscript" title="Superscript">x²</Btn><Btn c="subscript" title="Subscript">x₂</Btn>
         <button type="button" className="btn" onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => setDlg("symbols")}>Ω Symbols</button>
         <button type="button" className="btn" onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => setDlg("formula")}>∑ Formula</button>
+        <VoiceButton d={voice} mouseDown={(e) => { e.preventDefault(); remember(); }} />
         {!compact && <button type="button" className="btn" onMouseDown={(e) => { e.preventDefault(); remember(); }} onClick={() => setDlg("image")}>🖼 Image</button>}
       </div>
+      <VoiceBar d={voice} />
       <div ref={ref} className="input rich" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label={label}
         style={{ minHeight: `${compact ? 2.4 : minRows * 1.6}rem`, marginTop: ".5rem" }} onInput={emit}
         onKeyDown={(e) => {
+          if (e.altKey && e.key.toLowerCase() === "m" && voice.ok) { e.preventDefault(); remember(); voice.toggle(); return; }
           if (autofix && e.key === "Backspace" && undoAutofix()) { e.preventDefault(); emit(); return; }  // undo the last automatic change
           if (compact && e.key === "Enter" && !e.shiftKey) e.preventDefault();
         }} onBlur={() => { remember(); emit(); }}

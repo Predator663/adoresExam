@@ -1,0 +1,20 @@
+/* Voice typing button and its status bar. */
+.vd-btn{position:relative;display:inline-flex;align-items:center;gap:.35rem}
+.vd-btn.on{background:color-mix(in srgb,var(--bad) 18%,var(--surface));border-color:var(--bad);color:var(--text)}
+.vd-btn.on::before{content:"";position:absolute;inset:-3px;border-radius:inherit;border:2px solid var(--bad);opacity:0;animation:vd-ping 1.6s ease-out infinite;pointer-events:none}
+.vd-mic{display:inline-block;font-size:1.05rem;line-height:1}.vd-btn.on .vd-mic{animation:vd-beat 1s ease-in-out infinite}
+.vd-bar{display:grid;gap:.35rem;margin-top:.5rem;padding:.55rem .7rem;border-radius:12px;background:var(--soft);border:1px solid var(--border);animation:vd-in .25s cubic-bezier(.2,.8,.2,1)}
+.vd-bar.err{border-color:var(--bad)}
+.vd-live{display:flex;align-items:center;gap:.6rem;min-height:1.6rem}
+.vd-wave{display:inline-flex;align-items:center;gap:2px;height:18px;flex:none}
+.vd-wave i{display:block;width:3px;height:100%;border-radius:2px;background:var(--bad);transform-origin:center;animation:vd-wave 1s ease-in-out infinite}
+.vd-wave i:nth-child(2){animation-delay:.15s}.vd-wave i:nth-child(3){animation-delay:.3s}.vd-wave i:nth-child(4){animation-delay:.45s}.vd-wave i:nth-child(5){animation-delay:.6s}
+.vd-text{flex:1;min-width:0;font-style:italic;overflow-wrap:anywhere}
+.vd-hint{font-size:.78rem}
+.vd-opts{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}.vd-opts select{min-height:38px;width:auto}
+@keyframes vd-ping{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.25)}}
+@keyframes vd-beat{50%{transform:scale(1.2)}}
+@keyframes vd-wave{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@keyframes vd-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.vd-btn::before,.vd-mic,.vd-wave i,.vd-bar{animation:none!important}.vd-wave i{transform:scaleY(.7)}}
+.reduce-motion .vd-btn::before,.reduce-motion .vd-mic,.reduce-motion .vd-wave i,.reduce-motion .vd-bar{animation:none!important}.reduce-motion .vd-wave i{transform:scaleY(.7)}

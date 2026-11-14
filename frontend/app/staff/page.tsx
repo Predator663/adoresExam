@@ -4,7 +4,8 @@ import { PagedList, Pager, useClientPage } from "@/components/Pager";
 import { InstallBanner } from "@/components/InstallApp";
 import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
-import StaffOverview from "@/components/StaffOverview";
+import "@/components/staff-home.css";
+import StaffHome from "@/components/StaffHome";
 import { Bar, ErrorNote, Loading, useLoad, Tabs } from "@/components/ui";
 import { api, downloadFile } from "@/lib/api";
 import { eatDate } from "@/lib/clock";
@@ -140,20 +141,22 @@ export default function Staff() {
   const { user, t, logout } = useSession();
   const [tab, setTab] = useState("overview");
   const admin = user?.role === "admin" || user?.role === "super_admin";
-  const tabs = [["overview", "Overview"], ["subjects", t("subjects")], ["exams", t("nav_exams")], ...(admin ? [["students", t("students")], ["announce", t("announcements")]] : [])];
+  const tabs = [["overview", "Home"], ["subjects", t("subjects")], ["exams", t("nav_exams")], ...(admin ? [["students", t("students")], ["announce", t("announcements")]] : [])];
   return (
     <Shell bare title={t("staff_console")}>
       {user && user.role === "student" ? <p>{t("not_allowed")}</p> : (
         <>
           <StaffNav />
           <InstallBanner who={admin ? "admin" : "teacher"} />
-          <Tabs tabs={tabs} value={tab} onChange={setTab} />
-          {tab === "overview" && <StaffOverview />}
-          {tab === "subjects" && <Subjects />}
-          {tab === "exams" && <Exams admin={admin} />}
-          {tab === "students" && admin && <BulkUpload />}
-          {tab === "announce" && admin && <Announce />}
-          <p><button className="btn danger" onClick={() => logout()}>{t("log_out")}</button></p>
+          <div className="sh-tabs"><Tabs tabs={tabs} value={tab} onChange={setTab} /></div>
+          <div className="sh-pane" key={tab}>
+            {tab === "overview" && <StaffHome go={setTab} />}
+            {tab === "subjects" && <Subjects />}
+            {tab === "exams" && <Exams admin={admin} />}
+            {tab === "students" && admin && <BulkUpload />}
+            {tab === "announce" && admin && <Announce />}
+          </div>
+          <p><button className="btn ghost" onClick={() => logout()}>{t("log_out")}</button></p>
         </>
       )}
     </Shell>
