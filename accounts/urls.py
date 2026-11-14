@@ -19,6 +19,7 @@ urlpatterns = [
     path("lockouts/<int:pk>/reset-password/", lockouts.reset_password),
     path("students/bulk-action/", views.students_bulk_action),
     path("students/credentials/", views.class_credentials),
+    path("students/bulk-upload/options/", views.upload_options),
     path("students/bulk-upload/template/", views.upload_template),
     path("students/bulk-upload/validate/", views.bulk_validate),
     path("students/bulk-upload/<int:batch_id>/confirm/", views.bulk_confirm),

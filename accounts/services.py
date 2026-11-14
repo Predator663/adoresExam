@@ -26,8 +26,39 @@ def _norm_header(h):
     return re.sub(r"\s+", " ", str(h or "").replace("_", " ").strip().lower())
 
 
-def parse_upload(uploaded_file):
-    """Return a list of dicts keyed by normalised header. Supports .csv and .xlsx."""
+# Other names teachers commonly use for the template's columns; they are read as the template's own name.
+HEADER_ALIASES = {
+    "firstname": "first name", "given name": "first name", "first": "first name",
+    "lastname": "last name", "surname": "last name", "family name": "last name", "last": "last name",
+    "index no": "index number", "index": "index number", "index no.": "index number", "admission number": "index number",
+    "admission no": "index number", "reg no": "index number", "registration number": "index number",
+    "class": "class or form", "form": "class or form", "class/form": "class or form",
+    "name": "full name", "student name": "full name", "student": "full name",
+}
+_NAME_WORD = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
+
+
+def _canon(h):
+    h = _norm_header(h)
+    return HEADER_ALIASES.get(h, h)
+
+
+def tidy_name(s):
+    """Amina  JUMA -> Amina Juma. Only used when the person ticked "tidy names"."""
+    return " ".join(_NAME_WORD.sub(lambda m: m.group().capitalize(), w) for w in s.split())
+
+
+def _cell_text(v):
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():  # a number cell in Excel: 1234.0 -> 1234
+        return str(int(v))
+    return str(v).strip()
+
+
+def parse_upload(uploaded_file, class_fixed=False):
+    """Return a list of dicts keyed by normalised header. Supports .csv and .xlsx.
+    class_fixed: the class was chosen on screen, so the file needs no class or stream column."""
     name = (uploaded_file.name or "").lower()
     raw = uploaded_file.read()
     if name.endswith(".xlsx"):
@@ -40,43 +71,85 @@ def parse_upload(uploaded_file):
         rows = list(csv.reader(io.StringIO(text)))
     else:
         raise ValueError("Please upload the template as an .xlsx or .csv file.")
+    rows = [r for r in rows if r is not None]
     if not rows:
         raise ValueError("The file is empty.")
-    headers = [_norm_header(h) for h in rows[0]]
-    missing = [c for c in REQUIRED_COLUMNS if c not in headers]
+    headers = [_canon(h) for h in rows[0]]
+    needed = ["index number"] + ([] if class_fixed else ["class or form"])
+    if "full name" not in headers:
+        needed = ["first name", "last name"] + needed
+    missing = [c for c in needed if c not in headers]
     if missing:
         raise ValueError("Missing column(s): " + ", ".join(missing) + ". Please use the downloadable template.")
     out = []
     for i, r in enumerate(rows[1:], start=2):  # spreadsheet row number
-        if r is None or all(c in (None, "") for c in r):
+        if all(c in (None, "") for c in r):
             continue
-        d = {h: ("" if v is None else str(v).strip()) for h, v in zip(headers, r)}
+        d = {}
+        for h, v in zip(headers, r):
+            if h and h not in d:
+                d[h] = _cell_text(v)
+        if d.get("full name") and not (d.get("first name") or d.get("last name")):
+            first, _, last = d["full name"].partition(" ")
+            d["first name"], d["last name"] = first.strip(), last.strip()
         d["_row"] = i
         out.append(d)
     return out
 
 
-def validate_rows(rows):
+def class_key(name, stream):
+    return (re.sub(r"\s+", " ", name.strip()).lower(), stream.strip().lower())
+
+
+def _class_name(text, tidy):
+    t = re.sub(r"\s+", " ", text.strip())
+    if re.fullmatch(r"[0-4]", t):
+        return f"Form {t}"  # "2" means Form 2
+    return tidy_name(t) if tidy else t
+
+
+def validate_rows(rows, opts=None):
+    """opts: fixed=(name, stream) when one class was chosen, create_classes (default True), existing ("reject" | "skip"),
+    tidy (bool), username_style ("first" | "first.last")."""
     from guardians import services as parents  # imported here: the guardians app also imports accounts
 
+    opts = opts or {}
+    fixed, create_ok, skip_existing, tidy = opts.get("fixed"), opts.get("create_classes", True), opts.get("existing") == "skip", opts.get("tidy", False)
+    style = opts.get("username_style", "first")
+    classes = {class_key(c.name, c.stream): c for c in SchoolClass.objects.all()}
     existing_index = set(User.objects.exclude(index_number="").values_list("index_number", flat=True))
     seen = {}
-    clean, errors, warnings, with_parents = [], [], [], []
+    clean, errors, warnings, with_parents, skipped = [], [], [], [], []
     for d in rows:
         problems = []
         first, last = d.get("first name", ""), d.get("last name", "")
-        index, klass, stream = d.get("index number", ""), d.get("class or form", ""), d.get("stream", "")
+        if tidy:
+            first, last = tidy_name(first), tidy_name(last)
+        index = d.get("index number", "")
+        klass, stream = fixed if fixed else (d.get("class or form", ""), d.get("stream", ""))
         for label, val in (("first name", first), ("last name", last), ("index number", index), ("class or form", klass)):
             if not val:
                 problems.append(f"missing {label}")
+        if klass and not fixed:
+            if not re.search(r"[0-4]", klass):
+                problems.append("class or form must include a form number (0 to 4)")
+            else:
+                klass, stream = _class_name(klass, tidy), stream.strip().upper() if stream.strip() else ""
+                match = classes.get(class_key(klass, stream))
+                if match:
+                    klass, stream = match.name, match.stream  # use the spelling already in the school's list
+                elif not create_ok:
+                    problems.append(f"class “{(klass + ' ' + stream).strip()}” does not exist yet")
         if index:
             if index in seen:
                 problems.append(f"duplicate index number (also on row {seen[index]})")
             elif index in existing_index:
+                if skip_existing and not problems:
+                    skipped.append({"row": d["_row"], "index": index})
+                    seen.setdefault(index, d["_row"])
+                    continue
                 problems.append("index number already registered")
             seen.setdefault(index, d["_row"])
-        if klass and not re.search(r"[1-4]", klass):
-            problems.append("class or form must include a form number from 1 to 4")
         found, p_problems, p_warns = parents.read_parent_cells(d)
         problems += p_problems
         if problems:
@@ -106,14 +179,27 @@ def validate_rows(rows):
         for w in warnings:
             merged.setdefault(w["row"], []).extend(w["problems"])
         warnings = [{"row": r, "problems": merged[r]} for r in sorted(merged)]
+    by_class, taken, preview = {}, set(User.objects.values_list("username", flat=True)), []
+    for r in clean:
+        label = f"{r['class']} {r['stream']}".strip()
+        by_class.setdefault(label, {"class": label, "count": 0, "is_new": class_key(r["class"], r["stream"]) not in classes})["count"] += 1
+        login = make_username(r["first_name"], taken, r["last_name"], style)
+        if len(preview) < 8:
+            preview.append({"first_name": r["first_name"], "last_name": r["last_name"], "index_number": r["index_number"], "class": label, "username": login})
+    by_class = sorted(by_class.values(), key=lambda c: c["class"])
     report = {"total_rows": len(rows), "valid_rows": len(clean), "invalid_rows": len(errors), "errors": errors,
-              "warnings": warnings, "parents": stats}
+              "warnings": warnings, "parents": stats, "skipped": len(skipped), "skipped_rows": skipped[:50],
+              "by_class": by_class, "new_classes": [c["class"] for c in by_class if c["is_new"]], "preview": preview,
+              "options": {"username_style": style}}
     return clean, report
 
 
-def make_username(first_name, taken):
-    """Exact first name, lowercase, no spaces; amina, amina2, amina3 ... (AUTH-04)."""
+def make_username(first_name, taken, last_name="", style="first"):
+    """Exact first name, lowercase, no spaces; amina, amina2, amina3 ... (AUTH-04). style "first.last": amina.juma."""
     base = re.sub(r"\s+", "", first_name.strip().lower()) or "student"
+    if style == "first.last":
+        tail = re.sub(r"[^a-z0-9]", "", last_name.lower())
+        base = f"{re.sub(r'[^a-z0-9]', '', base) or 'student'}.{tail}" if tail else base
     candidate, n = base, 1
     while candidate in taken:
         n += 1
@@ -128,16 +214,17 @@ def create_students(batch, actor):
 
     taken = set(User.objects.values_list("username", flat=True))
     class_cache = {}
+    style = (batch.report.get("options") or {}).get("username_style", "first")
     users, wanted = [], []  # wanted[i] = the parents named on the row of users[i]
     for r in batch.rows:
         key = (r["class"], r["stream"])
         if key not in class_cache:
-            level = int(re.search(r"[1-4]", r["class"]).group())
+            level = int(re.search(r"[0-4]", r["class"]).group())
             class_cache[key], _ = SchoolClass.objects.get_or_create(
                 name=r["class"], stream=r["stream"], defaults={"form_level": level}
             )
         u = User(
-            username=make_username(r["first_name"], taken),
+            username=make_username(r["first_name"], taken, r["last_name"], style),
             first_name=r["first_name"],
             last_name=r["last_name"],
             index_number=r["index_number"],

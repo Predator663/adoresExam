@@ -1,11 +1,13 @@
 import csv
+import io
 import logging
+import re
 from datetime import timedelta
 
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.contrib.auth.hashers import make_password
 from django.http import HttpResponse
 from django.utils import timezone
@@ -282,30 +284,136 @@ class StudentViewSet(viewsets.ModelViewSet):
         return self._set_state(request, pk, "move", school_class=klass)
 
 
+def _flag(v, default):
+    """A form or query value such as "1", "0", "true", "false"."""
+    if v in (None, ""):
+        return default
+    return str(v).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _chosen_class(data):
+    """The class picked on screen: ("id", SchoolClass) | ("new", (name, stream)) | None. Raises ValidationError for a bad choice."""
+    cid = (data.get("class") or "").strip() if isinstance(data.get("class"), str) else data.get("class")
+    if cid:
+        klass = SchoolClass.objects.filter(pk=cid).first() if str(cid).isdigit() else None
+        if not klass:
+            raise ValidationError({"class": "That class no longer exists. Choose another."})
+        return "id", klass
+    name = (data.get("class_name") or "").strip()
+    if name:
+        if not re.search(r"[0-4]", name):
+            raise ValidationError({"class_name": "The class name needs a form number from 0 to 4, for example Form 2."})
+        return "new", (re.sub(r"\s+", " ", name)[:40], (data.get("class_stream") or "").strip().upper()[:20])
+    return None
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def upload_options(request):
+    """Everything the upload screen needs: the school's classes with how many students each already has."""
+    counts = dict(User.objects.filter(role=User.Role.STUDENT, is_archived=False, school_class__isnull=False)
+                  .values_list("school_class").annotate(n=Count("pk")).values_list("school_class", "n"))
+    return Response({"classes": [{"id": c.pk, "label": str(c), "form_level": c.form_level, "students": counts.get(c.pk, 0)} for c in SchoolClass.objects.all()]})
+
+
 @api_view(["GET"])
 @permission_classes([IsAdminRole])
 def upload_template(request):
-    resp = HttpResponse(content_type="text/csv")
-    resp["Content-Disposition"] = 'attachment; filename="students_template.csv"'
-    csv.writer(resp).writerow([c.title() for c in TEMPLATE_COLUMNS])
+    """?class=<id> leaves out the class and stream columns (the class is chosen on screen); ?parents=0|1|2 how many parents;
+    ?format=csv|xlsx (the Excel version has a class drop-down and a "How to fill" sheet). With no options: the classic CSV."""
+    p = request.query_params
+    chosen = _chosen_class(p)
+    cols = ["first name", "last name", "index number"]
+    if not chosen:
+        cols += ["class or form", "stream"]
+    n_parents = p.get("parents", "2")
+    if n_parents not in ("0", "1", "2"):
+        n_parents = "2"
+    cols += TEMPLATE_COLUMNS[5:8][: 3 if n_parents != "0" else 0] + (TEMPLATE_COLUMNS[8:11] if n_parents == "2" else [])
+    head = [c.title() for c in cols]
+    label = (str(chosen[1]) if chosen and chosen[0] == "id" else " ".join(x for x in chosen[1] if x) if chosen else "").strip()
+    stub = "students_template" + (f"_{re.sub(r'[^A-Za-z0-9]+', '_', label).strip('_')}" if label else "")
+    if p.get("format") != "xlsx":
+        resp = HttpResponse(content_type="text/csv")
+        resp["Content-Disposition"] = f'attachment; filename="{stub}.csv"'
+        csv.writer(resp).writerow(head)
+        return resp
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Students"
+    ws.append(head)
+    for i, h in enumerate(head, start=1):
+        c = ws.cell(row=1, column=i)
+        c.font, c.fill = Font(bold=True, color="FFFFFF"), PatternFill("solid", fgColor="0B6B4F")
+        c.alignment = Alignment(vertical="center")
+        ws.column_dimensions[get_column_letter(i)].width = max(16, len(h) + 6)
+    ws.freeze_panes = "A2"
+    ws.row_dimensions[1].height = 24
+    for col_name in ("index number", "parent phone", "parent 2 phone"):  # text, so a leading zero or a long number is kept as typed
+        if col_name in cols:
+            L = get_column_letter(cols.index(col_name) + 1)
+            for r in range(2, 502):
+                ws[f"{L}{r}"].number_format = "@"
+    classes = list(SchoolClass.objects.all())
+    names = wb.create_sheet("Classes")
+    names.append(["Class (form)", "Stream"])
+    for c in classes:
+        names.append([c.name, c.stream])
+    names.column_dimensions["A"].width, names.column_dimensions["B"].width = 20, 12
+    if "class or form" in cols and classes:
+        L = get_column_letter(cols.index("class or form") + 1)
+        dv = DataValidation(type="list", formula1=f"=Classes!$A$2:$A${len(classes) + 1}", allow_blank=True, showErrorMessage=False)
+        ws.add_data_validation(dv)
+        dv.add(f"{L}2:{L}501")
+    how = wb.create_sheet("How to fill")
+    lines = ["How to fill this sheet", "",
+             "1. One student per row on the Students sheet, starting under the green heading row.",
+             "2. First name, last name and index number are required." + ("" if chosen else " So is the class or form (for example Form 2)."),
+             f"3. All students go into {label or 'the class written on each row'}." if chosen else "3. Pick the class from the drop-down, or type it. Add a stream (A, B, …) if the class has streams.",
+             "4. Leave a cell empty if you do not have the answer; only the required ones must be filled.",
+             "5. Parent columns are optional. Phone numbers are Tanzanian mobiles, such as 0712 345 678.",
+             "6. Save the file and upload it on the Students tab. You will see a check before anything is created."]
+    for i, t in enumerate(lines, start=1):
+        how.cell(row=i, column=1, value=t)
+    how["A1"].font = Font(bold=True, size=14)
+    how.column_dimensions["A"].width = 110
+    buf = io.BytesIO()
+    wb.save(buf)
+    resp = HttpResponse(buf.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    resp["Content-Disposition"] = f'attachment; filename="{stub}.xlsx"'
     return resp
 
 
 @api_view(["POST"])
 @permission_classes([IsAdminRole])
 def bulk_validate(request):
-    """Step 1: validate only. Nothing is created yet (AUTH-03)."""
+    """Step 1: validate only. Nothing is created yet (AUTH-03).
+    Form fields besides the file: class (id) or class_name + class_stream, create_classes, existing (reject|skip), tidy, username_style."""
     f = request.FILES.get("file")
     if not f:
         return Response({"detail": "Please choose a file."}, status=400)
+    d = request.data
+    chosen = _chosen_class(d)
+    existing = d.get("existing") if d.get("existing") in ("reject", "skip") else "reject"
+    style = d.get("username_style") if d.get("username_style") in ("first", "first.last") else "first"
+    fixed = None
+    if chosen:
+        fixed = (chosen[1].name, chosen[1].stream) if chosen[0] == "id" else chosen[1]
+    opts = {"fixed": fixed, "create_classes": _flag(d.get("create_classes"), True), "existing": existing,
+            "tidy": _flag(d.get("tidy"), False), "username_style": style}
     try:
-        rows = parse_upload(f)
+        rows = parse_upload(f, class_fixed=bool(fixed))
     except ValueError as e:
         return Response({"detail": str(e)}, status=400)
     except Exception:
         return Response({"detail": "We could not read that file. Please use the template."}, status=400)
     try:
-        clean, report = validate_rows(rows)
+        clean, report = validate_rows(rows, opts)
     except ValueError as e:  # e.g. parents named in the file but GUARDIAN_KEY is not set
         return Response({"detail": str(e)}, status=400)
     batch = BulkUploadBatch.objects.create(created_by=request.user, rows=clean, report=report)

@@ -6,8 +6,9 @@ import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
 import "@/components/staff-home.css";
 import StaffHome from "@/components/StaffHome";
+import StudentUpload from "@/components/StudentUpload";
 import { Bar, ErrorNote, Loading, useLoad, Tabs } from "@/components/ui";
-import { api, downloadFile } from "@/lib/api";
+import { api } from "@/lib/api";
 import { eatDate } from "@/lib/clock";
 import { useSession } from "@/lib/session";
 
@@ -78,48 +79,6 @@ function Exams({ admin }: { admin: boolean }) {
   );
 }
 
-/** AUTH-02, AUTH-03, AUTH-06: choose the file, read the report, confirm, then download the printable sheet. */
-function BulkUpload() {
-  const { t } = useSession();
-  const [report, setReport] = useState<any>(null), [err, setErr] = useState(""), [done, setDone] = useState<any>(null), [busy, setBusy] = useState(false);
-  async function validate(f: File | undefined) {
-    if (!f) return; setErr(""); setDone(null); setReport(null); setBusy(true);
-    const fd = new FormData(); fd.append("file", f);
-    try { setReport(await api("/students/bulk-upload/validate/", { body: fd })); } catch (e: any) { setErr(e.message); }
-    setBusy(false);
-  }
-  async function confirm() {
-    setBusy(true); setErr("");
-    try { setDone(await api(`/students/bulk-upload/${report.batch_id}/confirm/`, { body: { skip_invalid: true } })); setReport(null); } catch (e: any) { setErr(e.message); }
-    setBusy(false);
-  }
-  return (
-    <div className="card">
-      <h2>{t("bulk_upload")}</h2>
-      <button className="btn" onClick={() => downloadFile("/students/bulk-upload/template/", "students_template.csv").catch((e) => setErr(e.message))}>⬇ {t("download_template")}</button>
-      <label className="field"><span>{t("choose_file")}</span><input className="input" type="file" accept=".csv,.xlsx" onChange={(e) => validate(e.target.files?.[0])} /></label>
-      {busy && <Loading />}
-      {err && <p className="no" role="alert">⚠ {err}</p>}
-      {report && (
-        <>
-          <p><b>{report.valid_rows}</b> {t("valid_rows")} · <b className={report.invalid_rows ? "no" : "ok"}>{report.invalid_rows}</b> {t("invalid_rows")} ({report.total_rows} {t("total")})</p>
-          {report.parents?.links > 0 && <p className="ok">👪 {t("parents_summary", { rows: report.parents.rows_with_parents, links: report.parents.links, newp: report.parents.parents_new, old: report.parents.parents_existing, multi: report.parents.parents_with_several_students })}</p>}
-          {report.errors.length > 0 && <div className="tbl-wrap"><table><tbody>{report.errors.slice(0, 50).map((x: any) => <tr key={x.row}><td>{t("row")} {x.row}</td><td>{x.problems.join("; ")}</td></tr>)}</tbody></table></div>}
-          {report.warnings?.length > 0 && <><h3>⚠ {t("parent_warnings")}</h3><div className="tbl-wrap"><table><tbody>{report.warnings.slice(0, 50).map((x: any) => <tr key={x.row}><td>{t("row")} {x.row}</td><td>{x.problems.join("; ")}</td></tr>)}</tbody></table></div></>}
-          <button className="btn primary big" disabled={busy || !report.valid_rows} onClick={confirm}>{t("create_accounts", { n: report.valid_rows })}</button>
-        </>
-      )}
-      {done && (
-        <>
-          <p className="ok">✓ {t("accounts_created", { n: done.created })}</p>
-          {done.parents && <p className="ok">👪 {t("parents_linked", { made: done.parents.parents_created, links: done.parents.links_created })}</p>}
-          <button className="btn primary" onClick={() => downloadFile(done.credentials_url.replace(/^\/api/, "") + "?file=pdf", "credentials.pdf").catch((e) => setErr(e.message))}>⬇ {t("credential_sheet")}</button>
-        </>
-      )}
-    </div>
-  );
-}
-
 function Announce() {
   const { t } = useSession();
   const [title, setTitle] = useState(""), [body, setBody] = useState(""), [msg, setMsg] = useState("");
@@ -153,7 +112,7 @@ export default function Staff() {
             {tab === "overview" && <StaffHome go={setTab} />}
             {tab === "subjects" && <Subjects />}
             {tab === "exams" && <Exams admin={admin} />}
-            {tab === "students" && admin && <BulkUpload />}
+            {tab === "students" && admin && <StudentUpload />}
             {tab === "announce" && admin && <Announce />}
           </div>
           <p><button className="btn ghost" onClick={() => logout()}>{t("log_out")}</button></p>
