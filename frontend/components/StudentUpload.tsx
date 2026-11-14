@@ -235,7 +235,7 @@ export default function StudentUpload() {
           {r.warnings?.length > 0 && (
             <div className="up-card flat">
               <button type="button" className="up-acc" aria-expanded={openWarn} onClick={() => setOpenWarn((v) => !v)}><b>⚠ {r.warnings.length} parent note{r.warnings.length === 1 ? "" : "s"}</b><span className="grow" /><Icon n="chevron" size={18} /></button>
-              <div className={`up-collapse ${openWarn ? "open" : ""}`}><div><ul className="up-probs">{r.warnings.slice(0, 50).map((x: any) => <li key={x.row}><b>Row {x.row}</b><span>{x.problems.join("; ")}</span></li>)}</ul></div></div>
+              <div className={`up-collapse ${openWarn || r.warnings.length <= 3 ? "open" : ""}`}><div><ul className="up-probs">{r.warnings.slice(0, 50).map((x: any) => <li key={x.row}><b>Row {x.row}</b><span>{x.problems.join("; ")}</span></li>)}</ul></div></div>
             </div>
           )}
           {r.parents?.links > 0 && <p className="up-note"><Icon n="phone" size={16} /> {r.parents.links} parent link{r.parents.links === 1 ? "" : "s"} will be made ({r.parents.parents_new} new parent{r.parents.parents_new === 1 ? "" : "s"}, {r.parents.parents_existing} already known).</p>}
