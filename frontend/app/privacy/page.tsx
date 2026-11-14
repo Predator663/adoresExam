@@ -18,6 +18,7 @@ export default function Privacy() {
         <li><b>Account details:</b> name, username, index number, class and stream, role (student, teacher or admin), and your choices for language, theme and accessibility.</li>
         <li><b>Exam and practice records:</b> your answers, scores, grades, start and finish times, retakes or extra time, and practice sessions.</li>
         <li><b>Engagement records:</b> streaks, XP, level, badges and leaderboard position.</li>
+        <li><b>Profile photo (optional):</b> only if you choose to add one. It is cropped to a small square picture, hidden details such as the place it was taken are removed, and you can replace or delete it at any time in Settings.</li>
         <li><b>Exam integrity information:</b> how many times the exam screen was left. This is information for teachers only and is never treated as proof of cheating.</li>
         <li><b>Location during exams (see section 2A):</b> while an exam attempt is running, your phone sends its position and a few device status words. Nothing is collected before you start or after you submit.</li>
         <li><b>Your acceptance:</b> the date and the version of the Terms of use and this Privacy policy you accepted before each exam.</li>
@@ -25,7 +26,7 @@ export default function Privacy() {
         <li><b>Parent and guardian contact details:</b> name, relationship and mobile number, kept encrypted. They are used only to send a child’s login details and school notices, and are visible only to administrators, who see the number hidden unless they choose to show it. Every time one is shown is recorded.</li>
         <li><b>Optional notifications:</b> if you switch on push notifications, your browser gives us a notification address so results and reminders can reach you.</li>
       </ul>
-      <p>We do <b>not</b> collect your location outside an exam attempt, your contacts, photos (unless a teacher adds a question image), or payment details.</p>
+      <p>We do <b>not</b> collect your location outside an exam attempt, your contacts, photos (other than a profile photo you choose to add, or a question image a teacher adds), or payment details.</p>
 
       <h2>2. Why we use it</h2>
       <ul>
@@ -57,6 +58,7 @@ export default function Privacy() {
         <li><b>You:</b> your own answers, results and progress only. Another student cannot open your result.</li>
         <li><b>Teachers:</b> results and analytics for the subjects and classes assigned to them, after results are published. During a live exam teachers see participation numbers only, never your location.</li>
         <li><b>Administrators:</b> everything needed to run the school’s exams and accounts, including your position during an exam and proximity alerts (section 2A). Reviewing an alert is recorded in the audit log. Only a Super Admin can permanently delete data.</li>
+        <li><b>Your profile photo</b> is shown to you, to your teachers and to administrators. Classmates never see it: they see only the avatar you chose.</li>
         <li><b>Other students:</b> the online counter shows a number, never names. The leaderboard shows only what the school has switched on.</li>
       </ul>
       <p>We do not sell your information, show advertising, or use third-party tracking or analytics. We share information outside the school only if the law requires it or an education authority properly asks for it.</p>

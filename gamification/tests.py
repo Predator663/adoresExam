@@ -322,3 +322,82 @@ class LanguageTests(AnalyticsBase):
         d = APIClient().get("/api/i18n/sw/").json()
         self.assertEqual(d["levels"]["7"], "Kipanga")
         self.assertEqual(APIClient().get("/api/i18n/xx/").json()["lang"], "en")
+
+
+class ProfilePhotoTests(AnalyticsBase):
+    def png(self, size=(300, 200)):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", size, (200, 30, 90)).save(buf, "PNG")
+        return SimpleUploadedFile("me.png", buf.getvalue(), content_type="image/png")
+
+    def test_photo_is_saved_square_replaced_and_removed(self):
+        from PIL import Image
+        c = self.client_for(self.amina)
+        d = c.post("/api/gamification/profile/photo/", {"photo": self.png()}, format="multipart").json()
+        self.assertTrue(d["photo"].endswith(".jpg"))
+        p = services.get_profile(self.amina)
+        self.assertEqual(Image.open(p.photo.path).size, (services.PHOTO_SIZE, services.PHOTO_SIZE))
+        first = p.photo.path
+        d2 = c.post("/api/gamification/profile/photo/", {"photo": self.png((50, 50))}, format="multipart").json()
+        self.assertNotEqual(d["photo"], d2["photo"])
+        import os
+        self.assertFalse(os.path.exists(first))  # the old file is deleted
+        self.assertEqual(c.get("/api/gamification/me/").json()["profile"]["photo"], d2["photo"])
+        self.assertEqual(c.delete("/api/gamification/profile/photo/").json()["photo"], "")
+
+    def test_only_pictures_are_accepted(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        c = self.client_for(self.amina)
+        bad = SimpleUploadedFile("x.png", b"not a picture", content_type="image/png")
+        self.assertEqual(c.post("/api/gamification/profile/photo/", {"photo": bad}, format="multipart").status_code, 400)
+        self.assertEqual(c.post("/api/gamification/profile/photo/", {}, format="multipart").status_code, 400)
+
+    def test_classmates_never_get_the_photo(self):
+        mate = type(self.amina).objects.create(username="neema2", first_name="Neema", last_name="Juma", role="student", school_class=self.cls_a, index_number="S9")
+        services.award_xp(self.amina, "practice", 40, "p1")
+        services.award_xp(mate, "practice", 20, "p2")
+        s = SchoolSettings.load()
+        s.leaderboard_enabled = True
+        s.save()
+        self.client_for(self.amina).post("/api/gamification/profile/photo/", {"photo": self.png()}, format="multipart")
+        d = self.client_for(mate).get("/api/gamification/leaderboard/").json()
+        self.assertTrue(d["entries"])
+        self.assertFalse(any("photo" in e for e in d["entries"]))
+
+    def test_teachers_cannot_use_it(self):
+        self.assertEqual(self.client_for(self.teacher).post("/api/gamification/profile/photo/", {"photo": self.png()}, format="multipart").status_code, 403)
+
+
+class AdminGamificationTests(AnalyticsBase):
+    def setUp(self):
+        super().setUp()
+        services.award_xp(self.amina, "submit", 300, "t:1")
+        services.award_xp(self.zawadi, "submit", 700, "t:2")
+        BadgeAward.objects.create(user=self.zawadi, code="first_steps", tier=3)
+
+    def test_only_admins(self):
+        for who in (self.teacher, self.amina):
+            for url in ("/api/gamification/admin/overview/", "/api/gamification/admin/students/?q=am"):
+                self.assertEqual(self.client_for(who).get(url).status_code, 403)
+
+    def test_overview_ranks_and_counts(self):
+        d = self.client_for(self.admin).get("/api/gamification/admin/overview/").json()
+        self.assertEqual([t["id"] for t in d["top"]][:2], [self.zawadi.pk, self.amina.pk])
+        self.assertEqual(d["top"][0]["gold"], 1)
+        self.assertEqual(d["tier_totals"]["gold"], 1)
+        self.assertEqual(sum(lv["count"] for lv in d["levels"]), d["students"])
+        self.assertEqual(len(d["daily_xp"]), 14)
+        self.assertNotIn("marks", str(d).lower())
+
+    def test_search_needs_two_letters_and_detail_shows_rank(self):
+        a = self.client_for(self.admin)
+        self.assertEqual(a.get("/api/gamification/admin/students/?q=a").json()["results"], [])
+        hit = a.get(f"/api/gamification/admin/students/?q={self.amina.first_name[:3]}").json()["results"]
+        self.assertIn(self.amina.pk, [h["id"] for h in hit])
+        d = a.get(f"/api/gamification/admin/students/{self.amina.pk}/").json()
+        self.assertEqual((d["xp"], d["rank"]), (300, 2))
+        self.assertEqual(len(d["daily_xp"]), 14)

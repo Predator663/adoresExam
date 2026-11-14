@@ -5,6 +5,7 @@ import Shell from "@/components/Shell";
 import { Ring } from "@/components/student";
 import { Bar, ErrorNote, Loading, Tabs, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ProfilePhoto } from "@/components/PhotoPicker";
 import { AVATAR_EMOJI, BADGE_EMOJI, TIER_MARK } from "@/lib/emoji";
 import { useSession } from "@/lib/session";
 
@@ -23,7 +24,7 @@ export default function Badges() {
     <Shell title={t("nav_badges")}>
       {me.data && (
         <div className="card sx-profile">
-          <Ring value={me.data.level.progress_percent} size={76} stroke={5} label={t("xp_progress")}><span className="sx-hero-avatar" aria-hidden>{AVATAR_EMOJI[me.data.profile.avatar] || "🦉"}</span></Ring>
+          <Ring value={me.data.level.progress_percent} size={76} stroke={5} label={t("xp_progress")}><ProfilePhoto photo={me.data.profile.photo} fallback={AVATAR_EMOJI[me.data.profile.avatar] || "🦉"} size={62} className="sx-hero-avatar" /></Ring>
           <div className="grow"><b className="sx-profile-name">{me.data.profile.display_name || t("my_profile")}</b><br /><span className="muted">{t("level_n", { n: me.data.level.level })} · {me.data.level.name} · {me.data.xp} XP</span>
             {b.data && <p className="small sx-earned-line">{t("badges_earned_of", { a: earned, b: all.length })}</p>}</div>
         </div>

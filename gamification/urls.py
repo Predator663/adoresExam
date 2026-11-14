@@ -9,6 +9,7 @@ urlpatterns = [
     path("gamification/badges/", views.my_badges),
     path("gamification/xp/", views.my_xp),
     path("gamification/profile/", views.my_profile),
+    path("gamification/profile/photo/", views.my_photo),
     path("gamification/leaderboard/", views.leaderboard),
     path("gamification/catalog/", views.badge_catalog),
     # review mode progress (Mistake Master)
@@ -24,4 +25,7 @@ urlpatterns = [
     path("practice/mark-eligible/", views.practice_mark_eligible),
     # admin
     path("gamification/settings/", views.gamification_settings),
+    path("gamification/admin/overview/", views.admin_overview),
+    path("gamification/admin/students/", views.admin_students),
+    path("gamification/admin/students/<int:student_id>/", views.admin_student),
 ]

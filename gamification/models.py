@@ -28,7 +28,10 @@ class Profile(models.Model):
     """A student's gamification profile (SRS 5.6). Created the first time it is needed."""
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gamification")
-    avatar = models.CharField(max_length=20, default="owl")  # one of AVATARS (no photo uploads, so nothing to moderate)
+    avatar = models.CharField(max_length=20, default="owl")  # one of AVATARS; shown to classmates (leaderboard)
+    # The student's own photo. Shown only to her and to staff, never to classmates. A random file name, re-encoded and stripped of
+    # location data on upload (see services.set_photo). Empty = she has not added one, the avatar is used instead.
+    photo = models.ImageField(upload_to="profile_photos/", blank=True)
     display_name = models.CharField(max_length=30, blank=True)  # shown to classmates; empty = "Amina K."
     hide_from_leaderboard = models.BooleanField(default=False)  # each student can hide herself
     last_seen_level = models.PositiveSmallIntegerField(default=1)  # drives the level-up celebration

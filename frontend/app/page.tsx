@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { eatDate, makeOffset } from "@/lib/clock";
 import { AVATAR_EMOJI, BADGE_EMOJI, TIER_MARK } from "@/lib/emoji";
 import { greetKey } from "@/lib/student";
+import { ProfilePhoto } from "@/components/PhotoPicker";
 import { useSwr } from "@/lib/swr";
 import { useSession } from "@/lib/session";
 import type { ExamCard } from "@/lib/types";
@@ -22,7 +23,7 @@ type Summary = {
   exam_streak: { current: number; best: number };
   recent_badges: { code: string; name: string; tier: string; tier_label: string; subject: string | null; new: boolean }[];
   new_badges: number; next_goals: { code: string; name: string; subject: string | null; progress: number; target: number; unit: string }[];
-  profile?: { avatar?: string; display_name?: string };
+  profile?: { avatar?: string; display_name?: string; photo?: string };
 };
 type ResultRow = { attempt_id: number; exam: string; subject: string; percent: number; grade: string; date: string };
 type Analytics = { subjects?: { subject: string; revise?: string[] }[] };
@@ -92,12 +93,13 @@ function StudentHome() {
           <i className="ux-hero-blob b1" aria-hidden /><i className="ux-hero-blob b2" aria-hidden />
           <div className="ux-hero-row">
             <Ring value={s?.level.progress_percent ?? 0} size={92} stroke={5} className="sx-hero-ring ux-hero-ring" label={s ? t("xp_progress") : undefined}>
-              <span className="ux-avatar" aria-hidden>{avatar}</span>
+              <ProfilePhoto photo={s?.profile?.photo} fallback={avatar} size={78} className="ux-avatar" />
             </Ring>
             <div className="ux-hero-text">
               <p className="ux-greet">{t(greetKey())}</p>
               <h1 className="ux-name">{name} <span className="wave" aria-hidden>👋</span></h1>
               <p className="ux-focus" key={focus}>{focus}</p>
+              {s && !s.profile?.photo && <Link href="/settings/#photo" className="ux-addphoto">📷 {lang === "sw" ? "Weka picha yako" : "Add your photo"}</Link>}
             </div>
           </div>
           {s ? (

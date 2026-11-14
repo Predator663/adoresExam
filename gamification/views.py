@@ -3,7 +3,8 @@
 import logging
 
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.parsers import MultiPartParser
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
@@ -14,7 +15,7 @@ from core.models import audit
 from core.pagination import envelope, page_params, paginate, wants_page
 from exams.views import _visible_result_or_404
 from questions.models import Question
-from . import catalog, rules, services
+from . import adminstats, catalog, rules, services
 from .models import AVATARS, GamificationSettings
 
 log = logging.getLogger(__name__)
@@ -98,6 +99,25 @@ def my_profile(request):
                 raise ValidationError({"hide_from_leaderboard": "Must be true or false."})
             profile.hide_from_leaderboard = d["hide_from_leaderboard"]
         profile.save()
+    return Response(services.profile_payload(profile))
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsStudent])
+@parser_classes([MultiPartParser])
+def my_photo(request):
+    """The student's own profile photo. POST a picture (multipart field "photo"), or DELETE to go back to the avatar."""
+    profile = services.get_profile(request.user)
+    if request.method == "DELETE":
+        services.remove_photo(profile)
+    else:
+        f = request.FILES.get("photo")
+        if not f:
+            return Response({"detail": "Please choose a photo."}, status=400)
+        try:
+            services.set_photo(profile, f)
+        except services.GamificationError as e:
+            return _err(e)
     return Response(services.profile_payload(profile))
 
 
@@ -312,3 +332,29 @@ def gamification_settings(request):
         s.save()
         audit(request.user, "gamification.update", 1, fields=sorted(k for k in d if k != "reset"))
     return Response(_settings_payload(s))
+
+
+# ---------------------------------------------------------------- admin: gamification analytics (numbers only, no marks)
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def admin_overview(request):
+    """The whole school at a glance: top three, how levels and badges are spread, XP over the last two weeks."""
+    return Response(adminstats.overview())
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def admin_students(request):
+    """Find a student by name, user name or index number (at least 2 letters). Returns a few matches, never the whole school."""
+    q = (request.query_params.get("q") or "").strip()
+    if len(q) < 2:
+        return Response({"results": [], "hint": "Type at least 2 letters."})
+    return Response({"results": adminstats.search(q)})
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def admin_student(request, student_id):
+    """One student's gamification: XP, level, badges, streak, rank and recent XP."""
+    return Response(adminstats.detail(get_object_or_404(adminstats.students(), pk=student_id)))

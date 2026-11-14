@@ -707,7 +707,65 @@ def student_summary(student, now=None):
 
 def profile_payload(profile):
     return {"avatar": profile.avatar, "display_name": profile.display_name, "hide_from_leaderboard": profile.hide_from_leaderboard,
-            "avatars": AVATARS}
+            "avatars": AVATARS, "photo": photo_url(profile)}
+
+
+# ---------------------------------------------------------------- profile photo
+
+PHOTO_SIZE = 480                  # pixels, square: sharp on a big screen, a few tens of KB on a phone
+PHOTO_MAX_BYTES = 8 * 1024 * 1024
+
+
+def photo_url(profile):
+    try:
+        return profile.photo.url if profile and profile.photo else ""
+    except ValueError:
+        return ""
+
+
+def set_photo(profile, f):
+    """Keep the student's photo: any JPG, PNG or WebP is turned into a square JPEG (the web app already crops it, this makes sure),
+    rotated the way the phone meant it, with all hidden data (such as GPS position) removed. The old photo file is deleted."""
+    import io
+    import uuid
+
+    from django.core.files.base import ContentFile
+    from PIL import Image, ImageOps
+
+    from core.images import BadImage, open_image
+
+    if f.size > PHOTO_MAX_BYTES:
+        raise GamificationError("That photo is too large (max 8 MB). Choose a smaller one.")
+    try:
+        img = open_image(f, invalid="That file is not a photo we can read. Use a JPG, PNG or WebP picture.")
+    except BadImage as e:
+        raise GamificationError(str(e))
+    if img.format not in ("JPEG", "PNG", "WEBP"):
+        raise GamificationError("Only JPG, PNG and WebP photos are allowed.")
+    img = ImageOps.exif_transpose(img)
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        flat = Image.new("RGB", img.size, "white")  # a see-through PNG gets a white background instead of black
+        flat.paste(img, mask=img.split()[-1])
+        img = flat
+    else:
+        img = img.convert("RGB")
+    img = ImageOps.fit(img, (PHOTO_SIZE, PHOTO_SIZE), Image.LANCZOS, centering=(0.5, 0.4))  # a little above the middle: faces
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85, optimize=True)  # a new file, so nothing from the original is carried over
+    old = profile.photo.name if profile.photo else ""
+    profile.photo.save(f"{uuid.uuid4().hex}.jpg", ContentFile(buf.getvalue()), save=False)  # unguessable name: /media/ needs no login
+    profile.save(update_fields=["photo"])
+    if old:
+        profile.photo.storage.delete(old)
+
+
+def remove_photo(profile):
+    old = profile.photo.name if profile.photo else ""
+    if old:
+        profile.photo = ""
+        profile.save(update_fields=["photo"])
+        profile.photo.storage.delete(old)
 
 
 def acknowledge(student):

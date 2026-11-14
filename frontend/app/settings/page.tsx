@@ -5,6 +5,7 @@ import A11yPanel from "@/components/A11yPanel";
 import OfflineManager from "@/components/OfflineManager";
 import Shell from "@/components/Shell";
 import Icon from "@/components/Icon";
+import PhotoPicker from "@/components/PhotoPicker";
 import { api } from "@/lib/api";
 import { AVATAR_EMOJI } from "@/lib/emoji";
 import { useSession } from "@/lib/session";
@@ -61,8 +62,9 @@ export default function Settings() {
   const patch = async (b: any) => { try { setProf(await api("/gamification/profile/", { method: "PATCH", body: b })); setSaved(t("saved")); setTimeout(() => setSaved(""), 2000); } catch (e: any) { setSaved(e.message); } };
   return (
     <Shell title={t("nav_more")}>
-      <div className="card sx-profile">
-        <span className="sx-bigavatar" aria-hidden>{prof ? (AVATAR_EMOJI[prof.avatar] || "🦉") : (user?.first_name?.[0] || user?.username?.[0] || "?").toUpperCase()}</span>
+      <div className="card sx-profile" id="photo">
+        {prof ? <PhotoPicker photo={prof.photo} fallback={AVATAR_EMOJI[prof.avatar] || "🦉"} onChange={setProf} />
+          : <span className="sx-bigavatar" aria-hidden>{(user?.first_name?.[0] || user?.username?.[0] || "?").toUpperCase()}</span>}
         <div className="grow"><b className="sx-profile-name">{user?.first_name} {user?.last_name}</b><br /><span className="muted">@{user?.username}{user?.class ? ` · ${user.class}` : ""}</span></div>
       </div>
 
