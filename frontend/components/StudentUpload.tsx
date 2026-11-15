@@ -61,7 +61,7 @@ export default function StudentUpload() {
   const set = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setP((o) => { const n = { ...o, [k]: v }; savePrefs(n); return n; });
   const one = p.mode === "one";
   const picked = useMemo(() => opts.data?.classes.find((c) => String(c.id) === cls), [opts.data, cls]);
-  const newBad = newOn && !/[0-4]/.test(newName);
+  const newBad = newOn && !/[0-4]|pre[\s-]*form/i.test(newName);
   const classOk = !one || (newOn ? !!newName.trim() && !newBad : !!cls);
   const classLabel = !one ? "the class written on each row" : newOn ? `${newName.trim() || "a new class"} ${newStream.trim().toUpperCase()}`.trim() : picked?.label || "";
 
