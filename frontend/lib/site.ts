@@ -13,7 +13,7 @@ export const OPERATOR = {
 /** The second person credited next to the operator. No photo yet: the footer and card show his initial. Add one at
  *  public/operator/pamtech.jpg and set avatar below to use it. */
 export const PARTNER = {
-  id: "pamtech",
+  id: "pamatec",
   name: "Mr. Pascal",
   callsign: "Pamtech",
   email: "pniniku@gmail.com",
