@@ -28,7 +28,7 @@ from .models import THEMES, BulkUploadBatch, User
 from .permissions import IsAdminRole, IsSuperAdmin
 from .throttles import LoginIPThrottle, LoginUserThrottle
 from . import temp_password
-from .services import (TEMPLATE_COLUMNS, create_students, generate_password, parse_upload, validate_rows,
+from .services import (TEMPLATE_COLUMNS, _form_level, create_students, generate_password, parse_upload, validate_rows,
                        validate_staff_password)
 
 MAX_FAILED = 5  # no longer locks anyone; only used by the Locked accounts screen to flag "warning" accounts
@@ -292,19 +292,22 @@ def _flag(v, default):
 
 
 def _chosen_class(data):
-    """The class picked on screen: ("id", SchoolClass) | ("new", (name, stream)) | None. Raises ValidationError for a bad choice."""
-    cid = (data.get("class") or "").strip() if isinstance(data.get("class"), str) else data.get("class")
-    if cid:
-        klass = SchoolClass.objects.filter(pk=cid).first() if str(cid).isdigit() else None
+    """The class picked on screen, as {"id", "name", "stream", "level"}, or None. id is set for a class the school already has;
+    otherwise it is a new class from class_name + class_form (0-4, as in Settings) + class_stream. Raises ValidationError."""
+    raw = data.get("class")
+    if raw not in (None, ""):
+        klass = SchoolClass.objects.filter(pk=raw).first() if str(raw).isdigit() else None
         if not klass:
             raise ValidationError({"class": "That class no longer exists. Choose another."})
-        return "id", klass
-    name = (data.get("class_name") or "").strip()
-    if name:
-        if not re.search(r"[0-4]", name):
-            raise ValidationError({"class_name": "The class name needs a form number from 0 to 4, for example Form 2."})
-        return "new", (re.sub(r"\s+", " ", name)[:40], (data.get("class_stream") or "").strip().upper()[:20])
-    return None
+        return {"id": klass.pk, "name": klass.name, "stream": klass.stream, "level": klass.form_level}
+    name = re.sub(r"\s+", " ", (data.get("class_name") or "").strip())
+    if not name:
+        return None
+    form = data.get("class_form")
+    level = int(form) if str(form or "").strip() in ("0", "1", "2", "3", "4") else _form_level(name)
+    if level is None:
+        raise ValidationError({"class_form": "Choose the form (0 to 4) for the new class."})
+    return {"id": None, "name": name[:40], "stream": (data.get("class_stream") or "").strip().upper()[:20], "level": level}
 
 
 @api_view(["GET"])
@@ -331,7 +334,7 @@ def upload_template(request):
         n_parents = "2"
     cols += TEMPLATE_COLUMNS[5:8][: 3 if n_parents != "0" else 0] + (TEMPLATE_COLUMNS[8:11] if n_parents == "2" else [])
     head = [c.title() for c in cols]
-    label = (str(chosen[1]) if chosen and chosen[0] == "id" else " ".join(x for x in chosen[1] if x) if chosen else "").strip()
+    label = f"{chosen['name']} {chosen['stream']}".strip() if chosen else ""
     stub = "students_template" + (f"_{re.sub(r'[^A-Za-z0-9]+', '_', label).strip('_')}" if label else "")
     if p.get("format") != "xlsx":
         resp = HttpResponse(content_type="text/csv")
@@ -361,10 +364,10 @@ def upload_template(request):
                 ws[f"{L}{r}"].number_format = "@"
     classes = list(SchoolClass.objects.all())
     names = wb.create_sheet("Classes")
-    names.append(["Class (form)", "Stream"])
+    names.append(["Class (write it like this)", "Form"])
     for c in classes:
-        names.append([c.name, c.stream])
-    names.column_dimensions["A"].width, names.column_dimensions["B"].width = 20, 12
+        names.append([str(c), c.form_level])
+    names.column_dimensions["A"].width, names.column_dimensions["B"].width = 30, 8
     if "class or form" in cols and classes:
         L = get_column_letter(cols.index("class or form") + 1)
         dv = DataValidation(type="list", formula1=f"=Classes!$A$2:$A${len(classes) + 1}", allow_blank=True, showErrorMessage=False)
@@ -373,8 +376,8 @@ def upload_template(request):
     how = wb.create_sheet("How to fill")
     lines = ["How to fill this sheet", "",
              "1. One student per row on the Students sheet, starting under the green heading row.",
-             "2. First name, last name and index number are required." + ("" if chosen else " So is the class or form (for example Form 2)."),
-             f"3. All students go into {label or 'the class written on each row'}." if chosen else "3. Pick the class from the drop-down, or type it. Add a stream (A, B, …) if the class has streams.",
+             "2. First name, last name and index number are required." + ("" if chosen else " So is the class."),
+             f"3. All students go into {label}." if chosen else "3. Pick the class from the drop-down (the Classes sheet lists your school's classes). Leave Stream empty when the class already includes it.",
              "4. Leave a cell empty if you do not have the answer; only the required ones must be filled.",
              "5. Parent columns are optional. Phone numbers are Tanzanian mobiles, such as 0712 345 678.",
              "6. Save the file and upload it on the Students tab. You will see a check before anything is created."]
@@ -401,9 +404,7 @@ def bulk_validate(request):
     chosen = _chosen_class(d)
     existing = d.get("existing") if d.get("existing") in ("reject", "skip") else "reject"
     style = d.get("username_style") if d.get("username_style") in ("first", "first.last") else "first"
-    fixed = None
-    if chosen:
-        fixed = (chosen[1].name, chosen[1].stream) if chosen[0] == "id" else chosen[1]
+    fixed = chosen
     opts = {"fixed": fixed, "create_classes": _flag(d.get("create_classes"), True), "existing": existing,
             "tidy": _flag(d.get("tidy"), False), "username_style": style}
     try:
@@ -436,8 +437,7 @@ def bulk_confirm(request, batch_id):
         ids = create_students(batch, request.user)
     except Exception as e:  # nothing was saved (the whole step is one transaction); say why instead of a blank "something went wrong"
         logging.getLogger(__name__).exception("bulk upload %s could not be confirmed", batch.pk)
-        return Response({"detail": f"The accounts could not be created, and nothing was saved. Reason: {type(e).__name__}: {str(e)[:300]}. "
-                                   "Check the file for very long cells or odd characters, then upload it again."}, status=400)
+        return Response({"detail": f"The accounts could not be created, and nothing was saved. Please check the file and try again (upload {batch.pk})."}, status=400)
     out = {"created": len(ids), "credentials_url": f"/api/students/bulk-upload/{batch.pk}/credentials/"}
     if batch.report.get("parents_result"):
         out["parents"] = batch.report["parents_result"]

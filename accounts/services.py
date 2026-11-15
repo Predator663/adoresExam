@@ -98,7 +98,17 @@ def parse_upload(uploaded_file, class_fixed=False):
 
 
 def class_key(name, stream):
-    return (re.sub(r"\s+", " ", name.strip()).lower(), stream.strip().lower())
+    """Classes are free text in Settings ("Form 1A", or "Form 1" with stream "A", or "Pre-Form One" with stream "A"), so a class is
+    recognised by its whole label with spaces, dashes and capitals ignored: all of those spellings of one class match."""
+    return re.sub(r"[\s_-]+", "", f"{name}{stream}".lower())
+
+
+def _form_level(name):
+    """The form (0 to 4) a class name stands for: "Form 2" -> 2, "Pre-Form One" -> 0. None when it cannot be told."""
+    m = re.search(r"[0-4]", name)
+    if m:
+        return int(m.group())
+    return 0 if re.search(r"\bpre[\s-]*form", name, re.I) else None
 
 
 def _class_name(text, tidy):
@@ -109,8 +119,10 @@ def _class_name(text, tidy):
 
 
 def validate_rows(rows, opts=None):
-    """opts: fixed=(name, stream) when one class was chosen, create_classes (default True), existing ("reject" | "skip"),
-    tidy (bool), username_style ("first" | "first.last")."""
+    """opts: fixed={"id", "name", "stream", "level"} when one class was chosen on screen (id: a class the school has; otherwise a new
+    one with that name, stream and form level), create_classes (default True), existing ("reject" | "skip"), tidy (bool),
+    username_style ("first" | "first.last"). Every clean row carries its class decision (class_id, or level for a new class), so
+    creating the accounts never has to work out again which class a row means."""
     from guardians import services as parents  # imported here: the guardians app also imports accounts
 
     opts = opts or {}
@@ -126,19 +138,24 @@ def validate_rows(rows, opts=None):
         if tidy:
             first, last = tidy_name(first), tidy_name(last)
         index = d.get("index number", "")
-        klass, stream = fixed if fixed else (d.get("class or form", ""), d.get("stream", ""))
+        klass, stream = (fixed["name"], fixed["stream"]) if fixed else (d.get("class or form", ""), d.get("stream", ""))
         for label, val in (("first name", first), ("last name", last), ("index number", index), ("class or form", klass)):
             if not val:
                 problems.append(f"missing {label}")
-        if klass and not fixed:
-            if not re.search(r"[0-4]", klass):
-                problems.append("class or form must include a form number (0 to 4)")
-            else:
+        class_id, level = None, None
+        if klass:
+            if not fixed:
                 klass, stream = _class_name(klass, tidy), stream.strip().upper() if stream.strip() else ""
-                match = classes.get(class_key(klass, stream))
-                if match:
-                    klass, stream = match.name, match.stream  # use the spelling already in the school's list
-                elif not create_ok:
+            match = classes.get(class_key(klass, stream))
+            if match:  # a class the school already has (Settings): its name, stream and form are used exactly as saved
+                class_id, klass, stream, level = match.pk, match.name, match.stream, match.form_level
+            else:
+                level = fixed.get("level") if fixed else None
+                if level is None:
+                    level = _form_level(klass)
+                if level is None:
+                    problems.append(f"class “{(klass + ' ' + stream).strip()}” is not in the school's list. Add it in Settings, or write it like Form 2")
+                elif not create_ok and not fixed:
                     problems.append(f"class “{(klass + ' ' + stream).strip()}” does not exist yet")
         for label, val, limit in (("first name", first, 150), ("last name", last, 150), ("index number", index, 40), ("class", klass, 40), ("stream", stream, 20)):
             if len(val) > limit:
@@ -158,7 +175,8 @@ def validate_rows(rows, opts=None):
         if problems:
             errors.append({"row": d["_row"], "problems": problems})
         else:
-            row = {"first_name": first, "last_name": last, "index_number": index, "class": klass, "stream": stream}
+            row = {"first_name": first, "last_name": last, "index_number": index, "class": klass, "stream": stream,
+                   "class_id": class_id, "level": level}
             clean.append(row)
             if found:
                 with_parents.append((d["_row"], found, row))
@@ -185,7 +203,7 @@ def validate_rows(rows, opts=None):
     by_class, taken, preview = {}, {u.lower() for u in User.objects.values_list("username", flat=True)}, []
     for r in clean:
         label = f"{r['class']} {r['stream']}".strip()
-        by_class.setdefault(label, {"class": label, "count": 0, "is_new": class_key(r["class"], r["stream"]) not in classes})["count"] += 1
+        by_class.setdefault(label, {"class": label, "count": 0, "is_new": r["class_id"] is None})["count"] += 1
         login = make_username(r["first_name"], taken, r["last_name"], style)
         if len(preview) < 8:
             preview.append({"first_name": r["first_name"], "last_name": r["last_name"], "index_number": r["index_number"], "class": label, "username": login})
@@ -212,6 +230,19 @@ def make_username(first_name, taken, last_name="", style="first"):
     return candidate
 
 
+def _class_for(r):
+    """The SchoolClass for a checked row: the one chosen when the file was checked; if it vanished since, the same label; else a new one."""
+    klass = SchoolClass.objects.filter(pk=r["class_id"]).first() if r.get("class_id") else None
+    if klass is None:
+        want = class_key(r["class"], r["stream"])
+        klass = next((c for c in SchoolClass.objects.all() if class_key(c.name, c.stream) == want), None)
+    if klass is None:
+        level = r.get("level")
+        level = _form_level(r["class"]) if level is None else level
+        klass = SchoolClass.objects.create(name=r["class"], stream=r["stream"], form_level=1 if level is None else level)
+    return klass
+
+
 @transaction.atomic
 def create_students(batch, actor):
     from guardians import services as parents
@@ -221,12 +252,9 @@ def create_students(batch, actor):
     style = (batch.report.get("options") or {}).get("username_style", "first")
     users, wanted = [], []  # wanted[i] = the parents named on the row of users[i]
     for r in batch.rows:
-        key = (r["class"], r["stream"])
+        key = r.get("class_id") or class_key(r["class"], r["stream"])
         if key not in class_cache:
-            level = int(re.search(r"[0-4]", r["class"]).group())
-            class_cache[key], _ = SchoolClass.objects.get_or_create(
-                name=r["class"], stream=r["stream"], defaults={"form_level": level}
-            )
+            class_cache[key] = _class_for(r)
         u = User(
             username=make_username(r["first_name"], taken, r["last_name"], style),
             first_name=r["first_name"],

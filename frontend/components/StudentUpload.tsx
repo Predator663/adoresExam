@@ -52,7 +52,7 @@ const Switch = ({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 
 export default function StudentUpload() {
   const [step, setStep] = useState(0), [p, setP] = useState<Prefs>(DEFAULTS), [ready, setReady] = useState(false);
-  const [cls, setCls] = useState(""), [newOn, setNewOn] = useState(false), [newName, setNewName] = useState(""), [newStream, setNewStream] = useState(""), [more, setMore] = useState(false);
+  const [cls, setCls] = useState(""), [newOn, setNewOn] = useState(false), [newName, setNewName] = useState(""), [newForm, setNewForm] = useState("1"), [newStream, setNewStream] = useState(""), [more, setMore] = useState(false);
   const [file, setFile] = useState<File | null>(null), [drag, setDrag] = useState(false), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [report, setReport] = useState<any>(null), [done, setDone] = useState<any>(null), [openProb, setOpenProb] = useState(false), [openWarn, setOpenWarn] = useState(false);
   const inp = useRef<HTMLInputElement>(null);
@@ -61,13 +61,13 @@ export default function StudentUpload() {
   const set = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setP((o) => { const n = { ...o, [k]: v }; savePrefs(n); return n; });
   const one = p.mode === "one";
   const picked = useMemo(() => opts.data?.classes.find((c) => String(c.id) === cls), [opts.data, cls]);
-  const newBad = newOn && !/[0-4]|pre[\s-]*form/i.test(newName);
-  const classOk = !one || (newOn ? !!newName.trim() && !newBad : !!cls);
+  const classOk = !one || (newOn ? !!newName.trim() : !!cls);
   const classLabel = !one ? "the class written on each row" : newOn ? `${newName.trim() || "a new class"} ${newStream.trim().toUpperCase()}`.trim() : picked?.label || "";
 
   const query = () => {
     const q = new URLSearchParams({ parents: p.parents, format: p.format });
     if (one && !newOn && cls) q.set("class", cls);
+    if (one && newOn && newName.trim()) { q.set("class_name", newName.trim()); q.set("class_form", newForm); q.set("class_stream", newStream.trim()); }
     return q;
   };
   async function template() {
@@ -84,7 +84,7 @@ export default function StudentUpload() {
     fd.append("file", f); fd.append("tidy", p.tidy ? "1" : "0"); fd.append("existing", p.existing); fd.append("username_style", p.style);
     fd.append("create_classes", p.createClasses || newOn ? "1" : "0");
     if (one && !newOn && cls) fd.append("class", cls);
-    if (one && newOn) { fd.append("class_name", newName.trim()); fd.append("class_stream", newStream.trim()); }
+    if (one && newOn) { fd.append("class_name", newName.trim()); fd.append("class_form", newForm); fd.append("class_stream", newStream.trim()); }
     try { setReport(await api<any>("/students/bulk-upload/validate/", { body: fd })); setStep(2); window.scrollTo({ top: 0, behavior: "smooth" }); }
     catch (e: any) { setErr(e.message); setFile(null); }
     setBusy(false);
@@ -123,6 +123,16 @@ export default function StudentUpload() {
             ))}
           </div>
 
+          {!one && (
+            <div className="up-classes">
+              <h3>Your school’s classes</h3>
+              {opts.loading ? <div className="up-skel"><i /><i /><i /><i /></div> : !opts.data?.classes.length ? <p className="up-hint">No classes yet. Add them in <Link href="/staff/settings/">Settings</Link>, or let the upload create the ones named in your file.</p> : (
+                <div className="up-chips">{opts.data.classes.map((c, i) => <span key={c.id} className="up-chip big" style={stagger(i)}>{c.label}<small>{c.students}</small></span>)}</div>
+              )}
+              <p className="up-hint">Write each student’s class in the file exactly like this (the Excel template offers them in a drop-down). A class that is not in the list is created only if “Create classes that are new” is on.</p>
+            </div>
+          )}
+
           {one && (
             <div className="up-classes">
               <h3>Which class?</h3>
@@ -141,8 +151,8 @@ export default function StudentUpload() {
               {newOn && (
                 <div className="up-new">
                   <label className="field"><span>Class name</span><input className="input" value={newName} maxLength={40} placeholder="Form 2" onChange={(e) => setNewName(e.target.value)} autoFocus /></label>
+                  <label className="field"><span>Form</span><select className="input" value={newForm} onChange={(e) => setNewForm(e.target.value)}>{[0, 1, 2, 3, 4].map((n) => <option key={n} value={n}>{n === 0 ? "Form 0 (Pre-Form)" : `Form ${n}`}</option>)}</select></label>
                   <label className="field"><span>Stream (optional)</span><input className="input" value={newStream} maxLength={20} placeholder="A" onChange={(e) => setNewStream(e.target.value)} /></label>
-                  {newBad && <p className="up-hint warn">The name needs a form number from 0 to 4, for example “Form 2”.</p>}
                 </div>
               )}
             </div>

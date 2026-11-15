@@ -42,7 +42,11 @@ class UploadFlowTests(AnalyticsBase):
         self.assertEqual(r.json()["new_classes"], ["Form 0 A"])
         self.confirm(r)
         self.assertTrue(SchoolClass.objects.filter(name="Form 0", stream="A", form_level=0).exists())
-        self.assertEqual(self.check("A,B,Z9\n", class_name="Primary").status_code, 400)  # no form number
+        self.assertEqual(self.check("A,B,Z9\n", class_name="Primary").status_code, 400)  # no form given and none in the name
+        r3 = self.check("First name,Last name,Index number\nA,B,Z8\n", class_name="Primary", class_form="2")  # the form comes from the dropdown
+        self.assertEqual(r3.status_code, 200, r3.content)
+        self.confirm(r3)
+        self.assertTrue(SchoolClass.objects.filter(name="Primary", form_level=2).exists())
 
     def test_unknown_classes_can_be_refused_and_names_matched_loosely(self):
         text = "First name,Last name,Index number,Class,Stream\nA,B,C1,2,\nA,B,C2,form 9,\n"
@@ -113,3 +117,29 @@ class UploadSafetyTests(AnalyticsBase):
         r = self.a.post(f"{BASE}/validate/", {"file": csv_file(text)}, format="multipart")
         self.assertEqual(r.json()["preview"][0]["username"], "neema2")
         self.assertEqual(self.a.post(f"{BASE}/{r.json()['batch_id']}/confirm/", {"skip_invalid": True}, format="json").status_code, 200)
+
+
+class NumberlessClassTests(AnalyticsBase):
+    def test_a_class_without_a_number_in_its_name_can_take_students(self):
+        pre = SchoolClass.objects.create(name="Pre-Form One", stream="A", form_level=0)
+        a = self.client_for(self.admin)
+        for kw in ({"class": pre.pk}, {}):  # chosen on screen, and named in the file
+            head, row = ("First name,Last name,Index number", f"N{len(kw)},B,PF{len(kw)}") if kw else ("First name,Last name,Index number,Class,Stream", "N0,B,PF0,Pre-Form One,A")
+            r = a.post(f"{BASE}/validate/", {"file": csv_file(f"{head}\n{row}\n"), **kw}, format="multipart")
+            self.assertEqual((r.status_code, r.json()["valid_rows"]), (200, 1), r.content)
+            self.assertEqual(a.post(f"{BASE}/{r.json()['batch_id']}/confirm/", {"skip_invalid": True}, format="json").status_code, 200)
+        self.assertEqual(User.objects.filter(school_class=pre).count(), 2)
+        self.assertEqual(SchoolClass.objects.filter(name="Pre-Form One").count(), 1)
+
+
+class ClassSpellingTests(AnalyticsBase):
+    def test_one_class_written_in_different_ways_is_still_one_class(self):
+        c = SchoolClass.objects.create(name="Form 3A", stream="", form_level=3)
+        a = self.client_for(self.admin)
+        text = "First name,Last name,Index number,Class,Stream\nA,B,S1,Form 3,A\nC,D,S2,form 3a,\nE,F,S3,FORM 3 A,\n"
+        r = a.post(f"{BASE}/validate/", {"file": csv_file(text)}, format="multipart").json()
+        self.assertEqual((r["valid_rows"], r["new_classes"]), (3, []))
+        self.assertEqual([x["count"] for x in r["by_class"]], [3])
+        self.assertEqual(a.post(f"{BASE}/{r['batch_id']}/confirm/", {"skip_invalid": True}, format="json").status_code, 200)
+        self.assertEqual(User.objects.filter(school_class=c).count(), 3)
+        self.assertFalse(SchoolClass.objects.filter(name="Form 3").exists())
