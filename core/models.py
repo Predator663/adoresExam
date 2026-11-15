@@ -31,6 +31,8 @@ class SchoolSettings(models.Model):
     proximity_alert_meters = models.FloatField(default=20)  # anti-cheat: two students closer than this raise an alert
     proximity_lock_enabled = models.BooleanField(default=False)  # anti-cheat: also lock both students' exam screens until an admin unlocks
     leave_lock_enabled = models.BooleanField(default=True)  # anti-cheat: lock a student's exam once she has left the exam screen more than leave_lock_limit times
+    practice_default_count = models.PositiveSmallIntegerField(default=10)  # the quiz length a student's practice page starts on (5, 10, 15 or 20)
+    student_photos_enabled = models.BooleanField(default=True)  # students may add or change their profile photo (existing photos stay)
     leave_lock_limit = models.PositiveSmallIntegerField(default=3)  # how many times she may leave; the next time locks her until an admin unlocks
 
     CACHE_KEY, CACHE_SECONDS = "school_settings_row", 15

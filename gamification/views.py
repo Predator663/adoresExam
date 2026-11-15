@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from academics.models import Subject, TeacherAssignment
 from accounts.permissions import IsAdminRole, IsAnyUser, IsStaffUser, IsStudent
 from core.i18n import lang_of
-from core.models import audit
+from core.models import SchoolSettings, audit
 from core.pagination import envelope, page_params, paginate, wants_page
 from exams.views import _visible_result_or_404
 from questions.models import Question
@@ -111,6 +111,8 @@ def my_photo(request):
     if request.method == "DELETE":
         services.remove_photo(profile)
     else:
+        if not SchoolSettings.load().student_photos_enabled:
+            return Response({"detail": "Profile photos are switched off by the school."}, status=403)
         f = request.FILES.get("photo")
         if not f:
             return Response({"detail": "Please choose a photo."}, status=400)

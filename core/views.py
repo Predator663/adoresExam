@@ -61,6 +61,7 @@ SETTINGS_FIELDS = [
     "school_name", "short_name", "contact_email", "contact_phone", "address", "result_delay_minutes", "late_entry_minutes", "question_approval_required",
     "show_class_position", "leaderboard_enabled", "grade_scale", "rules_text", "default_theme", "default_language",
     "proximity_alert_meters", "proximity_lock_enabled", "leave_lock_enabled", "leave_lock_limit",
+    "practice_default_count", "student_photos_enabled",
 ]
 
 
@@ -112,7 +113,12 @@ def clean_settings(data):
                 errors["leave_lock_limit"] = "Enter a number from 0 to 50."
             else:
                 clean["leave_lock_limit"] = v
-    for name in ("question_approval_required", "show_class_position", "leaderboard_enabled", "proximity_lock_enabled", "leave_lock_enabled"):
+    if "practice_default_count" in data:
+        if isinstance(data["practice_default_count"], int) and not isinstance(data["practice_default_count"], bool) and data["practice_default_count"] in (5, 10, 15, 20):
+            clean["practice_default_count"] = data["practice_default_count"]
+        else:
+            errors["practice_default_count"] = "Choose 5, 10, 15 or 20."
+    for name in ("question_approval_required", "show_class_position", "leaderboard_enabled", "proximity_lock_enabled", "leave_lock_enabled", "student_photos_enabled"):
         if name in data:
             if isinstance(data[name], bool):
                 clean[name] = data[name]

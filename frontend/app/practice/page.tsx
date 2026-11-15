@@ -78,6 +78,7 @@ export default function Practice() {
   const { t } = useSession(), { d } = usePT();
   const subs = useLoad(() => api<any[]>("/practice/subjects/"));
   const ov = useLoad(() => api<any>("/practice/overview/"));
+  const dflt = ov.data?.default_count;
   const [game, setGame] = useState<{ st: PState; id: number } | null>(null), [err, setErr] = useState(""), [count, setCount] = useState(10), [busy, setBusy] = useState<number | null>(null);
   const [offline, setOffline] = useState<string | null>(null), [packs, setPacks] = useState<ReturnType<typeof listPacks>>([]), [off, setOff] = useState(false);
   useEffect(() => {
@@ -94,6 +95,7 @@ export default function Practice() {
   const saved = (id: number) => packs.some((p) => p.id === String(id) && !p.expired);
   const usable = packs.filter((p) => !p.expired);
   const noSignal = off || !!subs.error;
+  useEffect(() => { if ([5, 10, 15, 20].includes(dflt)) setCount(dflt); }, [dflt]);  // the length the school chose; she can still change it
   const exit = () => { setGame(null); subs.reload(); ov.reload(); };
   return (
     <Shell title={t("nav_practice")}>

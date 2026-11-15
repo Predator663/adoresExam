@@ -537,7 +537,7 @@ def practice_overview(student, now=None):
         if closest is None or ratio > closest[0]:
             closest = (ratio, {"code": b["code"], "name": catalog.badge_name(b["code"], lang, tier + 1), "unit": catalog.badge_unit(b["code"], lang),
                                "progress": value, "target": target, "tier": catalog.tier_key(tier + 1), "tier_label": catalog.tier_label(tier + 1, lang)})
-    return {"xp_per_quiz": cfg["xp"]["practice_quiz"], "daily_cap": cfg["practice_cap"], "xp_quizzes_today": xp_quizzes,
+    return {"default_count": SchoolSettings.load().practice_default_count, "xp_per_quiz": cfg["xp"]["practice_quiz"], "daily_cap": cfg["practice_cap"], "xp_quizzes_today": xp_quizzes,
             "quizzes_today": PracticeSession.objects.filter(user=student, status=PracticeSession.COMPLETED, completed_at__date=today).count(),
             "total_quizzes": metrics["practice_quizzes"], "questions_answered": metrics["questions_answered"],
             "streak": {"current": streak["current"], "best": streak["best"], "at_risk": bool(streak["at_risk"])},
@@ -784,7 +784,7 @@ def student_summary(student, now=None):
 
 def profile_payload(profile):
     return {"avatar": profile.avatar, "display_name": profile.display_name, "hide_from_leaderboard": profile.hide_from_leaderboard,
-            "avatars": AVATARS, "photo": photo_url(profile)}
+            "avatars": AVATARS, "photo": photo_url(profile), "photos_enabled": SchoolSettings.load().student_photos_enabled}
 
 
 # ---------------------------------------------------------------- profile photo

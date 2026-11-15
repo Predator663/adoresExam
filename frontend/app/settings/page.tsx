@@ -63,7 +63,8 @@ export default function Settings() {
   return (
     <Shell title={t("nav_more")}>
       <div className="card sx-profile" id="photo">
-        {prof ? <PhotoPicker photo={prof.photo} fallback={AVATAR_EMOJI[prof.avatar] || "🦉"} onChange={setProf} />
+        {prof && prof.photos_enabled === false ? <span className="sx-bigavatar" aria-hidden>{AVATAR_EMOJI[prof.avatar] || "🦉"}</span>
+          : prof ? <PhotoPicker photo={prof.photo} fallback={AVATAR_EMOJI[prof.avatar] || "🦉"} onChange={setProf} />
           : <span className="sx-bigavatar" aria-hidden>{(user?.first_name?.[0] || user?.username?.[0] || "?").toUpperCase()}</span>}
         <div className="grow"><b className="sx-profile-name">{user?.first_name} {user?.last_name}</b><br /><span className="muted">@{user?.username}{user?.class ? ` · ${user.class}` : ""}</span></div>
       </div>

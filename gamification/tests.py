@@ -427,3 +427,23 @@ class AdminGamificationTests(AnalyticsBase):
         d = a.get(f"/api/gamification/admin/students/{self.amina.pk}/").json()
         self.assertEqual((d["xp"], d["rank"]), (300, 2))
         self.assertEqual(len(d["daily_xp"]), 14)
+
+
+class NewSchoolSettingsTests(AnalyticsBase):
+    """Practice length default and the profile-photo switch."""
+    png = ProfilePhotoTests.png
+
+    def test_practice_default_count_is_validated_and_served(self):
+        a = self.client_for(self.admin)
+        self.assertEqual(a.patch("/api/settings/", {"practice_default_count": 15}, format="json").status_code, 200)
+        self.assertEqual(self.client_for(self.amina).get("/api/practice/overview/").json()["default_count"], 15)
+        for bad in (7, 0, "x", True):
+            self.assertEqual(a.patch("/api/settings/", {"practice_default_count": bad}, format="json").status_code, 400, bad)
+
+    def test_photos_can_be_switched_off(self):
+        s = SchoolSettings.load()
+        s.student_photos_enabled = False
+        s.save()
+        c = self.client_for(self.amina)
+        self.assertEqual(c.post("/api/gamification/profile/photo/", {"photo": self.png()}, format="multipart").status_code, 403)
+        self.assertFalse(c.get("/api/gamification/me/").json()["profile"]["photos_enabled"])
