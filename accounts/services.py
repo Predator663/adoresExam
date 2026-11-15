@@ -140,6 +140,9 @@ def validate_rows(rows, opts=None):
                     klass, stream = match.name, match.stream  # use the spelling already in the school's list
                 elif not create_ok:
                     problems.append(f"class “{(klass + ' ' + stream).strip()}” does not exist yet")
+        for label, val, limit in (("first name", first, 150), ("last name", last, 150), ("index number", index, 40), ("class", klass, 40), ("stream", stream, 20)):
+            if len(val) > limit:
+                problems.append(f"{label} is longer than {limit} characters")
         if index:
             if index in seen:
                 problems.append(f"duplicate index number (also on row {seen[index]})")
@@ -179,7 +182,7 @@ def validate_rows(rows, opts=None):
         for w in warnings:
             merged.setdefault(w["row"], []).extend(w["problems"])
         warnings = [{"row": r, "problems": merged[r]} for r in sorted(merged)]
-    by_class, taken, preview = {}, set(User.objects.values_list("username", flat=True)), []
+    by_class, taken, preview = {}, {u.lower() for u in User.objects.values_list("username", flat=True)}, []
     for r in clean:
         label = f"{r['class']} {r['stream']}".strip()
         by_class.setdefault(label, {"class": label, "count": 0, "is_new": class_key(r["class"], r["stream"]) not in classes})["count"] += 1
@@ -200,11 +203,12 @@ def make_username(first_name, taken, last_name="", style="first"):
     if style == "first.last":
         tail = re.sub(r"[^a-z0-9]", "", last_name.lower())
         base = f"{re.sub(r'[^a-z0-9]', '', base) or 'student'}.{tail}" if tail else base
+    base = base[:140]
     candidate, n = base, 1
-    while candidate in taken:
+    while candidate.lower() in taken:  # compared in lower case: some databases treat Amina and amina as the same name
         n += 1
         candidate = f"{base}{n}"
-    taken.add(candidate)
+    taken.add(candidate.lower())
     return candidate
 
 
@@ -212,7 +216,7 @@ def make_username(first_name, taken, last_name="", style="first"):
 def create_students(batch, actor):
     from guardians import services as parents
 
-    taken = set(User.objects.values_list("username", flat=True))
+    taken = {u.lower() for u in User.objects.values_list("username", flat=True)}
     class_cache = {}
     style = (batch.report.get("options") or {}).get("username_style", "first")
     users, wanted = [], []  # wanted[i] = the parents named on the row of users[i]
@@ -237,9 +241,9 @@ def create_students(batch, actor):
         users.append(u)
         wanted.append(parents.decode_parents(r.get("parents_enc", "")))  # rows saved before this feature have none
     User.objects.bulk_create(users)
-    pk_of = dict(User.objects.filter(username__in=[u.username for u in users]).values_list("username", "pk"))
+    pk_of = {name.lower(): pk for name, pk in User.objects.filter(username__in=[u.username for u in users]).values_list("username", "pk")}
     ids = list(pk_of.values())
-    result = parents.link_new_students([(pk_of[u.username], ps) for u, ps in zip(users, wanted) if ps], actor)
+    result = parents.link_new_students([(pk_of[u.username.lower()], ps) for u, ps in zip(users, wanted) if ps], actor)
     batch.status = BulkUploadBatch.CONFIRMED
     batch.created_user_ids = ids
     batch.rows = []  # no need to keep the data (parents' numbers included) once accounts exist

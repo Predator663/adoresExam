@@ -94,3 +94,22 @@ class UploadFlowTests(AnalyticsBase):
         opts = self.a.get(f"{BASE}/options/").json()["classes"]
         self.assertIn(str(self.cls_a), [c["label"] for c in opts])
         self.assertEqual(self.client_for(self.teacher).get(f"{BASE}/options/").status_code, 403)
+
+
+class UploadSafetyTests(AnalyticsBase):
+    def setUp(self):
+        super().setUp()
+        self.a = self.client_for(self.admin)
+
+    def test_cells_too_long_for_the_database_are_flagged_before_anything_is_created(self):
+        text = "First name,Last name,Index number,Class or form\nA,B," + "9" * 60 + ",Form 1\nC,D,OK1,Form 1\n"
+        r = self.a.post(f"{BASE}/validate/", {"file": csv_file(text)}, format="multipart").json()
+        self.assertEqual((r["valid_rows"], r["invalid_rows"]), (1, 1))
+        self.assertIn("longer than 40", r["errors"][0]["problems"][0])
+
+    def test_usernames_that_differ_only_by_case_get_a_number(self):
+        User.objects.create_user(username="neema", password="x", role="student", first_name="Old", last_name="One")
+        text = "First name,Last name,Index number,Class or form\nNEEMA,B,Q1,Form 1\n"
+        r = self.a.post(f"{BASE}/validate/", {"file": csv_file(text)}, format="multipart")
+        self.assertEqual(r.json()["preview"][0]["username"], "neema2")
+        self.assertEqual(self.a.post(f"{BASE}/{r.json()['batch_id']}/confirm/", {"skip_invalid": True}, format="json").status_code, 200)

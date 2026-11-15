@@ -432,7 +432,12 @@ def bulk_confirm(request, batch_id):
         return Response({"detail": "This upload was already confirmed."}, status=409)
     if batch.report.get("invalid_rows") and not request.data.get("skip_invalid"):
         return Response({"detail": "Some rows are invalid. Fix the file, or confirm with skip_invalid to create only the valid rows."}, status=400)
-    ids = create_students(batch, request.user)
+    try:
+        ids = create_students(batch, request.user)
+    except Exception as e:  # nothing was saved (the whole step is one transaction); say why instead of a blank "something went wrong"
+        logging.getLogger(__name__).exception("bulk upload %s could not be confirmed", batch.pk)
+        return Response({"detail": f"The accounts could not be created, and nothing was saved. Reason: {type(e).__name__}: {str(e)[:300]}. "
+                                   "Check the file for very long cells or odd characters, then upload it again."}, status=400)
     out = {"created": len(ids), "credentials_url": f"/api/students/bulk-upload/{batch.pk}/credentials/"}
     if batch.report.get("parents_result"):
         out["parents"] = batch.report["parents_result"]
