@@ -2,6 +2,7 @@
  *  (the same "amani_sound" choice the exam screen uses) and stay quiet and short. Browsers allow sound only after a tap or click,
  *  which is always the case here because every effect starts from a finger or mouse action. */
 let ctx: AudioContext | null = null;
+export const hapticsOn = () => { try { return localStorage.getItem("amani_haptics") !== "off"; } catch { return true; } };
 export const soundOn = () => { try { return localStorage.getItem("amani_sound") !== "off"; } catch { return true; } };
 
 function ac(): AudioContext | null {
@@ -26,7 +27,7 @@ function tone(freq: number, dur: number, vol: number, opts: { to?: number; type?
   osc.connect(gain).connect(a.destination);
   osc.start(t0); osc.stop(t0 + dur + 0.02);
 }
-const buzz = (ms: number) => { try { navigator.vibrate?.(ms); } catch { /* not on every phone */ } };
+const buzz = (ms: number) => { try { if (hapticsOn()) navigator.vibrate?.(ms); } catch { /* not on every phone */ } };
 
 export const sfx = {
   /** an item is picked up: a soft rising "pop" */

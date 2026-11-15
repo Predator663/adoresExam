@@ -1,0 +1,25 @@
+/* Student/staff "More" page. Reuses the Settings cards (settings.css). */
+.ss{display:grid;gap:1rem;max-width:760px;margin:0 auto;padding-bottom:6rem;--e:cubic-bezier(.2,.8,.2,1)}
+.ss-anchor{scroll-margin-top:72px;min-width:0}
+.ss-hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:1rem;padding:1.2rem;border-radius:26px;color:var(--on-primary);background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 55%,#000));box-shadow:var(--shadow);animation:st-rise .5s var(--e) both}
+.ss-hero-av{position:relative;z-index:1;flex:none}
+.ss-hero .sx-bigavatar{width:80px;height:80px;font-size:2.6rem;background:rgba(255,255,255,.92);color:#0a3b2c;border-color:rgba(255,255,255,.7)}
+.ss-hero-t{position:relative;z-index:1;display:grid;gap:.1rem;min-width:0}
+.ss-hero-t small{opacity:.85}.ss-hero-t b{font-size:clamp(1.3rem,5vw,1.8rem);line-height:1.15;overflow-wrap:anywhere}.ss-hero-t span{opacity:.9;overflow-wrap:anywhere}
+.ss-orb{position:absolute;border-radius:50%;background:rgba(255,255,255,.13);animation:ss-float 9s ease-in-out infinite}
+.ss-orb.a{width:170px;height:170px;right:-40px;top:-60px}.ss-orb.b{width:90px;height:90px;right:70px;bottom:-40px;animation-delay:-4s}
+@keyframes ss-float{50%{transform:translate(-14px,10px) scale(1.06)}}
+.ss-nav{position:sticky;top:0;z-index:12;display:flex;gap:.4rem;margin:0 -1rem;padding:.5rem 1rem;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;background:linear-gradient(180deg,var(--bg) 78%,transparent)}
+.ss-nav::-webkit-scrollbar{display:none}
+.ss-nav button{flex:none;display:inline-flex;align-items:center;gap:.4rem;min-height:44px;padding:.3rem .9rem;border:1px solid var(--border);border-radius:99px;background:var(--surface);color:var(--text);font:inherit;font-weight:700;font-size:.9rem;cursor:pointer;white-space:nowrap;transition:background .25s,color .25s,border-color .25s,transform .2s var(--e)}
+.ss-nav button:active{transform:scale(.96)}.ss-nav button.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.ss .st-card{margin:0}
+.ss-a11y{min-width:0;padding:.7rem;border-radius:16px;background:var(--bg);border:1px solid var(--border)}
+.ss-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;margin-top:.4rem}
+.ss-tiles a{display:grid;justify-items:start;gap:.5rem;padding:.9rem;min-height:84px;border:1px solid var(--border);border-radius:18px;background:var(--bg);color:var(--text);text-decoration:none;font-weight:700;transition:transform .25s var(--e),border-color .25s,background .25s}
+.ss-tiles a svg{color:var(--primary)}
+@media(hover:hover){.ss-tiles a:hover{transform:translateY(-3px);border-color:var(--primary);background:var(--soft)}}
+.ss-tiles a:active{transform:scale(.97)}
+.ss-out{width:100%;margin-top:1rem;min-height:50px;display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
+@media(prefers-reduced-motion:reduce){.ss *{animation:none!important;transition:none!important}}
+.reduce-motion .ss *{animation:none!important;transition:none!important}

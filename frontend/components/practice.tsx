@@ -27,7 +27,7 @@ export function usePT() {
   const f = (s: string, v: Record<string, string | number> = {}) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
   return { d, f, lang };
 }
-export const buzz = (ms: number | number[]) => { try { if (!document.documentElement.classList.contains("reduce-motion")) navigator.vibrate?.(ms); } catch { /* not supported: fine */ } };
+export const buzz = (ms: number | number[]) => { try { if (!document.documentElement.classList.contains("reduce-motion") && localStorage.getItem("amani_haptics") !== "off") navigator.vibrate?.(ms); } catch { /* not supported: fine */ } };
 
 /* ----------------------------------------------------------------------------------------------- hub */
 export function Hero({ o }: { o: any }) {
