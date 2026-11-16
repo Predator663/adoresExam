@@ -66,7 +66,7 @@ export default function Online() {
   return (
     <Shell bare title="Who is online">
       <StaffNav />
-      <div className="on">
+      <div className="onl">
         <header className="on-head">
           <div><h1>Who is online</h1><p>Everyone with the app open right now, and what they are using. Only administrators see this page.</p></div>
           <div className="on-live" role="status"><i className={paused ? "off" : ""} aria-hidden />{paused ? "Paused" : at ? `Live · updated ${sec}s ago` : "Connecting…"}
