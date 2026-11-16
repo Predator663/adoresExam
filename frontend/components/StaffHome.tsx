@@ -89,6 +89,7 @@ export default function StaffHome({ go }: { go: (tab: string) => void }) {
       { icon: "download", label: "Download results", sub: "Reports and sheets", href: "/staff/reports/", h: 225 },
       { icon: "trophy", label: "Gamification", sub: "Badges and levels", href: "/staff/gamification/", h: 45 },
       { icon: "building", label: "School analytics", sub: "Whole school view", href: "/staff/school/", h: 285 },
+      { icon: "radar", label: "Who is online", sub: "Live, with devices", href: "/staff/online/", h: 150 },
       { icon: "shield", label: "Audit log", sub: "Who did what", href: "/staff/audit/", h: 0 },
     ] : [{ icon: "mail", label: "Messages", sub: "Notes to students", href: "/messages/", h: 330 }]),
   ];

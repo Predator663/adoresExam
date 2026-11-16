@@ -1,4 +1,5 @@
 import io
+from datetime import timedelta
 
 from django.core.cache import cache
 from django.core.files.base import ContentFile
@@ -15,7 +16,8 @@ from accounts.permissions import IsAdminRole
 from . import i18n
 from . import grading
 from .pagination import page_params, wants_page
-from .models import AuditLog, SchoolSettings, audit
+from .models import AuditLog, Presence, SchoolSettings, audit
+from .presence import ONLINE_SECONDS, record as record_presence
 
 ONLINE_WINDOW_SECONDS = 90
 _IDS_KEY, _COUNT_KEY = "online:student_ids", "online:count"
@@ -50,11 +52,51 @@ def presence(request):
     number only (BR-08). Needs a cache shared by all server processes (Redis, see REDIS_URL)."""
     if request.method == "POST":
         cache.set(_heartbeat_key(request.user.pk), timezone.now().timestamp(), ONLINE_WINDOW_SECONDS + 30)
+        record_presence(request)  # who and on what device, for the administrator's "Who is online" page
     count = cache.get(_COUNT_KEY)
     if count is None or request.method == "POST" and request.user.pk not in _student_ids():
         count = len(online_ids(extra=[request.user.pk]))
         cache.set(_COUNT_KEY, count, 5)  # at most one count every 5 seconds, however many students ask
     return Response({"online": count})
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def online_now(request):
+    """Administrators only: everyone whose app was open in the last 24 hours, who is online right now, and on what device."""
+    from collections import Counter
+    now = timezone.now()
+    rows = list(Presence.objects.filter(last_seen__gte=now - timedelta(hours=24), user__is_active=True)
+                .select_related("user", "user__school_class").order_by("-last_seen")[:1500])
+    ips = Counter(p.ip for p in rows if p.ip and now - p.last_seen <= timedelta(seconds=ONLINE_SECONDS))
+    people = []
+    for p in rows:
+        u, ago = p.user, int((now - p.last_seen).total_seconds())
+        online = ago <= ONLINE_SECONDS
+        c = u.school_class
+        people.append({
+            "id": u.pk, "username": u.username, "name": u.get_full_name() or u.username, "role": u.role,
+            "class": f"{c.name} {c.stream}".strip() if c else "", "online": online, "last_seen": p.last_seen, "seconds_ago": ago,
+            "session_minutes": int((p.last_seen - p.session_start).total_seconds() // 60) if online else None,
+            "ip": p.ip, "same_ip": ips.get(p.ip, 0) if online else 0,
+            "browser": f"{p.browser} {p.browser_version}".strip(), "os": f"{p.os} {p.os_version}".strip(), "browser_name": p.browser, "os_name": p.os,
+            "device_type": p.device_type, "device": p.device, "screen": p.screen, "connection": p.connection,
+            "language": p.language, "installed": p.standalone, "page": p.page,
+        })
+    on = [x for x in people if x["online"]]
+    top = lambda key, n=6: [{"name": k or "Unknown", "count": v} for k, v in Counter(x[key] for x in on).most_common(n)]
+    roles = Counter("admin" if x["role"] in ("admin", "super_admin") else x["role"] for x in on)
+    classes = Counter(x["class"] for x in on if x["role"] == "student" and x["class"])
+    return Response({
+        "window_seconds": ONLINE_SECONDS, "server_time": now,
+        "counts": {"online": len(on), "students": roles["student"], "teachers": roles["teacher"], "admins": roles["admin"],
+                   "mobile": sum(x["device_type"] == "mobile" for x in on), "tablet": sum(x["device_type"] == "tablet" for x in on),
+                   "desktop": sum(x["device_type"] == "desktop" for x in on), "installed": sum(bool(x["installed"]) for x in on),
+                   "active_today": len(people)},
+        "browsers": top("browser_name"), "systems": top("os_name"),
+        "classes": [{"name": k, "count": v} for k, v in classes.most_common(8)],
+        "connections": top("connection"), "people": people,
+    })
 
 
 SETTINGS_FIELDS = [

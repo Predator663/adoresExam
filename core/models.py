@@ -86,3 +86,25 @@ def audit(actor, action, target="", **detail):
         target=str(target)[:200],
         detail=detail,
     )
+
+
+class Presence(models.Model):
+    """The last time each person's app was open, and on what: one row per person, refreshed by the app's heartbeat (see core/presence.py).
+    Only administrators read it (Who is online)."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="presence")
+    last_seen = models.DateTimeField(db_index=True)
+    session_start = models.DateTimeField()  # moves forward when she comes back after 5 minutes or more away
+    ip = models.CharField(max_length=45, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    browser = models.CharField(max_length=40, blank=True)
+    browser_version = models.CharField(max_length=20, blank=True)
+    os = models.CharField(max_length=40, blank=True)
+    os_version = models.CharField(max_length=30, blank=True)
+    device_type = models.CharField(max_length=10, blank=True)  # mobile | tablet | desktop
+    device = models.CharField(max_length=60, blank=True)  # "Samsung SM-A315F", "iPhone", ...
+    screen = models.CharField(max_length=14, blank=True)
+    connection = models.CharField(max_length=10, blank=True)  # 4g, 3g, wifi ...
+    language = models.CharField(max_length=12, blank=True)
+    standalone = models.BooleanField(default=False)  # opened from the home screen (installed app)
+    page = models.CharField(max_length=80, blank=True)

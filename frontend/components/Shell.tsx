@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useMessages } from "@/lib/messages";
 import { useSession } from "@/lib/session";
@@ -39,6 +39,33 @@ function useOnline(enabled: boolean) {
   return online;
 }
 
+/** Tells the server this person has the app open (every 45 s while the tab is visible), with the kind of phone or browser, so
+ *  administrators can see who is online. Sends nothing while the tab is hidden or the phone has no signal. */
+function usePresence(enabled: boolean, path: string) {
+  const where = useRef(path);
+  where.current = path;
+  useEffect(() => {
+    if (!enabled) return;
+    let model = "", pv = "";
+    const hints = (navigator as any).userAgentData;
+    const ready = hints?.getHighEntropyValues ? hints.getHighEntropyValues(["model", "platformVersion"]).then((h: any) => { model = h?.model || ""; pv = h?.platformVersion || ""; }).catch(() => {}) : Promise.resolve();
+    const beat = async () => {
+      if (document.visibilityState === "hidden" || navigator.onLine === false) return;
+      try {
+        await ready;
+        await api("/presence/", { method: "POST", body: {
+          model, platform_version: pv, screen: `${window.screen.width}x${window.screen.height}`, connection: (navigator as any).connection?.effectiveType || "",
+          language: navigator.language, standalone: window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true, page: where.current,
+        } });
+      } catch { /* presence is best effort */ }
+    };
+    beat();
+    const id = setInterval(beat, 45_000), vis = () => { if (document.visibilityState === "visible") beat(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", vis); };
+  }, [enabled]);
+}
+
 function useUnread(enabled: boolean) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -63,6 +90,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
   const isStudent = user?.role === "student";
   const admin = user?.role === "admin" || user?.role === "super_admin";
   const online = useOnline(isStudent);
+  usePresence(!!user, path);
   const unread = useUnread(!!user);
   const msgs = useMessages(!!user);
   const focus = !!bare && !path.startsWith("/staff");  // exam, first password, demo: no menus, nothing to distract
@@ -122,7 +150,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
       { href: "/staff/monitor/", icon: "activity", label: "Live monitor" }, { href: "/staff/analytics/", icon: "chart", label: "Analytics" },
       ...(admin ? [] : [{ href: "/messages/", icon: "mail", label: "Messages" }]) ] },
     ...(admin ? [{ title: "Administration", items: [
-      { href: "/staff/people/", icon: "users", label: "People" }, { href: "/staff/guardians/", icon: "phone", label: "Parents" }, { href: "/staff/messages/", icon: "mail", label: "Messages" }, { href: "/staff/school/", icon: "building", label: "School analytics" }, { href: "/staff/gamification/", icon: "trophy", label: "Gamification" }, { href: "/staff/logins/", icon: "activity", label: "Login activity" }, ...(user.role === "super_admin" ? [{ href: "/staff/lockouts/", icon: "lock", label: "Locked accounts" }] : []), { href: "/staff/reports/", icon: "download", label: "Download results" }, { href: "/staff/not-submitted/", icon: "file", label: "Not submitted" },
+      { href: "/staff/people/", icon: "users", label: "People" }, { href: "/staff/guardians/", icon: "phone", label: "Parents" }, { href: "/staff/messages/", icon: "mail", label: "Messages" }, { href: "/staff/school/", icon: "building", label: "School analytics" }, { href: "/staff/gamification/", icon: "trophy", label: "Gamification" }, { href: "/staff/online/", icon: "radar", label: "Who is online" }, { href: "/staff/logins/", icon: "activity", label: "Login activity" }, ...(user.role === "super_admin" ? [{ href: "/staff/lockouts/", icon: "lock", label: "Locked accounts" }] : []), { href: "/staff/reports/", icon: "download", label: "Download results" }, { href: "/staff/not-submitted/", icon: "file", label: "Not submitted" },
       { href: "/staff/audit/", icon: "shield", label: "Audit log" }, { href: "/staff/settings/", icon: "sliders", label: "Settings" } ] }] : []),
     { title: "App", items: [{ href: "/install/", icon: "download", label: "Install the app" }] },
   ];
