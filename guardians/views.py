@@ -279,7 +279,10 @@ def jobs(request):
         qs = qs.filter(login=p["kind"] == "login")
     if (p.get("q") or "").strip():
         q = p["q"].strip()
-        qs = qs.filter(Q(guardian__name__icontains=q) | Q(summary__icontains=q) | Q(note__icontains=q))
+        # A parent's name is stored encrypted, so it cannot be searched in the database: decrypt the names (id + name only) and match here.
+        ql = q.lower()
+        ids = [pk for pk, enc in Guardian.objects.values_list("pk", "name_enc") if ql in crypto.decrypt(enc).lower()]
+        qs = qs.filter(Q(guardian_id__in=ids) | Q(summary__icontains=q) | Q(note__icontains=q))
     for key, lookup, end in (("from", "created_at__gte", False), ("to", "created_at__lt", True)):
         if p.get(key):
             moment = _moment(p[key], end)
