@@ -67,7 +67,7 @@ class LoginView(APIView):
     def post(self, request):
         username = (request.data.get("username") or "").strip()
         password = request.data.get("password") or ""
-        user = User.objects.filter(username__iexact=username).first() if username else None
+        user = User.objects.select_related("school_class").filter(username__iexact=username).first() if username else None  # the class comes with the user: no extra query for the reply
         now = timezone.now()
         # No lock-out: a wrong password never blocks the account. Every wrong try is counted instead, so administrators
         # can see them in Login activity (audit entries "login.failed"; `failed_logins` = wrong tries since the last good login).

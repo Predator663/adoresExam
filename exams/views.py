@@ -25,6 +25,7 @@ from questions.views import QuestionSerializer
 from proctoring import services as proctoring
 from . import services
 from .sections import letters, qtype_rank
+from . import timing
 from .models import Answer, Attempt, AttemptEvent, BuilderDraft, Exam, ExamGrant, ExamQuestion, Result, SavedQuestion
 from .services import ExamError
 
@@ -153,7 +154,7 @@ def attempt_answer(request, attempt_id):
     try:
         services.submit_answer(
             attempt.pk, request.user, request.data.get("question_id"), request.data.get("response"),
-            skip=bool(request.data.get("skip")),
+            skip=bool(request.data.get("skip")), timeout=bool(request.data.get("timeout")), at=request.data.get("at"),
         )
     except ExamError as e:
         if e.code == "time_over":
@@ -297,7 +298,7 @@ def _review_rows(attempt):
         a, p = answers.get(eq.pk), eq.payload
         out.append({
             "number": eq.position, "voided": eq.voided, "type": p["qtype"], "prompt": p["prompt"], "content": p["content"],
-            "marks": p["marks"], "your_response": a.response if a else None, "skipped": bool(a and a.skipped),
+            "marks": p["marks"], "your_response": a.response if a else None, "skipped": bool(a and a.skipped), "timed_out": bool(a and a.timed_out),
             "marks_awarded": a.marks_awarded if a else 0, "correct_answer": p["answer"], "explanation": p.get("explanation", ""),
             "topic": p.get("topic", ""),
         })
@@ -494,6 +495,7 @@ class ExamViewSet(viewsets.ModelViewSet):
             {"id": q.pk, "source": q.source_id, "position": q.position, "voided": q.voided, "void_reason": q.void_reason,
              "prompt": q.payload.get("prompt", ""), "qtype": q.payload.get("qtype"), "marks": q.payload.get("marks"),
              "topic": q.payload.get("topic", ""), "difficulty": q.payload.get("difficulty", ""),
+             "time_limit_seconds": timing.limit_for(q.payload),
              "section": sec.get(q.payload.get("qtype"), "")}
             for q in rows])
 
@@ -634,6 +636,17 @@ class ExamViewSet(viewsets.ModelViewSet):
             raise ValidationError({"question_ids": f"Only approved questions can be used. Not approved: {not_ok}"})
         if not chosen:
             raise ValidationError({"detail": "Choose at least one question."})
+        overrides = request.data.get("time_limits") or {}  # {question id: seconds}: this exam's own limit for a question
+        if not isinstance(overrides, dict):
+            raise ValidationError({"time_limits": "Send the time limits as {question id: seconds}."})
+        limits = {}
+        for qid, secs in overrides.items():
+            try:
+                n = timing.clean_limit(secs)
+            except ValueError as e:
+                raise ValidationError({"time_limits": str(e)})
+            if n is not None and str(qid).isdigit():
+                limits[int(qid)] = n
         exam.questions.all().delete()
         # Section A, B, C ... : grouped by type, in the order they were picked inside each section.
         ordered = sorted(chosen.values(), key=lambda q: qtype_rank(q.qtype))  # sorted() is stable
@@ -642,6 +655,8 @@ class ExamViewSet(viewsets.ModelViewSet):
                 "qtype": q.qtype, "prompt": q.prompt, "content": q.content, "answer": q.answer, "marks": q.marks,
                 "explanation": q.explanation, "topic": q.topic, "subtopic": q.subtopic, "difficulty": q.difficulty,
                 "language": q.language, "source_version": q.version,
+                # EVERY question in an exam has a time limit: this exam's own number, else the question's, else the default for its type
+                "time_limit_seconds": limits.get(q.pk) or q.time_limit_seconds or timing.default_limit(q.qtype, q.content, q.marks),
             })
         return Response({"questions": len(chosen), "total_marks": exam.total_marks})
 

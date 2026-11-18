@@ -5,7 +5,7 @@ export type User = {
 };
 export type Opt = { id: string; text: string; image?: string | null; alt_text?: string };
 export type Question = {
-  id: number; type: "mcq_single" | "mcq_multi" | "true_false" | "matching" | "fill_blank" | "ordering";
+  id: number; type: "mcq_single" | "mcq_multi" | "true_false" | "matching" | "fill_blank" | "fill_multi" | "ordering";
   prompt: string; marks: number; content: any;
 };
 export type AttemptState = {
@@ -14,6 +14,7 @@ export type AttemptState = {
   question?: Question | null; time_over?: boolean; results_at?: string; message?: string; results_note?: string;
   tips?: { kind: string; text: string }[];
   lock_reason?: "close" | "leaves" | "manual" | "";  // why it is locked
+  question_deadline_at?: string; question_limit_seconds?: number;  // this question's own time limit (server clock)
   locked?: boolean;  // sitting too close to another student: screen locked until an admin unlocks (clock keeps running)
 };
 export type ExamCard = {

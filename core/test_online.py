@@ -54,6 +54,9 @@ class OnlineNowTests(AnalyticsBase):
         self.assertEqual(d["counts"]["active_today"], 1)
         self.assertFalse(d["people"][0]["online"])
         old = Presence.objects.get(user=self.amina).session_start
+        self.beat(self.amina)  # back after only 3 minutes: the same session goes on
+        self.assertEqual(Presence.objects.get(user=self.amina).session_start, old)
+        Presence.objects.filter(user=self.amina).update(last_seen=timezone.now() - timedelta(minutes=6))
         self.beat(self.amina)
         self.assertGreater(Presence.objects.get(user=self.amina).session_start, old)
 
@@ -65,7 +68,7 @@ class OnlineNowTests(AnalyticsBase):
     def test_writes_are_throttled(self):
         self.beat(self.amina)
         first = Presence.objects.get(user=self.amina).last_seen
-        self.client_for(self.amina).post("/api/presence/", {}, format="json", HTTP_USER_AGENT=PHONE)  # within 40 s: no second write
+        self.client_for(self.amina).post("/api/presence/", {}, format="json", HTTP_USER_AGENT=PHONE)  # within 55 s: no second write
         self.assertEqual(Presence.objects.get(user=self.amina).last_seen, first)
 
 

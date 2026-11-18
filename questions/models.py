@@ -5,9 +5,10 @@ from django.db import models
 class Question(models.Model):
     MCQ_SINGLE, MCQ_MULTI, TRUE_FALSE = "mcq_single", "mcq_multi", "true_false"
     MATCHING, FILL_BLANK, ORDERING = "matching", "fill_blank", "ordering"
+    FILL_MULTI = "fill_multi"  # several blanks in one passage; typed, or dragged from a word bank
     TYPES = [(MCQ_SINGLE, "Multiple choice (one answer)"), (MCQ_MULTI, "Multiple choice (several answers)"),
              (TRUE_FALSE, "True or false"), (MATCHING, "Matching"), (FILL_BLANK, "Fill in the blank"),
-             (ORDERING, "Ordering")]  # BR-01 / QB-01: every type is auto-markable
+             (FILL_MULTI, "Fill in the blanks (several)"), (ORDERING, "Ordering")]  # BR-01 / QB-01: every type is auto-markable
     DRAFT, SUBMITTED, APPROVED, ARCHIVED = "draft", "submitted", "approved", "archived"
     STATUSES = [(DRAFT, "Draft"), (SUBMITTED, "Submitted"), (APPROVED, "Approved"), (ARCHIVED, "Archived")]
     DIFFICULTIES = [("easy", "Easy"), ("medium", "Medium"), ("hard", "Hard")]
@@ -18,6 +19,8 @@ class Question(models.Model):
     subtopic = models.CharField(max_length=120, blank=True)
     difficulty = models.CharField(max_length=8, choices=DIFFICULTIES, default="medium")
     marks = models.FloatField(default=1)
+    # Seconds a student may spend on this question in an exam (10 s .. 60 min). Empty = the default for its type (exams/timing.py).
+    time_limit_seconds = models.PositiveIntegerField(null=True, blank=True)
     language = models.CharField(max_length=2, default="en")
     qtype = models.CharField(max_length=12, choices=TYPES)
     prompt = models.TextField()  # sanitised rich text

@@ -39,7 +39,7 @@ function useOnline(enabled: boolean) {
   return online;
 }
 
-/** Tells the server this person has the app open (every 45 s while the tab is visible), with the kind of phone or browser, so
+/** Tells the server this person has the app open (every 60 s while the tab is visible, the first one after a random 0-20 s so a whole class logging in together does not call in the same second), with the kind of phone or browser, so
  *  administrators can see who is online. Sends nothing while the tab is hidden or the phone has no signal. */
 function usePresence(enabled: boolean, path: string) {
   const where = useRef(path);
@@ -59,10 +59,10 @@ function usePresence(enabled: boolean, path: string) {
         } });
       } catch { /* presence is best effort */ }
     };
-    beat();
-    const id = setInterval(beat, 45_000), vis = () => { if (document.visibilityState === "visible") beat(); };
+    const first = setTimeout(beat, Math.random() * 20_000);
+    const id = setInterval(beat, 60_000), vis = () => { if (document.visibilityState === "visible") beat(); };
     document.addEventListener("visibilitychange", vis);
-    return () => { clearInterval(id); document.removeEventListener("visibilitychange", vis); };
+    return () => { clearTimeout(first); clearInterval(id); document.removeEventListener("visibilitychange", vis); };
   }, [enabled]);
 }
 

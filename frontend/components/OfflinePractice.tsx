@@ -34,7 +34,7 @@ export default function OfflinePlay({ packId, count, onExit }: { packId: string;
   function check() {
     if (!hasAnswer(shown!, v)) return setErr(t("answer_first"));
     setErr("");
-    const f = fractionCorrect(cur.type, cur.answer, v);
+    const f = fractionCorrect(cur.type, cur.answer, v, cur.content);
     setScore((s) => s + f); if (f >= 0.9999) setFull((n) => n + 1);
     setFb({ fraction: f, correct: f >= 0.9999, message: t(f >= 0.9999 ? "pr_correct" : f > 0 ? "pr_partly" : "pr_wrong") });
   }

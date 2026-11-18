@@ -5,6 +5,7 @@ export const SECTIONS: [string, string, string][] = [
   ["true_false", "True or false", "Say whether each statement is true or false."],
   ["matching", "Matching", "Match each item on the left with the correct item on the right."],
   ["fill_blank", "Fill in the blank", "Write the missing answer."],
+  ["fill_multi", "Fill in the blanks", "Complete every blank in the passage."],
   ["ordering", "Ordering", "Put the items in the correct order."],
 ];
 export type Section<T> = { letter: string; qtype: string; title: string; instruction: string; items: T[]; marks: number };

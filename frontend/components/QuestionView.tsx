@@ -1,5 +1,6 @@
 "use client";
 import { useRef } from "react";
+import FillMulti from "./FillMulti";
 import { ItemContent, RichHtml } from "./Rich";
 import SortList from "./SortList";
 import SymbolPad from "./SymbolPad";
@@ -13,12 +14,14 @@ export function initialValue(q: Question): any {
   if (q.type === "mcq_multi") return [];
   if (q.type === "matching") return {};
   if (q.type === "fill_blank") return "";
+  if (q.type === "fill_multi") return {};
   return undefined;
 }
 export function hasAnswer(q: Question, v: any): boolean {
   if (q.type === "mcq_multi") return Array.isArray(v) && v.length > 0;
   if (q.type === "matching") return v && Object.keys(v).length > 0;
   if (q.type === "fill_blank") return typeof v === "string" && v.trim() !== "";
+  if (q.type === "fill_multi") return !!v && typeof v === "object" && Object.values(v).some((x) => String(x).trim() !== "");
   if (q.type === "ordering") return Array.isArray(v) && v.length > 0;
   return v !== undefined && v !== null;
 }
@@ -37,7 +40,8 @@ export default function QuestionView({ q, value, onChange, disabled }: { q: Ques
     : [];
   return (
     <div className="question">
-      <div data-seg="prompt"><RichHtml html={q.prompt} className="prompt" /></div>
+      {q.type !== "fill_multi" && <div data-seg="prompt"><RichHtml html={q.prompt} className="prompt" /></div>}
+      {q.type === "fill_multi" && <div data-seg="prompt"><FillMulti q={q} value={value} onChange={onChange} disabled={disabled} /></div>}
       <p data-seg="marks" className="muted small">{q.marks === 1 ? t("mark_one") : t("marks_n", { n: q.marks })}</p>
 
       {q.type === "mcq_single" && (

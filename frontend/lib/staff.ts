@@ -23,7 +23,7 @@ export const formLevels = (classes?: { form_level: number }[] | null): number[] 
 export const personName = (u: { first_name?: string; last_name?: string; username: string }) => `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username;
 export const QTYPES: [string, string][] = [
   ["mcq_single", "Multiple choice (one answer)"], ["mcq_multi", "Multiple choice (several answers)"], ["true_false", "True or false"],
-  ["matching", "Matching"], ["fill_blank", "Fill in the blank"], ["ordering", "Ordering"],
+  ["matching", "Matching"], ["fill_blank", "Fill in the blank"], ["fill_multi", "Fill in the blanks (several)"], ["ordering", "Ordering"],
 ];
 export const qtypeName = (k: string) => QTYPES.find((x) => x[0] === k)?.[1] || k;
 /** DRF errors come as {field: [msg]} or {detail}. Flatten to readable lines. */

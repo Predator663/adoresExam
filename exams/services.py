@@ -13,7 +13,7 @@ from core import grading
 from core.i18n import fmt_when, lang_of, t
 from core.models import SchoolSettings
 from core.tips import finish_tips
-from . import marking
+from . import marking, timing
 from .models import Answer, Attempt, Exam, ExamGrant, ExamQuestion, Result
 from .presenters import public_question
 
@@ -281,15 +281,53 @@ def attempt_state(attempt, now=None):
     if reason is not None:
         # SECURITY: a locked student must not be able to read the question in the network tab / devtools. The text is
         # sent again by the next GET once an administrator unlocks her.
+        # The question clock waits too: she must not lose the question's time while she cannot see it. It starts again on the unlock.
+        if attempt.question_started_at is not None:
+            Attempt.objects.filter(pk=attempt.pk, question_started_at__isnull=False).update(question_started_at=None)
         state["question"] = None
         return state
     eq = ExamQuestion.objects.get(pk=attempt.order[idx], exam=exam)
+    limit = timing.limit_for(eq.payload)
+    started = attempt.question_started_at
+    if started is None:  # first time she can see this question: the question clock starts now (one conditional UPDATE, no row lock)
+        Attempt.objects.filter(pk=attempt.pk, question_started_at__isnull=True).update(question_started_at=now)
+        started = Attempt.objects.values_list("question_started_at", flat=True).get(pk=attempt.pk)
+    elif now > started + timedelta(seconds=limit + timing.EXPIRE_GRACE):
+        # She closed the app or stopped the page: the question's time ran out without an answer. Move on (see expire_overdue).
+        return attempt_state(expire_overdue(attempt.pk, now), now)
     state["question"] = public_question(eq, attempt.seed, exam.shuffle_options)
+    state["question_limit_seconds"] = limit
+    state["question_deadline_at"] = started + timedelta(seconds=limit)
     return state
 
 
 @transaction.atomic
-def submit_answer(attempt_id, student, question_id, response, skip=False, now=None):
+def expire_overdue(attempt_id, now=None):
+    """Questions whose time limit ran out while she was not answering (phone closed, page stopped) are recorded as timed out
+    (no marks) and the exam moves on. The clock of each next question runs on from where the last one ended, so closing the app
+    never buys extra time. If that was the last question, the exam is submitted."""
+    now = now or timezone.now()
+    attempt = Attempt.objects.select_for_update().select_related("exam").get(pk=attempt_id)
+    if attempt.status != Attempt.IN_PROGRESS or attempt.question_started_at is None:
+        return attempt
+    order, idx, started = attempt.order, attempt.current_index, attempt.question_started_at
+    payloads = {eq.pk: eq.payload for eq in ExamQuestion.objects.filter(pk__in=order[idx:])}
+    while idx < len(order):
+        end = started + timedelta(seconds=timing.limit_for(payloads.get(order[idx], {})))
+        if now <= end + timedelta(seconds=timing.EXPIRE_GRACE):
+            break
+        Answer.objects.get_or_create(attempt=attempt, exam_question_id=order[idx], defaults=dict(skipped=True, timed_out=True))
+        idx, started = idx + 1, end
+    attempt.current_index = idx
+    attempt.question_started_at = started if idx < len(order) else None
+    attempt.save(update_fields=["current_index", "question_started_at"])
+    if idx >= len(order):
+        return finalize_attempt(attempt.pk, now)
+    return attempt
+
+
+@transaction.atomic
+def submit_answer(attempt_id, student, question_id, response, skip=False, now=None, timeout=False, at=None):
     now = now or timezone.now()
     attempt = Attempt.objects.select_for_update().select_related("exam").get(pk=attempt_id, student=student)
     if attempt.status != Attempt.IN_PROGRESS:
@@ -308,18 +346,37 @@ def submit_answer(attempt_id, student, question_id, response, skip=False, now=No
         if question_id in attempt.order[:idx]:
             return attempt  # a repeated send from the offline queue: already saved, ignore (BR-05)
         raise ExamError("That is not the current question.", 409, "out_of_order")
-    if skip:
+    # The question's own time limit (the phone stops at zero and sends what she has with timeout=true; the server decides).
+    late = False
+    if attempt.question_started_at is not None:
+        payload = ExamQuestion.objects.only("payload").get(pk=question_id).payload
+        arrived = now
+        if at:  # the phone's own reading of when she answered (an answer waiting offline must not be late just because the network was down)
+            try:
+                from datetime import datetime, timezone as dt_tz
+                said = datetime.fromtimestamp(float(at) / 1000.0, tz=dt_tz.utc)
+                if attempt.question_started_at - timedelta(seconds=5) <= said <= now:
+                    arrived = said
+            except (TypeError, ValueError, OverflowError, OSError):
+                pass
+        late = arrived > attempt.question_started_at + timedelta(seconds=timing.limit_for(payload) + timing.ANSWER_GRACE)
+    empty = response in (None, "", [], {})
+    if late or (timeout and (skip or empty)):
+        # Too late, or time ran out with nothing to send: recorded as timed out (no marks); the answer that came too late is not used.
+        Answer.objects.create(attempt=attempt, exam_question_id=question_id, skipped=True, timed_out=True)
+    elif skip:
         if not attempt.exam.allow_skip:
             raise ExamError("Skipping is not allowed in this exam.", 400, "no_skip")
         Answer.objects.create(attempt=attempt, exam_question_id=question_id, skipped=True)
     else:
-        if response in (None, "", [], {}):
+        if empty:
             raise ExamError("Please choose or write an answer first.", 400, "empty_answer")
         if len(str(response)) > 5000:
             raise ExamError("That answer is too long.", 400, "too_long")
         Answer.objects.create(attempt=attempt, exam_question_id=question_id, response=response)
     attempt.current_index = idx + 1
-    attempt.save(update_fields=["current_index"])
+    attempt.question_started_at = None  # the next question's clock starts when she first sees it
+    attempt.save(update_fields=["current_index", "question_started_at"])
     if attempt.current_index >= len(attempt.order):
         finalize_attempt(attempt.pk, now)
     return attempt

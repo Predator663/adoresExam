@@ -68,6 +68,9 @@ def fraction_correct(payload, response, partial=False):
             return 1.0
         return 0.0
 
+    if qtype == "fill_multi":
+        return _fill_multi_fraction(payload, response, partial)
+
     if qtype == "ordering":
         if not isinstance(response, list):
             return 0.0
@@ -80,6 +83,34 @@ def fraction_correct(payload, response, partial=False):
         return 0.0
 
     return 0.0
+
+
+def _fill_multi_fraction(payload, response, partial):
+    """Several blanks in one passage. The response is {blank id: text}, or {blank id: word-bank id} when the words come from a bank."""
+    ans = payload["answer"]
+    if not isinstance(response, dict):
+        return 0.0
+    bank = {w["id"]: w["text"] for w in (payload.get("content") or {}).get("bank") or []}
+    cs, ip = bool(ans.get("case_sensitive")), bool(ans.get("ignore_punct"))
+    blanks = ans.get("blanks") or {}
+    if not blanks:
+        return 0.0
+    right = 0
+    for bid, spec in blanks.items():
+        given = response.get(bid)
+        if given is None or given == "":
+            continue
+        given = bank.get(given, given) if (payload.get("content") or {}).get("mode") == "bank" else given
+        if any(_norm(given, cs, ip) == _norm(a, cs, ip) for a in spec.get("accepted", [])):
+            right += 1
+    if right == len(blanks):
+        return 1.0
+    own = ans.get("partial")  # the teacher can override the exam's setting for this question
+    if own == "per_blank":
+        partial = True
+    elif own == "all":
+        partial = False
+    return right / len(blanks) if partial else 0.0
 
 
 def marks_for(payload, response, *, partial, negative, negative_fraction):

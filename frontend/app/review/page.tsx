@@ -60,7 +60,7 @@ function Review({ id }: { id: number }) {
             <RichHtml html={q.prompt} className="prompt" />
             {q.voided ? <p className="hint">{t("voided_note")}</p> : (
               <>
-                <p className={full ? "ok" : "no"}>{full ? "✓" : part ? "◐" : "✗"} {t("your_answer")}: {q.skipped ? t("skipped") : describe(q.type, q.content, q.your_response, t)}</p>
+                <p className={full ? "ok" : "no"}>{full ? "✓" : part ? "◐" : "✗"} {t("your_answer")}: {q.timed_out ? t("q_timed_out") : q.skipped ? t("skipped") : describe(q.type, q.content, q.your_response, t)}</p>
                 {!full && <p><b>{t("correct_answer")}:</b> {describe(q.type, q.content, q.correct_answer, t)}</p>}
                 {q.explanation && <div className="hint"><b>{t("explanation")}:</b> <RichHtml html={q.explanation} /></div>}
               </>

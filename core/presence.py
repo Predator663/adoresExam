@@ -1,7 +1,7 @@
 """Who has the app open right now, and on what device.
 
-The web app sends a small heartbeat (POST /api/presence/) every 45 seconds while a tab is open and visible, for every role.
-record() keeps the newest one per person in the Presence table (at most one write per person per 40 seconds).
+The web app sends a small heartbeat (POST /api/presence/) every 60 seconds while a tab is open and visible, for every role.
+record() keeps the newest one per person in the Presence table (at most one write per person per 55 seconds, in a single query).
 Nothing here is shown to students; the administrator's "Who is online" page reads it."""
 import re
 from datetime import timedelta
@@ -9,7 +9,7 @@ from datetime import timedelta
 from django.core.cache import cache
 from django.utils import timezone
 
-ONLINE_SECONDS = 120  # the app beats every 45 s, so two missed beats = gone
+ONLINE_SECONDS = 150  # the app beats every 60 s, so two missed beats = gone
 NEW_SESSION_AFTER = timedelta(minutes=5)
 
 _BRANDS = [  # start of the model text -> make (only prefixes that are unambiguous)
@@ -76,7 +76,7 @@ def record(request):
     from .models import Presence
     from proctoring.services import client_ip
     u = request.user
-    if not getattr(u, "pk", None) or not cache.add(f"presence:w:{u.pk}", 1, 40):
+    if not getattr(u, "pk", None) or not cache.add(f"presence:w:{u.pk}", 1, 55):
         return
     try:
         now = timezone.now()
@@ -90,15 +90,11 @@ def record(request):
             info["os_version"] = _clean(d.get("platform_version"), 10).split(".")[0]
         fields = dict(last_seen=now, ip=client_ip(request), user_agent=ua, screen=_clean(d.get("screen"), 14), connection=_clean(d.get("connection"), 10),
                       language=_clean(d.get("language"), 12), standalone=bool(d.get("standalone")), page=_clean(d.get("page"), 80), **info)
-        p = Presence.objects.filter(user=u).first()
-        if p is None:
+        # One UPDATE does it all (a new session starts when she was away 5 minutes or more); a row is created only the first time.
+        from django.db.models import Case, F, When
+        gone = now - NEW_SESSION_AFTER
+        if not Presence.objects.filter(user=u).update(session_start=Case(When(last_seen__lt=gone, then=now), default=F("session_start")), **fields):
             Presence.objects.create(user=u, session_start=now, **fields)
-        else:
-            if now - p.last_seen > NEW_SESSION_AFTER:
-                fields["session_start"] = now
-            for k, v in fields.items():
-                setattr(p, k, v)
-            p.save()
     except Exception:
         import logging
         logging.getLogger(__name__).exception("presence not recorded")

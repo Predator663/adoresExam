@@ -1,13 +1,16 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { blank, build, formName, fresh, ItemRow, useFormLevels, type S } from "./QuestionEditor";
+import { blank, build, formName, fresh, ItemRow, suggestedLimit, useFormLevels, type S } from "./QuestionEditor";
+import TimeLimit from "./TimeLimit";
+import { limitProblem } from "@/lib/timing";
 import RichEditor from "./RichEditor";
 import SymbolPad from "./SymbolPad";
 import { api } from "@/lib/api";
 import { useAutofix } from "@/lib/autocorrect";
 import { enterToNext } from "@/lib/enterNext";
 import { leftMark, letters, rightMark, rightTag } from "@/lib/labels";
-import { AutofixSwitch, FillSettings, MatchSettings } from "./TypeSettings";
+import { AutofixSwitch, FillMultiEditor, FillSettings, MatchSettings } from "./TypeSettings";
+import { blankCount, splitAlt, splitWords } from "@/lib/fillMulti";
 import { errorLines, plain, qtypeName, QTYPES, uid } from "@/lib/staff";
 
 /** Write every question of the exam on one page, then save them all at once.
@@ -57,6 +60,16 @@ function problems(raw: S): string[] {
     if (!nums) out.push("The numeric answer must be a number.");
     if (!s.accepted.split("\n").some((x) => x.trim()) && s.numValue.trim() === "") out.push("Give at least one accepted answer.");
   }
+  if (s.qtype === "fill_multi") {
+    const n = blankCount(s.prompt);
+    if (n === 0) out.push("Type ____ in the question text where each blank belongs.");
+    else if (Array.from({ length: n }, (_, i) => splitAlt(s.fmAns[i] || "")).some((a) => !a.length)) out.push("Give the correct answer for every blank.");
+    else if (s.fmMode === "bank") {
+      const ok = new Set(Array.from({ length: n }, (_, i) => splitAlt(s.fmAns[i] || "")).flat().map((x) => x.toLowerCase()));
+      const bad = splitWords(s.fmWords).find((w) => ok.has(w.toLowerCase()));
+      if (bad) out.push(`"${bad}" is an accepted answer, so it cannot be a wrong word.`);
+    }
+  }
   if (s.qtype === "ordering" && s.items.length < 2) out.push("Give at least 2 items, in the correct order.");
   if (s.qtype === "matching") {
     if (s.left.length < 2 || s.right.length < 2) out.push("Give at least 2 items on each side.");
@@ -64,6 +77,7 @@ function problems(raw: S): string[] {
     else if (s.mUnique && new Set(s.left.map((l) => s.pairs[l.id])).size !== s.left.length) out.push("Each right item can be used once only, but two left items share a match.");
   }
   if (!(Number(s.marks) > 0)) out.push("Marks must be more than 0.");
+  const tp = limitProblem(s.timeLimit); if (tp) out.push(tp);
   return out;
 }
 
@@ -99,6 +113,7 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
           <select className="input" value={s.qtype} onChange={(e) => up({ qtype: e.target.value, correct: [] })}>{QTYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
         <label className="field"><span>Marks</span>
           <input className="input" type="number" min={0.5} step={0.5} value={s.marks} onChange={(e) => up({ marks: Number(e.target.value) })} /></label>
+        <div className="field" style={{ gridColumn: "1 / -1" }}><TimeLimit value={s.timeLimit} suggested={suggestedLimit(s)} onChange={(n) => up({ timeLimit: n })} /></div>
       </div>
       <RichEditor label="Question text" autofix={fix} value={s.prompt} onChange={(h) => up({ prompt: h })} minRows={3} />
 
@@ -120,6 +135,7 @@ function CardBody({ c, up }: { c: Card; up: (p: Partial<S>) => void }) {
           <details><summary>More settings (marking, unit, hint, keyboard)</summary><FillSettings s={s} up={up} /></details>
         </div>
       )}
+      {s.qtype === "fill_multi" && <FillMultiEditor s={s} up={up} />}
       {s.qtype === "ordering" && <><p className="muted small">Write the items in the CORRECT order. Students see them shuffled.</p>{list("items", 2, "Item")}</>}
       {s.qtype === "matching" && (
         <>

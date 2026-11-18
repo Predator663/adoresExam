@@ -22,6 +22,9 @@ def public_question(eq, seed, shuffle_options):
         content["options"] = _shuffled(content["options"], rnd)
     if qtype == "matching" and content.get("layout", {}).get("shuffle_right", True):  # a teacher may keep Column B in a fixed order
         content["right"] = _shuffled(content["right"], rnd)
+    if qtype == "fill_multi" and content.get("bank"):  # the word bank is stored with the right words first: every student gets her own order
+        content["bank"] = _shuffled(content["bank"], rnd)
+        content["bank_shuffled"] = True
     if qtype == "ordering":  # must never arrive in the correct order
         content["items"] = _shuffled(content["items"], rnd, avoid=p["answer"]["order"])
     return {"id": eq.pk, "type": qtype, "prompt": p["prompt"], "marks": p["marks"], "content": content}

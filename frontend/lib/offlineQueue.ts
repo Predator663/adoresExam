@@ -1,6 +1,6 @@
 /** EDAY-06: answers are kept on the phone until the server confirms them, so a refresh, a dropped network
  *  or a dead battery never loses an answer. The server ignores a repeated send of an answer it already has. */
-export type Pending = { qid: number; response: any; skip: boolean };
+export type Pending = { qid: number; response: any; skip: boolean; timeout?: boolean; at?: number };  // timeout: the question's time ran out; at: when she answered (ms, server-clock estimate)
 const qKey = (attempt: number) => `amani_queue_${attempt}`;
 const dKey = (attempt: number, qid: number) => `amani_draft_${attempt}_${qid}`;
 

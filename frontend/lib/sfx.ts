@@ -34,6 +34,14 @@ export const sfx = {
   pick() { buzz(10); if (soundOn()) { tone(420, 0.09, 0.07, { to: 700 }); tone(840, 0.05, 0.03, { at: 0.03, type: "triangle" }); } },
   /** the item passes another one: a tiny tick */
   tick() { buzz(5); if (soundOn()) tone(1000, 0.035, 0.04, { type: "triangle" }); },
+  /** a word snaps into its blank: a short, bright "click-chime" */
+  snap() { buzz(16); if (soundOn()) { tone(260, 0.07, 0.09, { to: 140 }); tone(784, 0.12, 0.06, { at: 0.04 }); tone(1175, 0.18, 0.045, { at: 0.09, type: "triangle" }); } },
+  /** a word leaves a blank and goes back to the bank: a soft downward whoosh */
+  back() { buzz(8); if (soundOn()) tone(620, 0.12, 0.05, { to: 260, type: "triangle" }); },
+  /** every blank is filled: a little rising run of notes */
+  done() { buzz(24); if (soundOn()) [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 0.05, { at: i * 0.07, type: "triangle" })); },
+  /** a question's time ran out: two falling notes */
+  timeup() { try { if (hapticsOn()) navigator.vibrate?.([120, 60, 120]); } catch { /* ignore */ } if (soundOn()) { tone(660, 0.16, 0.07, { type: "triangle" }); tone(440, 0.28, 0.07, { at: 0.16, type: "triangle" }); } },
   /** the item is put down: a soft thud and two bright notes */
   drop() { buzz(14); if (soundOn()) { tone(170, 0.13, 0.11, { to: 80 }); tone(660, 0.12, 0.05, { at: 0.05 }); tone(990, 0.2, 0.04, { at: 0.1 }); } },
 };

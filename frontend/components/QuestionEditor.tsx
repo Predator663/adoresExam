@@ -10,8 +10,11 @@ import { useSession } from "@/lib/session";
 import { useAutofix } from "@/lib/autocorrect";
 import { enterToNext } from "@/lib/enterNext";
 import { leftMark, letters, matchLayout, rightMark, rightTag, type LeftStyle, type RightStyle } from "@/lib/labels";
-import { AutofixSwitch, FillSettings, MatchSettings } from "./TypeSettings";
+import { AutofixSwitch, FillMultiEditor, FillSettings, MatchSettings } from "./TypeSettings";
+import { blankCount, fromTokens, splitAlt, splitWords, toTokens } from "@/lib/fillMulti";
 import type { Question } from "@/lib/types";
+import TimeLimit from "./TimeLimit";
+import { defaultLimit } from "@/lib/timing";
 
 export type Item = { id: string; text: string; image: string | null; alt_text: string };
 export type S = {
@@ -23,12 +26,18 @@ export type S = {
   mLeftStyle: LeftStyle; mRightStyle: RightStyle; mLeftTitle: string; mRightTitle: string; mShuffle: boolean; mUnique: boolean; mPartial: "" | "all" | "per_pair";
   // fill in the blank: answer box and marking
   fCase: boolean; fPunct: boolean; fUnit: string; fHint: string; fInput: "text" | "number"; fWidth: "short" | "medium" | "long";
+  // fill in the blanks (several): one answer line per blank, typed or word bank, extra wrong words, marks
+  fmAns: string[]; fmMode: "type" | "bank"; fmWords: string; fmPartial: "" | "all" | "per_blank";
+  // seconds a student may spend on this question in an exam; null = the suggested time for its type
+  timeLimit: number | null;
 };
+/** The time suggested for a question like this (by type, blanks, pairs, marks). */
+export const suggestedLimit = (s: S) => defaultLimit(s.qtype, s.qtype === "fill_multi" ? { blanks: Array.from({ length: blankCount(s.prompt) || 3 }) } : s.qtype === "matching" ? { left: s.left } : s.qtype === "ordering" ? { items: s.items } : {}, s.marks);
 export const blank = (n = 4): Item[] => Array.from({ length: n }, () => ({ id: uid(), text: "", image: null, alt_text: "" }));
 export const fresh = (): S => ({ subject: "", form_level: 1, topic: "", subtopic: "", difficulty: "medium", marks: 1, language: "en", qtype: "mcq_single", practice_eligible: true, prompt: "", explanation: "",
   options: blank(4), correct: [], tf: null, left: blank(3), right: blank(3), pairs: {}, accepted: "", numValue: "", numTol: "0", items: blank(3),
   mLeftStyle: "roman", mRightStyle: "LETTER", mLeftTitle: "", mRightTitle: "", mShuffle: true, mUnique: false, mPartial: "",
-  fCase: false, fPunct: false, fUnit: "", fHint: "", fInput: "text", fWidth: "medium" });
+  fCase: false, fPunct: false, fUnit: "", fHint: "", fInput: "text", fWidth: "medium", fmAns: [], fmMode: "type", fmWords: "", fmPartial: "", timeLimit: null });
 const fromApi = (q: any): S => {
   const s = fresh();
   Object.assign(s, { subject: String(q.subject), form_level: q.form_level, topic: q.topic, subtopic: q.subtopic, difficulty: q.difficulty, marks: q.marks, language: q.language, qtype: q.qtype, practice_eligible: q.practice_eligible, prompt: q.prompt, explanation: q.explanation });
@@ -44,13 +53,19 @@ const fromApi = (q: any): S => {
   if (q.qtype === "true_false") s.tf = q.answer.correct;
   if (q.qtype === "fill_blank") { s.accepted = (q.answer.accepted || []).join("\n"); if (q.answer.numeric) { s.numValue = String(q.answer.numeric.value); s.numTol = String(q.answer.numeric.tolerance); }
     Object.assign(s, { fCase: !!q.answer.case_sensitive, fPunct: !!q.answer.ignore_punct, fUnit: q.content?.unit || "", fHint: q.content?.hint || "", fInput: q.content?.input === "number" ? "number" : "text", fWidth: q.content?.width || "medium" }); }
+  s.timeLimit = typeof q.time_limit_seconds === "number" ? q.time_limit_seconds : null;
+  if (q.qtype === "fill_multi") {
+    const ids: string[] = (q.content?.blanks || []).map((b: any) => b.id);
+    Object.assign(s, { prompt: fromTokens(q.prompt || ""), fmAns: ids.map((id) => (q.answer?.blanks?.[id]?.accepted || []).join("; ")), fmMode: q.content?.mode === "bank" ? "bank" : "type",
+      fmWords: (q.answer?.distractors || []).join(", "), fmPartial: q.answer?.partial || "", fCase: !!q.answer?.case_sensitive, fPunct: !!q.answer?.ignore_punct, fHint: q.content?.hint || "", fWidth: q.content?.width || "medium" });
+  }
   return s;
 };
 /** True while nothing has been typed yet (so an untouched editor is not stored as a draft). */
 export function isBlank(s: S): boolean {
   const empty = (l: Item[]) => l.every((o) => !o.text.trim() && !o.image);
   return !plain(s.prompt) && !/<img/i.test(s.prompt) && !plain(s.explanation) && !s.topic.trim() && !s.subtopic.trim()
-    && empty(s.options) && empty(s.left) && empty(s.right) && empty(s.items) && !s.accepted.trim() && s.numValue === "" && s.tf === null && !s.correct.length;
+    && empty(s.options) && empty(s.left) && empty(s.right) && empty(s.items) && !s.accepted.trim() && s.numValue === "" && s.tf === null && !s.correct.length && s.fmAns.every((a) => !a.trim()) && !s.fmWords.trim();
 }
 const enc = (l: Item[]) => l.map((o) => ({ id: o.id, text: o.text, image: o.image, alt_text: o.alt_text }));
 
@@ -66,9 +81,16 @@ export function build(s: S) {
     content = { unit: s.fUnit || "", hint: s.fHint || "", input: s.fInput || "text", width: s.fWidth || "medium" };
     answer = { accepted: s.accepted.split("\n").map((x) => x.trim()).filter(Boolean), numeric: s.numValue !== "" ? { value: Number(s.numValue), tolerance: Number(s.numTol || 0) } : null, case_sensitive: !!s.fCase, ignore_punct: !!s.fPunct };
   }
+  if (s.qtype === "fill_multi") {
+    const n = blankCount(s.prompt), ans = Array.from({ length: n }, (_, i) => splitAlt(s.fmAns[i] || "")), extra = splitWords(s.fmWords);
+    const words = [...ans.map((a) => a[0] || ""), ...extra];
+    content = { blanks: ans.map((_, i) => ({ id: String(i + 1) })), mode: s.fmMode, hint: s.fHint || "", width: s.fWidth || "medium",
+      bank: s.fmMode === "bank" ? words.map((w, i) => ({ id: `w${i + 1}`, text: w })) : [] };  // the server rebuilds the bank itself; this copy drives the preview
+    answer = { blanks: Object.fromEntries(ans.map((a, i) => [String(i + 1), { accepted: a }])), distractors: s.fmMode === "bank" ? extra : [], case_sensitive: !!s.fCase, ignore_punct: !!s.fPunct, partial: s.fmPartial || null };
+  }
   if (s.qtype === "ordering") { content = { items: enc(s.items) }; answer = {}; }
   return { subject: Number(s.subject), form_level: s.form_level, topic: s.topic, subtopic: s.subtopic, difficulty: s.difficulty, marks: s.marks, language: s.language, qtype: s.qtype,
-    practice_eligible: s.practice_eligible, prompt: s.prompt, explanation: s.explanation, content, answer };
+    time_limit_seconds: s.timeLimit, practice_eligible: s.practice_eligible, prompt: s.qtype === "fill_multi" ? toTokens(s.prompt) : s.prompt, explanation: s.explanation, content, answer };
 }
 
 /** One entry (option, matching item, ordering item): text and/or an image with required description (QB-02, QB-03). */
@@ -162,7 +184,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
     const withIds = (l: any[]) => l.map((o: any) => ({ ...o, text: o.text }));
     const c: any = { ...b.content };
     for (const k of ["options", "left", "right", "items"]) if (c[k]) c[k] = withIds(c[k]);
-    return { id: 0, type: s.qtype as any, prompt: s.prompt || "<p><i>Question text appears here</i></p>", marks: s.marks, content: c };
+    return { id: 0, type: s.qtype as any, prompt: b.prompt || "<p><i>Question text appears here</i></p>", marks: s.marks, content: { ...c, ...(s.qtype === "fill_multi" ? { bank_shuffled: false } : {}) } };
   }, [s]);
   const [pv, setPv] = useState<any>(undefined);
 
@@ -221,6 +243,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
           <label className="field"><span>Sub-topic</span><input className="input" value={s.subtopic} onChange={(e) => up({ subtopic: e.target.value })} /></label>
           <label className="field"><span>Difficulty</span><select className="input" value={s.difficulty} onChange={(e) => up({ difficulty: e.target.value })}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
           <label className="field"><span>Marks</span><input className="input" type="number" min={0.5} step={0.5} value={s.marks} onChange={(e) => up({ marks: Number(e.target.value) })} /></label>
+          <div className="field" style={{ gridColumn: "1 / -1" }}><TimeLimit value={s.timeLimit} suggested={suggestedLimit(s)} onChange={(n) => up({ timeLimit: n })} /></div>
           <label className="field"><span>Language</span><select className="input" value={s.language} onChange={(e) => up({ language: e.target.value })}><option value="en">English</option><option value="sw">Kiswahili</option></select></label>
           <label className="field"><span>Question type</span><select className="input" value={s.qtype} disabled={!!cid} onChange={(e) => up({ qtype: e.target.value, correct: [] })}>{QTYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
         </div>
@@ -243,6 +266,7 @@ export default function QuestionEditor({ id, onClose, subject, onCreated, backLa
         </div>
       )}
       {s.qtype === "fill_blank" && <FillSettings s={s} up={up} />}
+      {s.qtype === "fill_multi" && <FillMultiEditor s={s} up={up} />}
       {s.qtype === "ordering" && <><p className="muted small">Write the items in the CORRECT order. Students see them shuffled. (2 or more items)</p>{listEditor("items", 2, Infinity, "Item")}</>}
       {s.qtype === "matching" && (
         <>

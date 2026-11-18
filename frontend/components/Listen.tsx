@@ -14,11 +14,12 @@ export function questionSegments(q: Question, t: (k: string, v?: Record<string, 
   const c = q.content || {}, out: Seg[] = [], say = (h: string) => spokenText(h, lang);
   const opt = t("ra_option"), img = t("ra_image");
   const body = (o: any) => [o.text ? say(o.text) : "", o.alt_text ? `${img}: ${o.alt_text}` : ""].filter(Boolean).join(". ");
-  out.push({ key: "prompt", text: say(q.prompt) });
+  out.push({ key: "prompt", text: say(q.type === "fill_multi" ? q.prompt.replace(/\[\[(\d+)\]\]/g, " blank $1 ") : q.prompt) });
   if (p.marks) out.push({ key: "marks", text: q.marks === 1 ? t("mark_one") : t("marks_n", { n: q.marks }) });
   if (!p.options) return out.filter((s) => s.text);
   if (q.type === "true_false") out.push({ key: "tf", text: t("true_or_false") });
   (c.options || []).forEach((o: any, i: number) => out.push({ key: `opt-${o.id}`, text: `${opt} ${KEYS[i] || i + 1}. ${body(o)}` }));
+  if (q.type === "fill_multi") (c.bank || []).forEach((o: any) => out.push({ key: `opt-${o.id}`, text: o.text }));
   if (q.type === "ordering") (c.items || []).forEach((o: any, i: number) => out.push({ key: `opt-${o.id}`, text: `${i + 1}. ${body(o)}` }));
   if (q.type === "matching") {
     const lay = matchLayout(c);

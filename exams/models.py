@@ -105,6 +105,8 @@ class Attempt(models.Model):
     submitted_at = models.DateTimeField(null=True, blank=True)
     order = models.JSONField(default=list)  # ExamQuestion ids in this student's order
     current_index = models.PositiveIntegerField(default=0)
+    # When the CURRENT question was first shown to her (server time). null = not shown yet (the clock starts on the first unlocked view).
+    question_started_at = models.DateTimeField(null=True, blank=True)
     seed = models.PositiveIntegerField(default=0)
     # Lock for leaving the exam screen too often, or by hand from the live monitor. "" = not locked.
     # The exam clock keeps running while locked. An unlock moves `leaves_forgiven` up to the number of exits so far,
@@ -127,6 +129,7 @@ class Answer(models.Model):
     exam_question = models.ForeignKey(ExamQuestion, on_delete=models.CASCADE, related_name="answers")
     response = models.JSONField(null=True, blank=True)
     skipped = models.BooleanField(default=False)
+    timed_out = models.BooleanField(default=False)  # the question's time limit ran out (the answer, if any, was too late)
     answered_at = models.DateTimeField(auto_now_add=True)
     marks_awarded = models.FloatField(null=True, blank=True)
 

@@ -13,6 +13,8 @@ import { api, ApiError } from "@/lib/api";
 import { clock, eatDate, makeOffset, stableOffset } from "@/lib/clock";
 import { clearAttempt, dequeue, enqueue, readDraft, readQueue, saveDraft } from "@/lib/offlineQueue";
 import { getBestFix, readSensors, startMotion, useProctor, deviceId } from "@/lib/proctor";
+import QTimer from "@/components/QTimer";
+import { sfx } from "@/lib/sfx";
 import { useSession } from "@/lib/session";
 import type { AttemptState, ExamCard } from "@/lib/types";
 
@@ -118,6 +120,7 @@ function Runner({ attemptId }: { attemptId: number }) {
   const locked = proctor.locked ?? !!st?.locked;  // too close to another student, left the screen too often, or locked by hand: an administrator must unlock; the clock keeps running
   const lockReason = proctor.lockReason || st?.lock_reason || "close";  // close | leaves | manual
   const [leaveMsg, setLeaveMsg] = useState("");
+  const [qBanner, setQBanner] = useState(""), qFired = useRef<number | null>(null), lastTick = useRef(-1);
 
   useEffect(() => { setSound(localStorage.getItem("amani_sound") !== "off"); }, []);
 
@@ -148,7 +151,7 @@ function Runner({ attemptId }: { attemptId: number }) {
       while (q.length) {
         const p = q[0];
         try {
-          applyState(await api<AttemptState>(`/attempts/${attemptId}/answer/`, { body: { question_id: p.qid, response: p.response, skip: p.skip } }));
+          applyState(await api<AttemptState>(`/attempts/${attemptId}/answer/`, { body: { question_id: p.qid, response: p.response, skip: p.skip, timeout: !!p.timeout, at: p.at } }));
           dequeue(attemptId, p.qid); setOffline(false); setWaiting(false);
         } catch (e: any) {
           if (!(e instanceof ApiError) || e.isNetwork || e.status >= 500) { setOffline(true); return false; }
@@ -261,12 +264,28 @@ function Runner({ attemptId }: { attemptId: number }) {
     return () => { clearTimeout(blurTimer); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("blur", onBlur); window.removeEventListener("focus", onFocus); window.removeEventListener("pagehide", onHide); window.removeEventListener("popstate", onPop); window.removeEventListener("beforeunload", onUnload); };
   }, [attemptId, st?.finished, !!st]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function submit(skip = false) {
+  // The question's own time limit (the server owns this clock; the countdown is only a display). At zero: send what she has and move on.
+  const qLeftMs = st && !st.finished && st.question && st.question_deadline_at && !locked ? new Date(st.question_deadline_at).getTime() - (now + offset) : null;
+  const qid = st?.question?.id ?? null;
+  useEffect(() => {
+    if (qLeftMs === null || qid === null) return;
+    const secs = Math.ceil(qLeftMs / 1000);
+    if (secs > 0 && secs <= 5 && secs !== lastTick.current) { lastTick.current = secs; if (sound) sfx.tick(); }
+    if (qLeftMs <= 0 && qFired.current !== qid && !busy && !waiting) {
+      qFired.current = qid;
+      if (sound) sfx.timeup(); else navigator.vibrate?.([120, 60, 120]);
+      setQBanner(t("q_time_up")); setTimeout(() => setQBanner(""), 3500);
+      const q = st!.question!;
+      submit(!hasAnswer(q, value), true);
+    }
+  }, [qLeftMs, qid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function submit(skip = false, timeout = false) {
     if (!st?.question) return;
     const q = st.question;
     if (!skip && !hasAnswer(q, value)) { setMsg(t("answer_first")); return; }
     setBusy(true); setMsg(""); setConfirm(null);
-    enqueue(attemptId, { qid: q.id, response: skip ? null : value, skip });
+    enqueue(attemptId, { qid: q.id, response: skip ? null : value, skip, timeout, at: Math.round(Date.now() + offset) });
     setWaiting(true);
     await flush();
     setBusy(false);
@@ -321,6 +340,7 @@ function Runner({ attemptId }: { attemptId: number }) {
       onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()}>
       {offline && <div className="offline-banner" role="status">📡 {t("offline_banner")}</div>}
       {banner && <div className="warn-banner" role="alert">⏳ {banner}</div>}
+      {qBanner && <div className="warn-banner qt-banner" role="alert">⏱ {qBanner}</div>}
       {leaveMsg && <div className="warn-banner leave-banner" role="alert">⚠️ {leaveMsg} <button className="btn small" onClick={() => setLeaveMsg("")}>OK</button></div>}
       {(proctor.state === "denied" || proctor.state === "lost") && <div className="offline-banner" role="status">📍 {t("loc_off_note")} {t("loc_why")}</div>}
       <div className="exam-head">
@@ -332,6 +352,7 @@ function Runner({ attemptId }: { attemptId: number }) {
         <Bar value={((idx - 1) / total) * 100} label={t("progress")} />
       </div>
       <div key={q.id} className="card slide-in" style={{ marginTop: ".9rem" }}>
+        {qLeftMs !== null && st.question_limit_seconds ? <QTimer leftMs={qLeftMs} totalSeconds={st.question_limit_seconds} label={t("q_time")} /> : null}
         <QuestionView q={q} value={value} disabled={waiting || busy}
           onChange={(v) => { setValue(v); saveDraft(attemptId, q.id, v); setMsg(""); }} />
         <div className="row" style={{ marginTop: ".6rem" }}><Listen q={q} /></div>

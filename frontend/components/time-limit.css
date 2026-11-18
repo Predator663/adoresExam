@@ -1,0 +1,22 @@
+.tl{display:flex;flex-direction:column;gap:.4rem;min-width:0}
+.tl-label{font-weight:650;font-size:.9rem}
+.tl-row{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.tl-box{display:inline-flex;align-items:center;border:1.5px solid var(--line,#cfd8d2);border-radius:12px;background:var(--card,#fff);overflow:hidden}
+.tl-box:focus-within{border-color:var(--brand,#0b6b4a);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand,#0b6b4a) 18%,transparent)}
+.tl-box.bad{border-color:#c0392b}
+.tl-step{border:0;background:transparent;width:2.4rem;height:2.4rem;font-size:1.2rem;cursor:pointer;color:inherit}
+.tl-step:active{background:color-mix(in srgb,var(--brand,#0b6b4a) 12%,transparent)}
+.tl-in{width:4.2rem;border:0;background:transparent;text-align:center;font:inherit;font-weight:700;padding:.4rem 0;color:inherit;outline:none;-moz-appearance:textfield}
+.tl-in::-webkit-outer-spin-button,.tl-in::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.tl-unit{color:var(--muted,#667);font-size:.85rem;margin-left:-.2rem;margin-right:.15rem}
+.tl-human{font-weight:600}.tl-human em{font-weight:400;color:var(--muted,#667);font-style:normal}
+.tl-chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.tl-chip{border:1.5px solid var(--line,#cfd8d2);background:var(--card,#fff);border-radius:999px;padding:.3rem .7rem;font:inherit;font-size:.85rem;cursor:pointer;color:inherit;transition:background .15s,border-color .15s}
+.tl-chip.on{background:var(--brand,#0b6b4a);border-color:var(--brand,#0b6b4a);color:#fff}
+.tl-chip.auto{border-style:dashed}
+.tl-note{margin:0;font-size:.8rem;color:var(--muted,#667)}
+.tl-compact{display:inline-flex;align-items:center;gap:.2rem;font-size:.85rem}
+.tl-compact .tl-step{width:1.7rem;height:1.9rem;font-size:1rem}
+.tl-compact .tl-in{width:3rem;font-size:.85rem}
+.bld-sel-row{flex-wrap:wrap}
+.bld-timeall{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin:.2rem 0 .5rem;padding:.5rem .6rem;border:1px dashed var(--line,#cfd8d2);border-radius:12px}

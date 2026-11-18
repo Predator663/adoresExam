@@ -1,6 +1,8 @@
 "use client";
 import { setAutofix, useAutofix } from "@/lib/autocorrect";
 import type { S } from "./QuestionEditor";
+import { blankCount, splitAlt, splitWords } from "@/lib/fillMulti";
+import "./fill-multi.css";
 
 /** The on/off switch for English auto-capitalisation and auto-correction (kept on this device). */
 export function AutofixSwitch({ language }: { language?: string }) {
@@ -62,6 +64,75 @@ export function FillSettings({ s, up }: { s: S; up: Up }) {
           <select className="input" value={s.fInput || "text"} onChange={(e) => up({ fInput: e.target.value as S["fInput"] })}><option value="text">Letters</option><option value="number">Numbers</option></select></label>
         <label className="field"><span>Size of the box</span>
           <select className="input" value={s.fWidth || "medium"} onChange={(e) => up({ fWidth: e.target.value as S["fWidth"] })}><option value="short">Short (a word or number)</option><option value="medium">Medium</option><option value="long">Long (a phrase)</option></select></label>
+      </div>
+    </div>
+  );
+}
+
+/** Everything a teacher sets for "fill in the blanks (several)": where the blanks are (____ typed in the question text), the answer for each,
+ *  typed or word bank, extra wrong words, marks. Used by the single-question editor and by "Create all". */
+export function FillMultiEditor({ s, up }: { s: S; up: Up }) {
+  const n = blankCount(s.prompt);
+  const ans = Array.from({ length: n }, (_, i) => s.fmAns[i] || "");
+  const setAns = (i: number, v: string) => { const a = [...ans]; a[i] = v; up({ fmAns: a }); };
+  const first = ans.map((a) => splitAlt(a)[0] || "");
+  const extra = splitWords(s.fmWords);
+  const clash = extra.find((w) => ans.some((a) => splitAlt(a).some((x) => x.toLowerCase() === w.toLowerCase())));
+  return (
+    <div className="fme">
+      <div className="hint" role="note">
+        Type <b>____</b> (three or more underscores) in the question text wherever a blank belongs. For example:
+        <br /><i>Amina is ____ to school while carrying ____ and when she is asked to ____ she refuses.</i>
+      </div>
+      {n === 0 ? <p className="no small" role="status">No blanks yet. Add ____ to the question text above.</p> : (
+        <div className="card fme-rows">
+          <h3 style={{ marginTop: 0 }}>Correct answer for each blank <span className="pill">{n} {n === 1 ? "blank" : "blanks"}</span></h3>
+          {ans.map((a, i) => (
+            <label key={i} className="fme-row"><span className="fme-n">{i + 1}</span>
+              <input className="input" value={a} placeholder={`Answer for blank ${i + 1}`} onChange={(e) => setAns(i, e.target.value)} aria-label={`Correct answer for blank ${i + 1}`} />
+            </label>
+          ))}
+          <p className="muted small" style={{ margin: ".3rem 0 0" }}>To accept more than one answer for a blank, separate them with a semicolon, for example <b>walking; going</b>. Capital letters and extra spaces are ignored.</p>
+        </div>
+      )}
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>How students answer</h3>
+        <div className="row2" role="radiogroup" aria-label="How students answer">
+          <label className={`opt ${s.fmMode === "type" ? "on" : ""}`}><input type="radio" name="fm-mode" checked={s.fmMode === "type"} onChange={() => up({ fmMode: "type" })} /><span>⌨ Type the words<br /><small className="muted">A box in each blank</small></span></label>
+          <label className={`opt ${s.fmMode === "bank" ? "on" : ""}`}><input type="radio" name="fm-mode" checked={s.fmMode === "bank"} onChange={() => up({ fmMode: "bank" })} /><span>👆 Drag words from a word bank<br /><small className="muted">Words snap into the blanks</small></span></label>
+        </div>
+        {s.fmMode === "bank" && (
+          <div style={{ marginTop: ".7rem" }}>
+            <label className="field"><span>Extra wrong words (optional, separated by commas)</span>
+              <input className="input" value={s.fmWords} placeholder="running, a book, dance" onChange={(e) => up({ fmWords: e.target.value })} /></label>
+            {clash && <p className="no small" role="alert">“{clash}” is also an accepted answer, so it cannot be a wrong word.</p>}
+            {(first.some(Boolean) || extra.length > 0) && (
+              <div className="fme-bank" aria-label="The word bank students will see (shuffled for each student)">
+                {[...first.filter(Boolean), ...extra].map((w, i) => <span key={i} className={`fme-chip ${i >= first.filter(Boolean).length ? "x" : ""}`}>{w}</span>)}
+              </div>
+            )}
+            <p className="muted small">The bank holds the first answer of every blank plus these words, mixed up for each student. Green words are the right ones; the grey ones are wrong words.</p>
+          </div>
+        )}
+      </div>
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Marking</h3>
+        <label className="field"><span>Marks for this question</span>
+          <select className="input" value={s.fmPartial || ""} onChange={(e) => up({ fmPartial: e.target.value as S["fmPartial"] })}>
+            <option value="">Follow the exam's setting</option>
+            <option value="all">All or nothing: every blank must be right</option>
+            <option value="per_blank">Partial marks: a share of the marks for each correct blank</option></select></label>
+        {s.fmMode === "type" && (
+          <>
+            <label className="switch"><input type="checkbox" checked={!!s.fCase} onChange={(e) => up({ fCase: e.target.checked })} /> Capital letters must match</label>
+            <label className="switch" style={{ marginTop: ".3rem" }}><input type="checkbox" checked={!!s.fPunct} onChange={(e) => up({ fPunct: e.target.checked })} /> Ignore punctuation</label>
+            <div className="grid2" style={{ marginTop: ".5rem" }}>
+              <label className="field"><span>Hint under the passage (optional)</span><input className="input" maxLength={120} value={s.fHint || ""} onChange={(e) => up({ fHint: e.target.value })} /></label>
+              <label className="field"><span>Size of each box</span>
+                <select className="input" value={s.fWidth || "medium"} onChange={(e) => up({ fWidth: e.target.value as S["fWidth"] })}><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></label>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from academics.models import TeacherAssignment
 from accounts.permissions import IsAdminRole, IsStaffUser
 from core.models import audit
+from exams import timing
 from .models import Question, QuestionImage, QuestionVersion
 from .validation import clean_prompt, validate_question
 
@@ -24,7 +25,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         fields = ["id", "subject", "form_level", "topic", "subtopic", "difficulty", "marks", "language", "qtype",
-                  "prompt", "content", "answer", "explanation", "status", "practice_eligible", "version",
+                  "time_limit_seconds", "prompt", "content", "answer", "explanation", "status", "practice_eligible", "version",
                   "created_by", "created_by_name", "is_mine", "can_edit", "updated_at", "used_in_exam"]
         read_only_fields = ["status", "version", "created_by", "updated_at"]
 
@@ -52,12 +53,20 @@ class QuestionSerializer(serializers.ModelSerializer):
         qtype = data.get("qtype", inst.qtype if inst else None)
         content = data.get("content", inst.content if inst else {})
         answer = data.get("answer", inst.answer if inst else {})
-        data["content"], data["answer"] = validate_question(qtype, content, answer)
         data["prompt"] = clean_prompt(data.get("prompt", inst.prompt if inst else ""))
+        data["content"], data["answer"] = validate_question(qtype, content, answer, data["prompt"])
         if "explanation" in data:
             data["explanation"] = clean_prompt(data["explanation"]) if data["explanation"].strip() else ""
         if data.get("marks", 1) <= 0:
             raise serializers.ValidationError({"marks": "Marks must be above zero."})
+        # Every question has a time limit in an exam: the teacher's own number, or the default for its type when she left it empty.
+        try:
+            limit = timing.clean_limit(data["time_limit_seconds"]) if "time_limit_seconds" in data else (inst.time_limit_seconds if inst else None)
+        except ValueError as e:
+            raise serializers.ValidationError({"time_limit_seconds": str(e)})
+        if limit is None:
+            limit = timing.default_limit(qtype, data["content"], data.get("marks", inst.marks if inst else 1))
+        data["time_limit_seconds"] = limit
         return data
 
 

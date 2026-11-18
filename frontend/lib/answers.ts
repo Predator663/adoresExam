@@ -18,6 +18,13 @@ export function describe(type: Question["type"], content: any, a: any, t: (k: st
       const right = (id: string) => { const j = content.right.findIndex((x: any) => x.id === id); return `${lay.shuffle_right ? "" : rightTag(lay.right_style, j) + ". "}${find(content.right, id)}`; };
       return content.left.map((l: any, i: number) => `${leftMark(lay.left_style, i)} ${label(l)} → ${pairs[l.id] ? right(pairs[l.id]) : "—"}`).join("; ");
     }
+    case "fill_multi": {  // the correct answers ({blanks}) or what the student gave ({blank id: text or word id})
+      const bank: Record<string, string> = {};
+      for (const w of content?.bank || []) bank[w.id] = w.text;
+      const ids: string[] = (content?.blanks || []).map((b: any) => b.id);
+      if (a && a.blanks) return ids.map((id, i) => `${i + 1}. ${(a.blanks[id]?.accepted || []).join(" / ")}`).join("   ");
+      return ids.map((id, i) => `${i + 1}. ${a[id] ? bank[a[id]] ?? a[id] : "—"}`).join("   ");
+    }
     case "ordering": return (a.order || a).map((id: string, i: number) => `${i + 1}. ${find(content.items, id)}`).join("  ");
   }
   return "";

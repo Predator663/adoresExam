@@ -19,7 +19,7 @@ const num = (s: any): number | null => {
 };
 
 /** The same rules as the server (exams/marking.py, with partial marks on as in practice mode): 0 to 1. */
-export function fractionCorrect(type: Question["type"], ans: any, response: any): number {
+export function fractionCorrect(type: Question["type"], ans: any, response: any, content?: any): number {
   if (response === null || response === undefined) return 0;
   switch (type) {
     case "mcq_single": return response === ans.correct ? 1 : 0;
@@ -50,6 +50,22 @@ export function fractionCorrect(type: Question["type"], ans: any, response: any)
       if (n && v !== null && Math.abs(v - n.value) <= n.tolerance + 1e-9) return 1;
       return 0;
     }
+    case "fill_multi": {  // response: {blank id: text}, or {blank id: word-bank id} when the words come from a bank
+      if (typeof response !== "object" || Array.isArray(response)) return 0;
+      const blanks = ans.blanks || {}, ids = Object.keys(blanks);
+      if (!ids.length) return 0;
+      const cs = !!ans.case_sensitive, ip = !!ans.ignore_punct, bank: Record<string, string> = {};
+      for (const w of content?.bank || []) bank[w.id] = w.text;
+      let right = 0;
+      for (const id of ids) {
+        let given = response[id];
+        if (given === undefined || given === null || given === "") continue;
+        if (content?.mode === "bank") given = bank[given] ?? given;
+        if ((blanks[id].accepted || []).some((a: any) => norm(given, cs, ip) === norm(a, cs, ip))) right++;
+      }
+      if (right === ids.length) return 1;
+      return ans.partial === "all" ? 0 : right / ids.length;
+    }
     case "ordering": {
       if (!Array.isArray(response)) return 0;
       const correct: string[] = ans.order || [];
@@ -74,6 +90,7 @@ export function presentQuestion(q: PackQuestion): Question {
   const content = JSON.parse(JSON.stringify(q.content || {}));
   if ((q.type === "mcq_single" || q.type === "mcq_multi") && content.options) content.options = shuffled(content.options);
   if (q.type === "matching" && content.right && content.layout?.shuffle_right !== false) content.right = shuffled(content.right);
+  if (q.type === "fill_multi" && content.bank) content.bank = shuffled(content.bank);  // the right words are stored first
   if (q.type === "ordering" && content.items) {
     const right: string[] = q.answer?.order || [];
     let items = shuffled<any>(content.items);

@@ -22,7 +22,7 @@ export default function StudyQuiz({ cards, onExit }: { cards: PackQuestion[]; on
   function check() {
     if (!hasAnswer(shown!, v)) return setErr(t("answer_first"));
     setErr("");
-    const f = fractionCorrect(cur.type, cur.answer, v);
+    const f = fractionCorrect(cur.type, cur.answer, v, cur.content);
     setScore((s) => s + f); if (f >= 0.9999) setFull((n) => n + 1);
     setFb({ fraction: f, correct: f >= 0.9999 });
   }
