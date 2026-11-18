@@ -18,7 +18,7 @@
 .ss-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;margin-top:.4rem}
 .ss-tiles a{display:grid;justify-items:start;gap:.5rem;padding:.9rem;min-height:84px;border:1px solid var(--border);border-radius:18px;background:var(--bg);color:var(--text);text-decoration:none;font-weight:700;transition:transform .25s var(--e),border-color .25s,background .25s}
 .ss-tiles a svg{color:var(--primary)}
-@media(hover:hover){.ss-tiles a:hover{transform:translateY(-3px);border-color:var(--primary);background:var(--soft)}}
+@media(hover:hover){.ss-tiles a:hover{transform:translateY(-2px);border-color:var(--primary);background:var(--soft)}}
 .ss-tiles a:active{transform:scale(.97)}
 .ss-out{width:100%;margin-top:1rem;min-height:50px;display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
 @media(prefers-reduced-motion:reduce){.ss *{animation:none!important;transition:none!important}}

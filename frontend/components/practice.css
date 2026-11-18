@@ -22,7 +22,7 @@
 /* length picker */
 .pr-len{animation:pr-rise .5s .08s var(--e) both}
 .pr-seg{position:relative;display:grid;grid-template-columns:repeat(4,1fr);margin-top:.6rem;padding:4px;border-radius:16px;background:var(--soft)}
-.pr-seg-ind{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 4);border-radius:12px;background:var(--primary);box-shadow:0 4px 12px rgba(0,0,0,.2);transition:transform .35s var(--e)}
+.pr-seg-ind{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 4);border-radius:12px;background:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.10);transition:transform .35s var(--e)}
 .pr-seg button{position:relative;z-index:1;display:grid;place-items:center;min-height:54px;border:0;background:none;color:var(--text);font:inherit;cursor:pointer;border-radius:12px;transition:color .25s;-webkit-tap-highlight-color:transparent}
 .pr-seg button.on{color:var(--on-primary)}.pr-seg button b{font-size:1.2rem;line-height:1}.pr-seg button small{font-size:.65rem;opacity:.85}
 .pr-seg button:active b{transform:scale(.9)}
@@ -33,7 +33,7 @@
 .pr-tile{position:relative;display:grid;gap:.55rem;padding:1rem;border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:var(--shadow);animation:pr-rise .5s var(--e) both;transition:transform .25s var(--e),box-shadow .25s,border-color .25s;overflow:hidden}
 .pr-tile::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:var(--border);transition:background .3s}
 .pr-tile.great::before{background:var(--good)}.pr-tile.ok::before{background:var(--primary)}.pr-tile.low::before{background:var(--warn)}
-@media(hover:hover){.pr-tile:not(.off):hover{transform:translateY(-4px);border-color:var(--primary);box-shadow:0 14px 30px rgba(0,0,0,.16)}}
+@media(hover:hover){.pr-tile:not(.off):hover{transform:translateY(-2px);border-color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.09)}}
 .pr-tile.off{opacity:.78}
 .pr-tile-top{display:flex;align-items:center;gap:.7rem}.pr-tile-name{display:block;font-size:1.05rem;overflow-wrap:anywhere}.pr-tile-top small{display:block}
 .pr-tile-pct{font-weight:900;font-size:.9rem}
@@ -88,7 +88,7 @@
 @keyframes pr-shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
 @keyframes pr-glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent)}100%{box-shadow:0 0 0 22px transparent}}
 @keyframes pr-pulse{50%{opacity:.6}}
-@keyframes pr-bob{50%{transform:translateY(-5px) rotate(4deg)}}
+@keyframes pr-bob{50%{transform:translateY(-2px) rotate(4deg)}}
 @keyframes pr-flicker{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.14) rotate(3deg)}}
 @keyframes pr-drift{to{transform:translate(28px,18px) scale(1.15)}}
 @keyframes pr-shine{0%{background-position:200% 0}60%,100%{background-position:-100% 0}}

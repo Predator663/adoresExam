@@ -25,7 +25,7 @@
 /* needs attention */
 .sh-attn{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .sh-alert{display:flex;align-items:center;gap:.7rem;padding:.8rem .9rem;border-radius:16px;border:1px solid var(--border);border-left-width:5px;background:var(--surface);color:var(--text);text-decoration:none;box-shadow:var(--shadow);animation:sh-rise .5s var(--e) both;animation-delay:calc(var(--i,0) * 90ms + .2s);transition:transform .25s var(--e),box-shadow .25s}
-a.sh-alert:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(0,0,0,.14)}
+a.sh-alert:hover{transform:translateY(-2px);box-shadow:0 2px 8px rgba(0,0,0,.09)}
 .sh-alert b{font-size:1.5rem;line-height:1;font-variant-numeric:tabular-nums}.sh-alert .grow{font-weight:600;font-size:.92rem}
 .sh-alert-ic{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:50%}
 .sh-alert.bad{border-left-color:var(--bad)}.sh-alert.bad .sh-alert-ic{background:color-mix(in srgb,var(--bad) 18%,var(--surface));color:var(--bad);animation:sh-pulse 1.8s ease-in-out infinite}
@@ -39,7 +39,7 @@ a.sh-alert:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(0,0,0,.1
 .sh-actions{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem}
 .sh-act{display:grid;gap:.15rem;justify-items:start;align-content:start;min-height:112px;padding:.9rem;border:1px solid var(--border);border-radius:18px;background:var(--surface);color:var(--text);font:inherit;text-align:left;text-decoration:none;cursor:pointer;box-shadow:var(--shadow);animation:sh-rise .5s var(--e) both;animation-delay:calc(var(--i,0) * 45ms + .15s);transition:transform .25s var(--e),box-shadow .25s,border-color .25s;-webkit-tap-highlight-color:transparent}
 .sh-act b{margin-top:.45rem;font-size:.98rem}.sh-act small{color:var(--muted);font-size:.78rem;line-height:1.25}
-@media(hover:hover){.sh-act:hover{transform:translateY(-4px);border-color:var(--primary);box-shadow:0 14px 28px rgba(0,0,0,.15)}.sh-act:hover .sh-ic{transform:rotate(-8deg) scale(1.1)}}
+@media(hover:hover){.sh-act:hover{transform:translateY(-2px);border-color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.09)}.sh-act:hover .sh-ic{transform:rotate(-8deg) scale(1.1)}}
 .sh-act:active{transform:scale(.97)}
 .sh-act:focus-visible,.sh-kpi:focus-visible,.sh-alert:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
 
@@ -48,7 +48,7 @@ a.sh-alert:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(0,0,0,.1
 .sh-kpi{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;align-items:center;column-gap:.7rem;padding:.8rem .9rem;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);text-decoration:none;box-shadow:var(--shadow);animation:sh-rise .5s var(--e) both;animation-delay:calc(var(--i,0) * 50ms + .3s);transition:transform .25s var(--e),border-color .25s}
 .sh-kpi .sh-ic{grid-row:1 / 3}.sh-kpi b{font-size:1.6rem;line-height:1;font-variant-numeric:tabular-nums}.sh-kl{font-size:.78rem;color:var(--muted)}
 .sh-kpi b.good{color:var(--good)}.sh-kpi b.warn{color:var(--warn)}.sh-kpi b.bad{color:var(--bad)}
-.sh-kpi.link:hover{transform:translateY(-3px);border-color:var(--primary)}
+.sh-kpi.link:hover{transform:translateY(-2px);border-color:var(--primary)}
 
 /* two columns on wide screens */
 .sh-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;align-items:start}
@@ -92,7 +92,7 @@ a.sh-alert:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(0,0,0,.1
 @keyframes sh-drift{to{transform:translate(-30px,20px) scale(1.15)}}
 @keyframes sh-spin{to{transform:rotate(360deg)}}
 @keyframes sh-pulse{50%{transform:scale(1.1)}}
-@keyframes sh-bob{50%{transform:translateY(-4px)}}
+@keyframes sh-bob{50%{transform:translateY(-2px)}}
 @keyframes sh-draw{to{stroke-dashoffset:0}}
 @keyframes sh-shimmer{to{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.sh *,.sh-pane,.sh-hero{animation:none!important;transition:none!important}.sh-in{opacity:1;transform:none}.sh-alert.ok svg{stroke-dashoffset:0}}

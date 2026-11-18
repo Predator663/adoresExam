@@ -23,7 +23,7 @@
 .up-modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.8rem}
 .up-mode,.up-class{position:relative;display:grid;gap:.2rem;justify-items:start;text-align:left;padding:1rem;border:2px solid var(--border);border-radius:18px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;animation:up-in .45s var(--e) both;animation-delay:calc(var(--i,0) * 45ms);transition:transform .25s var(--e),border-color .25s,box-shadow .25s,background .25s;-webkit-tap-highlight-color:transparent}
 .up-mode b{margin-top:.4rem;font-size:1.05rem}.up-mode small,.up-class small{color:var(--muted);font-size:.8rem;line-height:1.3}
-@media(hover:hover){.up-mode:hover,.up-class:hover{transform:translateY(-3px);border-color:var(--primary);box-shadow:0 10px 22px rgba(0,0,0,.12)}.up-mode:hover .up-ic{transform:rotate(-8deg) scale(1.08)}}
+@media(hover:hover){.up-mode:hover,.up-class:hover{transform:translateY(-2px);border-color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.09)}.up-mode:hover .up-ic{transform:rotate(-8deg) scale(1.08)}}
 .up-mode:active,.up-class:active{transform:scale(.97)}
 .up-mode.on,.up-class.on{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--surface));box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 16%,transparent)}
 .up-mode.on .up-ic{background:var(--primary);color:var(--on-primary)}
@@ -97,7 +97,7 @@
 @keyframes up-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes up-draw{to{stroke-dashoffset:0}}
 @keyframes up-shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
-@keyframes up-bob{50%{transform:translateY(-6px)}}
+@keyframes up-bob{50%{transform:translateY(-2px)}}
 @keyframes up-bar{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
 @keyframes up-grow{to{width:var(--w)}}
 @keyframes up-shimmer{to{background-position:-200% 0}}

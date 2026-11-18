@@ -10,7 +10,7 @@
 .rs-in.in{opacity:1;transform:none}
 
 .rs-stats .sx-stat{transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s}
-@media(hover:hover){.rs-stats .sx-stat:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(0,0,0,.12)}}
+@media(hover:hover){.rs-stats .sx-stat:hover{transform:translateY(-2px);box-shadow:0 2px 8px rgba(0,0,0,.09)}}
 
 /* you vs class */
 .rs-cmp h2{margin:0 0 .2rem;font-size:1.05rem}
@@ -50,7 +50,7 @@
 @keyframes rs-badge{0%{opacity:0;transform:scale(.5) rotate(-8deg)}60%{transform:scale(1.06)}100%{opacity:1;transform:none}}
 @keyframes rs-sweep{0%{background-position:200% 0}100%{background-position:-100% 0}}
 @keyframes rs-drift{to{transform:translate(-30px,20px) scale(1.15)}}
-@keyframes rs-bob{50%{transform:translateY(-4px) rotate(5deg)}}
+@keyframes rs-bob{50%{transform:translateY(-2px) rotate(5deg)}}
 @keyframes rs-glow{0%{box-shadow:0 0 0 0 rgba(255,255,255,.7)}100%{box-shadow:0 0 0 14px transparent}}
 @keyframes rs-nudge{0%,100%{transform:none}30%{transform:translateX(5px)}60%{transform:translateX(-3px)}}
 @media(prefers-reduced-motion:reduce){.rs-hero,.rs-hero *,.rs-hero::after,.rs-earned li,.rs-badge,.rs-badge *,.rs-badge::after,.rs-topic{animation:none!important}.rs-in{opacity:1;transform:none;transition:none}.rs-fill,.rs-pin,.rs-topic .bar i{transition:none!important}}

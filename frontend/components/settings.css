@@ -58,7 +58,7 @@
 .st-presets{display:flex;flex-wrap:wrap;gap:.3rem}.st-presets button{min-height:34px;min-width:40px;padding:0 .6rem;border:1px solid var(--border);border-radius:99px;background:var(--surface);color:var(--text);font:inherit;font-size:.8rem;cursor:pointer;transition:all .2s var(--e)}
 .st-presets button.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary);transform:scale(1.06)}
 .st-seg{position:relative;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));padding:3px;border-radius:14px;background:var(--soft);min-width:min(100%,260px)}
-.st-seg>i{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / var(--n));border-radius:11px;background:var(--primary);transform:translateX(calc(var(--k) * 100%));transition:transform .35s var(--e);box-shadow:0 3px 10px rgba(0,0,0,.2)}
+.st-seg>i{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / var(--n));border-radius:11px;background:var(--primary);transform:translateX(calc(var(--k) * 100%));transition:transform .35s var(--e);box-shadow:0 2px 8px rgba(0,0,0,.10)}
 .st-seg button{position:relative;z-index:1;min-height:42px;padding:0 .6rem;border:0;background:none;color:var(--text);font:inherit;font-weight:700;font-size:.88rem;cursor:pointer;border-radius:11px;transition:color .25s}.st-seg button.on{color:var(--on-primary)}
 .st-slider{display:grid;gap:.4rem;width:min(100%,360px);--p:0%}
 .st-slider output{justify-self:end;padding:.15rem .7rem;border-radius:99px;background:var(--soft);font-variant-numeric:tabular-nums}.st-slider output b{font-size:1.15rem}
@@ -69,7 +69,7 @@
 .st-marks{display:flex;justify-content:space-between}.st-marks button{border:0;background:none;color:var(--muted);font:inherit;font-size:.75rem;cursor:pointer;padding:.2rem}
 .st-themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:.6rem;width:100%}
 .st-themes button{position:relative;display:grid;gap:.35rem;justify-items:center;padding:.5rem;border:2px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;transition:transform .25s var(--e),border-color .25s,box-shadow .25s}
-@media(hover:hover){.st-themes button:hover{transform:translateY(-3px)}}
+@media(hover:hover){.st-themes button:hover{transform:translateY(-2px)}}
 .st-themes button.on{border-color:var(--primary);box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 18%,transparent)}
 .st-swatch{display:grid;place-items:center;width:100%;height:58px;border-radius:11px}.st-swatch i{display:grid;gap:4px;width:62%;padding:6px;border:1px solid;border-radius:8px}.st-swatch b{display:block;height:6px;border-radius:3px}.st-swatch b:first-child{width:60%}
 .st-themes small{font-weight:700;font-size:.78rem;text-align:center}
@@ -115,7 +115,7 @@
 .st-savebar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:center;padding:.7rem max(1rem,env(safe-area-inset-right)) max(.8rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));pointer-events:none;transform:translateY(120%);transition:transform .45s var(--e)}
 .st-savebar.show{transform:none}
 @media(min-width:900px){.st-savebar{left:var(--side-w,0)}}
-.st-savebar-in{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;width:min(100%,760px);padding:.7rem .9rem;border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:0 12px 40px rgba(0,0,0,.28)}
+.st-savebar-in{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;width:min(100%,760px);padding:.7rem .9rem;border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:0 4px 14px rgba(0,0,0,.14)}
 .st-savebar.bad .st-savebar-in{border-color:var(--bad)}
 .st-savebar ul{margin:0;padding:0;list-style:none;font-weight:600;flex:1 1 220px}
 .st-dirty{display:inline-flex;align-items:center;gap:.5rem;font-weight:700}.st-dirty i{width:10px;height:10px;border-radius:50%;background:var(--warn);animation:st-pulse 1.4s ease-in-out infinite}

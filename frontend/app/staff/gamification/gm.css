@@ -22,7 +22,7 @@
 .gm-podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:.6rem;align-items:end;padding:.5rem 0 0}
 .gm-pod{position:relative;display:grid;justify-items:center;gap:.15rem;padding:1.1rem .5rem 0;border:1px solid var(--border);border-bottom:0;border-radius:18px 18px 0 0;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;min-width:0;text-align:center;animation:gm-up .8s var(--e) both;transition:transform .25s var(--e),box-shadow .25s;box-shadow:var(--shadow)}
 .gm-pod.p1{animation-delay:.25s}.gm-pod.p2{animation-delay:.05s}.gm-pod.p3{animation-delay:.15s}
-.gm-pod:hover,.gm-pod:focus-visible{transform:translateY(-6px);box-shadow:0 14px 34px rgba(0,0,0,.2)}
+.gm-pod:hover,.gm-pod:focus-visible{transform:translateY(-2px);box-shadow:0 2px 8px rgba(0,0,0,.09)}
 .gm-pod.p1{border-color:var(--t3);background:linear-gradient(180deg,color-mix(in srgb,var(--t3) 16%,var(--surface)),var(--surface))}
 .gm-crown{font-size:1.7rem;animation:gm-bob 2.6s ease-in-out infinite}.p1 .gm-crown{font-size:2.2rem}
 .gm-pod-face{position:relative;display:grid;border-radius:50%;margin:.2rem 0;box-shadow:0 0 0 4px var(--surface),0 0 0 7px var(--t2)}
@@ -63,7 +63,7 @@
 /* badge wall */
 .gm-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem}
 .gm-tile{display:grid;justify-items:center;gap:.2rem;padding:.9rem .6rem;border:1px solid var(--border);border-radius:16px;background:var(--surface);text-align:center;box-shadow:var(--shadow);animation:gm-pop .5s var(--e) both;transition:transform .2s var(--e)}
-.gm-tile:hover{transform:translateY(-4px) rotate(-.6deg)}
+.gm-tile:hover{transform:translateY(-2px) rotate(-.6deg)}
 .gm-tile-ic{font-size:2rem;transition:transform .3s var(--e)}.gm-tile:hover .gm-tile-ic{transform:scale(1.25) rotate(-8deg)}
 .gm-tile-n{font-size:1.4rem;line-height:1}.gm-tile-name{font-weight:700}
 .gm-stack{display:flex;height:8px;border-radius:8px;overflow:hidden;background:var(--soft);min-width:8px;transition:width 1s var(--e) .2s}
@@ -116,7 +116,7 @@
 @keyframes gm-grow-x{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes gm-draw{to{stroke-dashoffset:0}}
 @keyframes gm-fade{to{opacity:1}}
-@keyframes gm-bob{50%{transform:translateY(-5px) rotate(4deg)}}
+@keyframes gm-bob{50%{transform:translateY(-2px) rotate(4deg)}}
 @keyframes gm-shine{0%{background-position:200% 0}60%,100%{background-position:-100% 0}}
 @keyframes gm-drift{to{transform:translate(30px,20px) scale(1.15)}}
 @keyframes gm-load{from{background-position:-50% 0}to{background-position:150% 0}}

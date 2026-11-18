@@ -21,7 +21,7 @@
 .ewp-day:active:not(:disabled) span{transform:scale(.9)}
 .ewp-day:disabled{color:var(--muted);opacity:.35;cursor:not-allowed}
 .ewp-day.today span{box-shadow:inset 0 0 0 2px var(--primary)}
-.ewp-day.start span,.ewp-day.end span{background:var(--primary);color:var(--on-primary);box-shadow:0 4px 12px rgba(0,0,0,.22);animation:ewp-pop .35s var(--e)}
+.ewp-day.start span,.ewp-day.end span{background:var(--primary);color:var(--on-primary);box-shadow:0 2px 8px rgba(0,0,0,.10);animation:ewp-pop .35s var(--e)}
 .ewp-day.mid::before,.ewp-day.band-r::before,.ewp-day.band-l::before{content:"";position:absolute;top:4px;bottom:4px;background:var(--soft);animation:ewp-band .35s var(--e) both}
 .ewp-day.mid::before{left:0;right:0}.ewp-day.band-r::before{left:50%;right:0;transform-origin:left}.ewp-day.band-l::before{left:0;right:50%;transform-origin:right}
 .ewp-hint{text-align:center;font-weight:700;color:var(--primary);margin:.4rem 0 0;animation:ewp-fade .3s both}
