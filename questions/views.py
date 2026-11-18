@@ -59,13 +59,11 @@ class QuestionSerializer(serializers.ModelSerializer):
             data["explanation"] = clean_prompt(data["explanation"]) if data["explanation"].strip() else ""
         if data.get("marks", 1) <= 0:
             raise serializers.ValidationError({"marks": "Marks must be above zero."})
-        # Every question has a time limit in an exam: the teacher's own number, or the default for its type when she left it empty.
+        # The time limit is OFF unless the teacher switched it on (empty / null = no limit); when on, it is her number of seconds.
         try:
             limit = timing.clean_limit(data["time_limit_seconds"]) if "time_limit_seconds" in data else (inst.time_limit_seconds if inst else None)
         except ValueError as e:
             raise serializers.ValidationError({"time_limit_seconds": str(e)})
-        if limit is None:
-            limit = timing.default_limit(qtype, data["content"], data.get("marks", inst.marks if inst else 1))
         data["time_limit_seconds"] = limit
         return data
 

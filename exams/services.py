@@ -289,6 +289,10 @@ def attempt_state(attempt, now=None):
     eq = ExamQuestion.objects.get(pk=attempt.order[idx], exam=exam)
     limit = timing.limit_for(eq.payload)
     started = attempt.question_started_at
+    if limit is None:  # no time limit on this question (the default): no clock
+        state["question"] = public_question(eq, attempt.seed, exam.shuffle_options)
+        state["question_limit_seconds"] = state["question_deadline_at"] = None
+        return state
     if started is None:  # first time she can see this question: the question clock starts now (one conditional UPDATE, no row lock)
         Attempt.objects.filter(pk=attempt.pk, question_started_at__isnull=True).update(question_started_at=now)
         started = Attempt.objects.values_list("question_started_at", flat=True).get(pk=attempt.pk)
@@ -313,7 +317,10 @@ def expire_overdue(attempt_id, now=None):
     order, idx, started = attempt.order, attempt.current_index, attempt.question_started_at
     payloads = {eq.pk: eq.payload for eq in ExamQuestion.objects.filter(pk__in=order[idx:])}
     while idx < len(order):
-        end = started + timedelta(seconds=timing.limit_for(payloads.get(order[idx], {})))
+        limit = timing.limit_for(payloads.get(order[idx], {}))
+        if limit is None:  # this question has no limit: she may take her time (the whole exam's time still counts)
+            break
+        end = started + timedelta(seconds=limit)
         if now <= end + timedelta(seconds=timing.EXPIRE_GRACE):
             break
         Answer.objects.get_or_create(attempt=attempt, exam_question_id=order[idx], defaults=dict(skipped=True, timed_out=True))
@@ -348,8 +355,8 @@ def submit_answer(attempt_id, student, question_id, response, skip=False, now=No
         raise ExamError("That is not the current question.", 409, "out_of_order")
     # The question's own time limit (the phone stops at zero and sends what she has with timeout=true; the server decides).
     late = False
-    if attempt.question_started_at is not None:
-        payload = ExamQuestion.objects.only("payload").get(pk=question_id).payload
+    limit = timing.limit_for(ExamQuestion.objects.only("payload").get(pk=question_id).payload) if attempt.question_started_at is not None else None
+    if limit is not None:
         arrived = now
         if at:  # the phone's own reading of when she answered (an answer waiting offline must not be late just because the network was down)
             try:
@@ -359,7 +366,7 @@ def submit_answer(attempt_id, student, question_id, response, skip=False, now=No
                     arrived = said
             except (TypeError, ValueError, OverflowError, OSError):
                 pass
-        late = arrived > attempt.question_started_at + timedelta(seconds=timing.limit_for(payload) + timing.ANSWER_GRACE)
+        late = arrived > attempt.question_started_at + timedelta(seconds=limit + timing.ANSWER_GRACE)
     empty = response in (None, "", [], {})
     if late or (timeout and (skip or empty)):
         # Too late, or time ran out with nothing to send: recorded as timed out (no marks); the answer that came too late is not used.

@@ -25,8 +25,9 @@ class TimingRulesTests(SimpleTestCase):
             with self.assertRaises(ValueError):
                 timing.clean_limit(bad)
 
-    def test_old_question_without_a_limit_gets_the_default(self):
-        self.assertEqual(timing.limit_for({"qtype": "true_false"}), timing.default_limit("true_false"))
+    def test_a_question_has_no_limit_unless_it_is_switched_on(self):
+        self.assertIsNone(timing.limit_for({"qtype": "true_false"}))
+        self.assertIsNone(timing.limit_for({"qtype": "true_false", "time_limit_seconds": None}))
         self.assertEqual(timing.limit_for({"qtype": "true_false", "time_limit_seconds": 20}), 20)
 
 
@@ -114,3 +115,13 @@ class QuestionClockTests(AnalyticsBase):
             s = self.state(self.t0 + timedelta(seconds=20))
         self.assertIsNone(s["question"])
         self.assertIsNone(Attempt.objects.get(pk=self.a.pk).question_started_at)  # it starts again when she can see the question
+
+    def test_questions_without_a_limit_have_no_clock_and_never_expire(self):
+        ExamQuestion.objects.filter(exam=self.exam).update(payload={**mcq()})
+        s = self.state(self.t0)
+        self.assertIsNone(s["question_deadline_at"])
+        self.assertIsNone(Attempt.objects.get(pk=self.a.pk).question_started_at)
+        later = self.state(self.t0 + timedelta(minutes=30))
+        self.assertEqual(later["index"], 1)
+        services.submit_answer(self.a.pk, self.amina, self.a.order[0], "b", now=self.t0 + timedelta(minutes=30))
+        self.assertFalse(Answer.objects.get(attempt_id=self.a.pk, exam_question_id=self.a.order[0]).timed_out)

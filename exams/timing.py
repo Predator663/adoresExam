@@ -1,13 +1,12 @@
-"""Per-question time limits. Every question in an exam has one, so nobody can sit on a single question for the whole paper.
+"""Per-question time limits. OFF by default: a question has a limit only when the teacher switches it on (on the question, or per exam in the builder).
 
-The limit is chosen by the teacher on the question (or per exam in the builder); a question that has none yet gets a sensible
-default for its type. The SERVER owns the question clock (Attempt.question_started_at); the phone only shows a countdown."""
+When it is on, the teacher picks the seconds; the default for its type is only the suggested starting number. The SERVER owns the question clock (Attempt.question_started_at); the phone only shows a countdown."""
 
 MIN_SECONDS, MAX_SECONDS = 10, 3600
 ANSWER_GRACE = 6      # seconds: network delay allowed for the answer the phone sends at zero
 EXPIRE_GRACE = 12     # seconds: after this the server moves a question on by itself (phone closed, JS stopped ...)
 
-# seconds per question type: enough to read and answer carefully, not enough to wander off
+# the SUGGESTED seconds per question type (what the box shows when a teacher switches the limit on): enough to read and answer carefully, not enough to wander off
 _BASE = {"true_false": 45, "mcq_single": 60, "mcq_multi": 90, "fill_blank": 60, "matching": 120, "ordering": 90}
 
 
@@ -49,8 +48,8 @@ def clean_limit(value):
 
 
 def limit_for(payload):
-    """The limit of one exam question (old exams made before this feature have no number: they get the default)."""
+    """The limit of one exam question in seconds, or None when it has no time limit (the default)."""
     n = payload.get("time_limit_seconds")
-    if isinstance(n, (int, float)) and n >= MIN_SECONDS:
+    if isinstance(n, (int, float)) and not isinstance(n, bool) and n >= MIN_SECONDS:
         return clamp(n)
-    return default_limit(payload.get("qtype"), payload.get("content"), payload.get("marks", 1))
+    return None

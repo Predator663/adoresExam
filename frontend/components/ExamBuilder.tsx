@@ -174,24 +174,28 @@ function Random({ exam, selIds, onAdded }: { exam: any; selIds: Set<number>; onA
 
 /* ------------------------------------------------------------------ selected list */
 /** One time for every question, and the total time the questions add up to (each question still has its own limit). */
-function SetAll({ total, onApply }: { total: number; onApply: (n: number) => void }) {
+function SetAll({ total, timed, count, onApply }: { total: number; timed: number; count: number; onApply: (n: number) => void }) {
   const [v, setV] = useState(60);
   return (
     <div className="bld-timeall">
-      <span className="small muted">⏱ Questions add up to <b>{fmtSecs(total)}</b> in total.</span>
-      <span className="row" style={{ gap: ".4rem" }}><TimeLimit compact value={v} suggested={v} onChange={(n) => setV(clampSecs(n ?? v))} /><button className="btn" type="button" onClick={() => onApply(v)}>Set all</button></span>
+      <span className="small muted">⏱ {timed ? <>{timed} of {count} questions timed, <b>{fmtSecs(total)}</b> in total.</> : "No time limits (students can take as long as the exam allows)."}</span>
+      <span className="row" style={{ gap: ".4rem", flexWrap: "wrap" }}>
+        <TimeLimit compact value={v} suggested={v} onChange={(n) => setV(clampSecs(n ?? v))} />
+        <button className="btn" type="button" onClick={() => onApply(v)}>Set all</button>
+        {timed > 0 && <button className="btn" type="button" onClick={() => onApply(0)}>No limits</button>}
+      </span>
     </div>
   );
 }
 
-function Selected({ sel, limit, onLimit, onLimitAll, onRemove, onMove, onClear, onPreview, onSave, canSave, narrow }: { sel: Q[]; limit: (q: Q) => number; onLimit: (id: number, n: number) => void; onLimitAll: (n: number) => void; onRemove: (id: number) => void; onMove: (id: number, d: -1 | 1) => void; onClear: () => void; onPreview: () => void; onSave: () => void; canSave: boolean; narrow?: boolean }) {
+function Selected({ sel, limit, onLimit, onLimitAll, onRemove, onMove, onClear, onPreview, onSave, canSave, narrow }: { sel: Q[]; limit: (q: Q) => number | null; onLimit: (id: number, n: number) => void; onLimitAll: (n: number) => void; onRemove: (id: number) => void; onMove: (id: number, d: -1 | 1) => void; onClear: () => void; onPreview: () => void; onSave: () => void; canSave: boolean; narrow?: boolean }) {
   const secs = groupSections(sel), marks = sel.reduce((a, q) => a + Number(q.marks), 0);
   let n = 0;  // the same running number the paper preview gives each question (it carries on across sections)
   return (
     <div className={`card bld-sel ${narrow ? "" : "bld-aside"}`}>
       <div className="row"><h3 className="grow" style={{ margin: 0 }}>Current exam</h3>{sel.length > 0 && <button className="btn ghost" onClick={onClear}>Clear</button>}</div>
       <div className="bld-totals"><div><b>{sel.length}</b><span>question{sel.length === 1 ? "" : "s"}</span></div><div><b>{Math.round(marks * 100) / 100}</b><span>marks</span></div><div><b>{secs.length}</b><span>section{secs.length === 1 ? "" : "s"}</span></div></div>
-      {sel.length > 0 && <SetAll total={sel.reduce((a, q) => a + limit(q), 0)} onApply={onLimitAll} />}
+      {sel.length > 0 && <SetAll total={sel.reduce((a, q) => a + (limit(q) ?? 0), 0)} timed={sel.filter((q) => limit(q)).length} count={sel.length} onApply={onLimitAll} />}
       {!sel.length ? <p className="muted small">Nothing selected yet. Add questions from the bank, create new ones, or add random ones.</p> : (
         <div className="bld-sel-list">
           {secs.map((s) => (
@@ -201,7 +205,7 @@ function Selected({ sel, limit, onLimit, onLimitAll, onRemove, onMove, onClear, 
                 <div key={q.id} className="bld-sel-row">
                   <span className="bld-sel-n" aria-label={`Question ${n + 1}`}>{++n}</span>
                   <span className="grow small">{plain(q.prompt).slice(0, 70) || "(image only)"}</span>
-                  <TimeLimit compact value={limit(q)} suggested={limit(q)} onChange={(n) => onLimit(q.id, clampSecs(n ?? limit(q)))} />
+                  <TimeLimit compact value={limit(q)} suggested={defaultLimit(q.qtype, q.content, q.marks)} onChange={(n) => onLimit(q.id, n == null ? 0 : clampSecs(n))} />
                   <button className="btn ghost icon" disabled={i === 0} aria-label="Move up" onClick={() => onMove(q.id, -1)}>↑</button>
                   <button className="btn ghost icon" disabled={i === s.items.length - 1} aria-label="Move down" onClick={() => onMove(q.id, 1)}>↓</button>
                   <button className="btn ghost icon" aria-label="Remove from exam" onClick={() => onRemove(q.id)}>✕</button>
@@ -243,7 +247,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
   // The marks stored on the exam's own copy of each question (source id -> marks; 0 if voided). The exam list adds these up, so the builder must too.
   const [savedMarks, setSavedMarks] = useState<Record<number, number>>({});
   // This exam's own time limit per question (source id -> seconds). Saved with the paper; anything missing falls back to the question's own limit, then to the default for its type.
-  const [limits, setLimits] = useState<Record<number, number>>({}), [savedLimits, setSavedLimits] = useState<Record<number, number>>({});
+  const [limits, setLimits] = useState<Record<number, number>>({}), [savedLimits, setSavedLimits] = useState<Record<number, number>>({});  // 0 = no limit in this exam
   const [step, setStep] = useState<"select" | "preview">(editable ? "select" : "preview"), [tab, setTab] = useState<"mine" | "others" | "bulk" | "create" | "random" | "selected">("mine"), [bulkSeen, setBulkSeen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null), [bankVer, setBankVer] = useState(0), [bulkKey, setBulkKey] = useState(0), [hasWork, setHasWork] = useState(false);
   const [counts, setCounts] = useState<{ mine: number; others: number } | null>(null), [initialBulk, setInitialBulk] = useState<BulkState | null>(null);
@@ -292,7 +296,7 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
         const paper = await api<any[]>(`/exams/${exam.id}/questions/`);
         const ids: number[] = paper.map((p) => p.source).filter(Boolean);
         if (live) { setSaved(ids); setOrphans(paper.length - ids.length); setSavedMarks(Object.fromEntries(paper.filter((p) => p.source).map((p) => [p.source, p.voided ? 0 : Number(p.marks) || 0])));
-          const lm = Object.fromEntries(paper.filter((p) => p.source && p.time_limit_seconds).map((p) => [p.source, Number(p.time_limit_seconds)])); setLimits(lm); setSavedLimits(lm); }
+          const lm = Object.fromEntries(paper.filter((p) => p.source).map((p) => [p.source, Number(p.time_limit_seconds) || 0])); setLimits(lm); setSavedLimits(lm); }
         // Where she stopped last time (unsaved selection, typed questions, tab). A failure here must never block the builder.
         let d: Draft | null = null;
         if (editable) { try { d = (await api<any>(`/exams/${exam.id}/draft/`)).data || null; } catch { d = null; } }
@@ -319,8 +323,9 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
   }, [exam.id]);
 
   const selIds = useMemo(() => new Set(sel.map((q) => q.id)), [sel]);
-  const limitOf = useCallback((q: Q) => limits[q.id] ?? q.time_limit_seconds ?? defaultLimit(q.qtype, q.content, q.marks), [limits]);
-  const limitsChanged = sel.some((q) => q.id in savedLimits && limitOf(q) !== savedLimits[q.id]);
+  /** seconds, or null = no time limit (the default) */
+  const limitOf = useCallback((q: Q): number | null => (q.id in limits ? limits[q.id] : q.time_limit_seconds ?? 0) || null, [limits]);
+  const limitsChanged = sel.some((q) => q.id in savedLimits && (limitOf(q) ?? 0) !== savedLimits[q.id]);
   const dirty = ready && (JSON.stringify(canonicalOrder(sel).map((q) => q.id)) !== JSON.stringify(saved) || limitsChanged);
   // Unsaved: show what saving will store (the question bank's current marks). Saved: show exactly what is stored, which is what the exam list shows.
   const shown = useMemo(() => sel.map((q) => (!dirty && q.id in savedMarks ? { ...q, marks: savedMarks[q.id] } : q)), [sel, dirty, savedMarks]);
@@ -370,8 +375,8 @@ export default function ExamBuilder({ exam, reload, editable, admin, subjectName
     try {
       if (dirty || orphans > 0 || action === "save") {
         const ids = canonicalOrder(sel).map((q) => q.id);
-        const r = await api<any>(`/exams/${exam.id}/paper/`, { body: { question_ids: ids, rules: [], time_limits: Object.fromEntries(sel.map((q) => [q.id, limitOf(q)])) } });
-        const lm = Object.fromEntries(sel.map((q) => [q.id, limitOf(q)])); setLimits(lm); setSavedLimits(lm);
+        const r = await api<any>(`/exams/${exam.id}/paper/`, { body: { question_ids: ids, rules: [], time_limits: Object.fromEntries(sel.map((q) => [q.id, limitOf(q) ?? 0])) } });
+        const lm = Object.fromEntries(sel.map((q) => [q.id, limitOf(q) ?? 0])); setLimits(lm); setSavedLimits(lm);
         setSaved(ids); setOrphans(0); setSavedMarks(Object.fromEntries(sel.map((q) => [q.id, Number(q.marks)]))); detail = `Paper saved: ${r.questions} questions, ${r.total_marks} marks.`;
       }
       await pause(350);

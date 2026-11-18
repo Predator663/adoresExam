@@ -642,10 +642,10 @@ class ExamViewSet(viewsets.ModelViewSet):
         limits = {}
         for qid, secs in overrides.items():
             try:
-                n = timing.clean_limit(secs)
+                n = 0 if secs in (0, "0", None, "") else timing.clean_limit(secs)  # 0 = this exam has no limit on that question
             except ValueError as e:
                 raise ValidationError({"time_limits": str(e)})
-            if n is not None and str(qid).isdigit():
+            if str(qid).isdigit():
                 limits[int(qid)] = n
         exam.questions.all().delete()
         # Section A, B, C ... : grouped by type, in the order they were picked inside each section.
@@ -655,8 +655,8 @@ class ExamViewSet(viewsets.ModelViewSet):
                 "qtype": q.qtype, "prompt": q.prompt, "content": q.content, "answer": q.answer, "marks": q.marks,
                 "explanation": q.explanation, "topic": q.topic, "subtopic": q.subtopic, "difficulty": q.difficulty,
                 "language": q.language, "source_version": q.version,
-                # EVERY question in an exam has a time limit: this exam's own number, else the question's, else the default for its type
-                "time_limit_seconds": limits.get(q.pk) or q.time_limit_seconds or timing.default_limit(q.qtype, q.content, q.marks),
+                                # OFF unless the teacher switched it on: this exam's own choice, else the question's own (None = no time limit)
+                "time_limit_seconds": (limits[q.pk] if q.pk in limits else q.time_limit_seconds) or None,
             })
         return Response({"questions": len(chosen), "total_marks": exam.total_marks})
 

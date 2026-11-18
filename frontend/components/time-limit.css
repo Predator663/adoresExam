@@ -20,3 +20,12 @@
 .tl-compact .tl-in{width:3rem;font-size:.85rem}
 .bld-sel-row{flex-wrap:wrap}
 .bld-timeall{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin:.2rem 0 .5rem;padding:.5rem .6rem;border:1px dashed var(--line,#cfd8d2);border-radius:12px}
+.tl-head{display:flex;align-items:center;gap:.6rem}
+.tl-label em{font-style:normal;font-weight:500;color:var(--muted,#667);margin-left:.3rem}
+.tl-sw{flex:none;position:relative;width:2.6rem;height:1.5rem;border-radius:999px;border:0;background:color-mix(in srgb,currentColor 22%,transparent);cursor:pointer;transition:background .2s;padding:0}
+.tl-sw.on{background:var(--brand,#0b6b4a)}
+.tl-knob{position:absolute;top:.2rem;left:.2rem;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;transition:transform .2s cubic-bezier(.3,.7,.4,1);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.tl-sw.on .tl-knob{transform:translateX(1.1rem)}
+.tl-sw:focus-visible{outline:3px solid color-mix(in srgb,var(--brand,#0b6b4a) 40%,transparent);outline-offset:2px}
+.tl-compact{gap:.35rem}
+.reduce-motion .tl-knob,.reduce-motion .tl-sw{transition:none}
