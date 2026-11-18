@@ -47,11 +47,18 @@ def unlock_user(u):
     u.save(update_fields=["failed_logins", "locked_until"])
 
 
+def _school_theme():
+    """The theme of someone who has not chosen one: the school's default (Settings), never an unknown name."""
+    from core.models import SchoolSettings
+    t = SchoolSettings.load().default_theme
+    return t if t in THEMES else "light"
+
+
 def user_payload(u):
     return {
         "id": u.pk, "username": u.username, "first_name": u.first_name, "last_name": u.last_name,
         "role": u.role, "class": str(u.school_class) if u.school_class else None,
-        "must_change_password": u.must_change_password, "language": u.language, "theme": u.theme,
+        "must_change_password": u.must_change_password, "language": u.language, "theme": u.theme or _school_theme(), "theme_custom": bool(u.theme),
         "accessibility": {
             "text_size": u.text_size, "line_spacing": u.line_spacing, "dyslexia_font": u.dyslexia_font,
             "reduce_motion": u.reduce_motion, "read_aloud": u.read_aloud,

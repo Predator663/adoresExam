@@ -1,6 +1,6 @@
 export type User = {
   id: number; username: string; first_name: string; last_name: string; role: string; class: string | null;
-  must_change_password: boolean; language: "en" | "sw"; theme: string;
+  must_change_password: boolean; language: "en" | "sw"; theme: string; theme_custom?: boolean;
   accessibility: { text_size: number; line_spacing: number; dyslexia_font: boolean; reduce_motion: boolean; read_aloud: boolean };
 };
 export type Opt = { id: string; text: string; image?: string | null; alt_text?: string };

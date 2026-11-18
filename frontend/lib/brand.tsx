@@ -39,6 +39,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     api<any>("/branding/", { auth: false }).then((d) => {
       if (!alive) return;
       const nb = fromApi(d); setB(nb);
+      // Nobody has chosen a theme on this device yet (not signed in): show the school's default theme.
+      try { if (!JSON.parse(localStorage.getItem("amani_prefs") || "{}").theme && d.default_theme) document.documentElement.dataset.theme = d.default_theme; } catch { /* keep the built-in look */ }
       try { localStorage.setItem(KEY(), JSON.stringify(nb)); } catch { /* private mode */ }
     }).catch(() => { /* keep the saved copy; the page still works */ });
     return () => { alive = false; };

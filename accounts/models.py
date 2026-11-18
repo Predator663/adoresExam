@@ -39,7 +39,7 @@ class User(AbstractUser):
     failed_logins = models.PositiveSmallIntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
     language = models.CharField(max_length=2, default="en")
-    theme = models.CharField(max_length=20, default="light")
+    theme = models.CharField(max_length=20, blank=True, default="")  # "" = she has not chosen: follow the school's default theme (Settings)
     graduated = models.BooleanField(default=False)  # ADM-01
     # Accessibility preferences (ACC-02, ACC-03, ACC-06); the app reads these and applies them.
     text_size = models.PositiveSmallIntegerField(default=100)  # percent, 100-200
