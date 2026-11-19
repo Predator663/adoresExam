@@ -23,3 +23,28 @@
 .ss-out{width:100%;margin-top:1rem;min-height:50px;display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
 @media(prefers-reduced-motion:reduce){.ss *{animation:none!important;transition:none!important}}
 .reduce-motion .ss *{animation:none!important;transition:none!important}
+
+/* ---- photo picker inside the coloured hero: its text, ring, buttons and messages must read on the hero's background in every theme ---- */
+.ss-hero .pp-side{gap:.4rem}
+.ss-hero .pp-priv,.ss-hero .pp-priv.muted{color:inherit;opacity:1;font-size:.82rem;line-height:1.35;font-weight:600}
+.ss-hero .pp-ring{border-color:var(--on-primary)}
+.ss-hero .pp-btn.busy .pp-ring{border-color:var(--on-primary) transparent var(--on-primary) transparent}
+.ss-hero .pp-btn:hover .pp-ring,.ss-hero .pp-btn:focus-visible .pp-ring{box-shadow:0 0 0 6px color-mix(in srgb,var(--on-primary) 28%,transparent)}
+.ss-hero .pp-cam{background:var(--surface);color:var(--text);border-color:var(--on-primary)}
+.ss-hero .pp-pick.over{background:color-mix(in srgb,var(--on-primary) 18%,transparent);box-shadow:0 0 0 3px var(--on-primary)}
+.ss-hero .pp-drop{background:var(--surface);color:var(--text)}
+/* buttons: solid surface with normal text colour so they are readable on any hero colour; "Remove" is outlined in the hero's own text colour */
+.ss-hero .pp-link{background:var(--surface);color:var(--text);border-color:var(--surface);font-weight:700}
+.ss-hero .pp-link.ghost{background:transparent;color:inherit;border-color:color-mix(in srgb,var(--on-primary) 70%,transparent)}
+@media(hover:hover){.ss-hero .pp-link.ghost:hover:not(:disabled){background:color-mix(in srgb,var(--on-primary) 16%,transparent)}}
+/* success / error messages become small readable chips */
+.ss-hero .pp-msg,.ss-hero .pp-side .no{display:inline-block;margin:0;padding:.3rem .65rem;border-radius:10px;background:var(--surface);font-size:.85rem;font-weight:700}
+.ss-hero .pp-msg{color:var(--good)}.ss-hero .pp-side .no{color:var(--bad)}
+/* hero colours: keep the greeting readable in the dark and high-contrast themes (white-on-dark gradient only suits the light themes) */
+:root[data-theme=dark] .ss-hero{background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 80%,#fff))}
+:root[data-theme=dark] .ss-hero .ss-orb{background:rgba(255,255,255,.22)}
+:root[data-theme=high_contrast] .ss-hero{background:var(--primary);border:2px solid var(--on-primary)}
+:root[data-theme=high_contrast] .ss-hero .ss-orb{display:none}
+.ss-hero-t small,.ss-hero-t span{opacity:1}
+/* narrow phones: stack photo above the text so nothing is squeezed */
+@media(max-width:420px){.ss-hero{flex-wrap:wrap}.ss-hero .pp-pick{gap:.7rem}}
