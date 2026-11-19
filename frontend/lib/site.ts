@@ -15,7 +15,7 @@ export const OPERATOR = {
 export const PARTNER = {
   id: "pamatec",
   name: "Mr. Pascal",
-  callsign: "Pamtech",
+  callsign: "Pamatec",
   email: "pniniku@gmail.com",
   phone: "0768 777 166",
   phoneTel: "+255768777166",

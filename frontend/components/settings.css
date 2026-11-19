@@ -113,7 +113,9 @@
 
 /* floating save bar */
 .st-savebar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:center;padding:.7rem max(1rem,env(safe-area-inset-right)) max(.8rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));pointer-events:none;transform:translateY(120%);transition:transform .45s var(--e)}
-.st-savebar.show{transform:none}
+.st-savebar:not(.show){visibility:hidden;opacity:0;transform:translateY(calc(100% + 120px));transition:transform .45s var(--e),opacity .25s,visibility 0s .45s}
+.st-savebar.show{transform:none;opacity:1;visibility:visible;transition:transform .45s var(--e),opacity .25s,visibility 0s}
+.st-savebar:not(.show) *{pointer-events:none!important}
 @media(min-width:900px){.st-savebar{left:var(--side-w,0)}}
 .st-savebar-in{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;width:min(100%,760px);padding:.7rem .9rem;border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:0 4px 14px rgba(0,0,0,.14)}
 .st-savebar.bad .st-savebar-in{border-color:var(--bad)}
