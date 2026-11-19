@@ -57,6 +57,8 @@
 .pr-actions{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:.7rem max(1rem,env(safe-area-inset-right)) max(.7rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));background:linear-gradient(180deg,transparent,var(--bg) 35%);pointer-events:none}
 .pr-actions>*{pointer-events:auto;display:block;width:100%;max-width:640px;margin:0 auto}
 @media(min-width:900px){.pr-actions{left:var(--side-w,0)}}
+/* phones: the fixed bottom menu (.bottom, ~58px + safe area) sits at the same spot, so lift the action bar above it and leave room under the question */
+@media(max-width:699.98px){.pr-actions{bottom:calc(58px + env(safe-area-inset-bottom));padding-bottom:.6rem}.pr-play{padding-bottom:9rem}}
 .pr-fb{animation:pr-qin .35s var(--e) both;border-width:2px}
 .pr-fb.right{border-color:var(--good);animation:pr-qin .35s var(--e) both,pr-glow 1s .2s ease-out}.pr-fb.wrong{border-color:var(--bad);animation:pr-qin .35s var(--e) both,pr-shake .45s .1s}.pr-fb.part{border-color:var(--warn)}
 .pr-fb-head{display:flex;align-items:center;gap:.7rem}.pr-fb-head h2{margin:0;font-size:1.25rem}

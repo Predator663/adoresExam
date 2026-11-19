@@ -13,8 +13,15 @@ def _norm(s, case_sensitive=False, ignore_punct=False):
 
 
 def _num(s):
+    """A typed number. A comma is a thousands separator ("1,500") only when exactly three digits follow it; otherwise it is a decimal comma ("2,5" is 2.5, not 25)."""
+    import re
+    t = str(s).replace("\u2212", "-").strip().replace(" ", "")
+    if t.count(",") == 1 and not re.search(r",\d{3}(?!\d)", t):
+        t = t.replace(",", ".")
+    else:
+        t = t.replace(",", "")
     try:
-        return float(str(s).replace(",", "").replace("\u2212", "-").strip())
+        return float(t)
     except (TypeError, ValueError):
         return None
 

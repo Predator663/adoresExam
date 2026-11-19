@@ -130,3 +130,6 @@
 @keyframes st-draw{from{stroke-dashoffset:30}to{stroke-dashoffset:0}}
 @media(prefers-reduced-motion:reduce){.st *,.st-savebar,.st-savebar *{animation:none!important;transition:none!important}}
 .reduce-motion .st *,.reduce-motion .st-savebar,.reduce-motion .st-savebar *{animation:none!important;transition:none!important}
+
+/* phones: float the save bar above the fixed bottom menu instead of covering it */
+@media(max-width:699.98px){.st-savebar{bottom:calc(58px + env(safe-area-inset-bottom));padding-bottom:.5rem}}

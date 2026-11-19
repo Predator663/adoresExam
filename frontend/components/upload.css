@@ -110,3 +110,6 @@
 .up-chips{display:flex;flex-wrap:wrap;gap:.45rem}
 .up-chip.big{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .5rem .3rem .8rem;font-size:.9rem;font-weight:700;animation:up-in .4s var(--e) both;animation-delay:calc(var(--i,0) * 40ms)}
 .up-chip.big small{display:inline-grid;place-items:center;min-width:1.4rem;height:1.4rem;padding:0 .3rem;border-radius:99px;background:var(--soft);color:var(--muted);font-size:.72rem}
+
+/* phones: keep the pinned actions above the fixed bottom menu */
+@media(max-width:699.98px){.up-actions.sticky{bottom:calc(58px + env(safe-area-inset-bottom));padding-bottom:.8rem}}
