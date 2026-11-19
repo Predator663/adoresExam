@@ -1,0 +1,17 @@
+/* Smooth, fast student screens: a short fade-and-rise when a screen opens, a press feel on everything tappable, shaped skeletons. */
+@keyframes pg-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.pg-in{animation:pg-in .22s cubic-bezier(.2,.7,.3,1) both}
+.pg-skel-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));gap:.6rem}
+.pg-skel-row{display:flex;align-items:center;gap:.8rem;padding:.8rem;border:1px solid var(--border);border-radius:16px;background:var(--surface);animation:pg-in .3s ease both}
+.pg-skel-lines{flex:1;display:grid;gap:.5rem}
+@media(hover:none){
+  .btn,.tab,.chip,.side-link,.bottom a,.ux-card,.dd-item,.sx-card{-webkit-tap-highlight-color:transparent}
+}
+.btn,.tab,.chip,.side-link,.bottom a,.dd-item{transition:transform .12s cubic-bezier(.3,.7,.4,1),background-color .18s,border-color .18s,color .18s}
+.btn:active:not(:disabled),.tab:active,.chip:active,.bottom a:active,.dd-item:active{transform:scale(.96)}
+.side-link:active{transform:scale(.985)}
+.ux-card:active{transform:scale(.985);transition:transform .1s}
+.reduce-motion .pg-in,.reduce-motion .pg-skel-row{animation:none}
+.reduce-motion .btn:active,.reduce-motion .tab:active,.reduce-motion .chip:active,.reduce-motion .bottom a:active,.reduce-motion .dd-item:active{transform:none}
+@media(prefers-reduced-motion:reduce){.pg-in,.pg-skel-row{animation:none}.btn:active,.tab:active,.chip:active,.bottom a:active,.dd-item:active{transform:none}}
+.pz-title{margin:.1rem 0 .2rem;font-size:.8rem;font-weight:700;color:var(--primary);letter-spacing:.02em;text-transform:uppercase}

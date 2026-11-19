@@ -2,15 +2,17 @@
 import Icon from "@/components/Icon";
 import Shell from "@/components/Shell";
 import { GradeMedal, Monogram, Spark } from "@/components/student";
-import { Bar, ErrorNote, Loading, useLoad } from "@/components/ui";
+import { Bar, ErrorNote } from "@/components/ui";
+import { PageSkeleton } from "@/components/student";
+import { useMine } from "@/lib/mine";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
 /** RES-04, GRD-02, GRD-03: strengths and weak areas, progress per subject, what to revise, projected division. */
 export default function Progress() {
   const { t } = useSession();
-  const a = useLoad(() => api<any>("/student/analytics/"));
-  if (a.loading) return <Shell title={t("my_analytics")}><Loading /></Shell>;
+  const a = useMine<any>("/student/analytics/");
+  if (a.loading) return <Shell title={t("my_analytics")}><PageSkeleton rows={4} stats={3} /></Shell>;
   if (a.error || !a.data) return <Shell title={t("my_analytics")}><ErrorNote error={a.error} retry={a.reload} /></Shell>;
   const d = a.data, p = d.projected;
   return (

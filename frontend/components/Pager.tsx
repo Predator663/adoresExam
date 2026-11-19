@@ -1,4 +1,5 @@
 "use client";
+import { swrRead, swrWrite } from "@/lib/swr";
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -51,7 +52,7 @@ type Params = Record<string, string | number | boolean | null | undefined>;
 /** A list the server pages (?page=&page_size=). Changing page or size fetches only that page and keeps the rows on
  *  screen while it loads, so nothing flashes and the page is never reloaded. Changing a filter (any value in `params`)
  *  goes back to page 1. Rows come from {results}, {items} (notifications) or the field named in opts.field (leaderboard: "entries"). */
-export function usePaged<T = any>(path: string | null, params: Params = {}, opts: { size?: number; field?: string } = {}) {
+export function usePaged<T = any>(path: string | null, params: Params = {}, opts: { size?: number; field?: string; cache?: string } = {}) {
   const base = opts.size ?? 20;
   const query = useMemo(() => {
     const u = new URLSearchParams();
@@ -63,11 +64,13 @@ export function usePaged<T = any>(path: string | null, params: Params = {}, opts
   const [st, setSt] = useState({ key, page: 1, size: base });
   const page = st.key === key ? st.page : 1;  // a new filter always starts on page 1
   const size = st.size;
-  const [box, setBox] = useState<{ p: string | null; r: any }>({ p: path, r: null });
+  // opts.cache (the signed-in person's id): the last answer for this page is shown at once and refreshed quietly
+  const ck = opts.cache && typeof window !== "undefined" ? `${opts.cache}:${path}?${query}|${page}|${base}` : null;
+  const [box, setBox] = useState<{ p: string | null; r: any }>(() => ({ p: path, r: ck ? swrRead(ck) : null }));
   const data = box.p === path ? box.r : null;  // rows of another list (teachers -> admins) are never shown under this one
   const setData = (r: any) => setBox({ p: path, r });
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => box.r === null);
   const [tick, setTick] = useState(0);
   const top = useRef<any>(null);
   const seq = useRef(0);
@@ -76,14 +79,16 @@ export function usePaged<T = any>(path: string | null, params: Params = {}, opts
   useEffect(() => {
     if (!path) { setLoading(false); return; }
     const mine = ++seq.current;
-    if (!quiet.current) setLoading(true);
+    const cached = ck ? swrRead<any>(ck) : null;
+    if (cached) { setBox({ p: path, r: cached }); setLoading(false); }
+    else if (!quiet.current) setLoading(true);
     quiet.current = false;
     const qs = new URLSearchParams(query);
     qs.set("page", String(page)); qs.set("page_size", String(size));
     api<any>(`${path}${path.includes("?") ? "&" : "?"}${qs}`)
       .then((r) => {
         if (mine !== seq.current) return;  // an older answer arriving late
-        setBox({ p: path, r }); setError("");
+        setBox({ p: path, r }); setError(""); if (ck) swrWrite(ck, r);
         if (r?.page && r.page !== page) setSt({ key, page: r.page, size });  // the last row of the last page was removed
       })
       .catch((e) => mine === seq.current && setError(e.message || "Error"))

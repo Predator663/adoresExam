@@ -6,6 +6,8 @@ import OfflineBar from "@/components/OfflineBar";
 import SwRegister from "@/components/SwRegister";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import "./globals.css";
+import "./pg-motion.css";
+import "./accent.css";
 
 export const metadata: Metadata = {
   title: "Online Exams",

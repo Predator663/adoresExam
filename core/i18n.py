@@ -45,6 +45,8 @@ MESSAGES = {
         "xp.review": "Reviewed your wrong answers",
         "xp.practice": "Completed a practice quiz",
         "xp.streak": "{n}-day streak",
+        "xp.daily": "Daily challenge bonus",
+        "daily.done": "You have finished today's challenge. Come back tomorrow for a new one!",
         # celebrations and streak messages (SRS 5.2, 5.3)
         "level.up.title": "Level up! You are now {name}",
         "level.up.body": "You reached level {level}. Keep learning!",
@@ -96,6 +98,8 @@ MESSAGES = {
         "xp.review": "Umepitia majibu uliyokosea",
         "xp.practice": "Umemaliza zoezi la mazoezi",
         "xp.streak": "Mfululizo wa siku {n}",
+        "xp.daily": "Zawadi ya changamoto ya leo",
+        "daily.done": "Umemaliza changamoto ya leo. Rudi kesho kwa mpya!",
         "level.up.title": "Umepanda ngazi! Sasa wewe ni {name}",
         "level.up.body": "Umefika ngazi ya {level}. Endelea kujifunza!",
         "badge.title": "Beji mpya: {name} ({tier})",

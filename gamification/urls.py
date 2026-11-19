@@ -18,6 +18,7 @@ urlpatterns = [
     path("practice/subjects/", views.practice_subjects),
     path("practice/overview/", views.practice_overview),
     path("practice/start/", views.practice_start),
+    path("practice/daily/", views.practice_daily),
     path("practice/pack/<int:subject_id>/", views.practice_pack),
     path("practice/<int:session_id>/", views.practice_current),
     path("practice/<int:session_id>/answer/", views.practice_answer),

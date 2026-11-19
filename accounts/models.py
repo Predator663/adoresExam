@@ -6,6 +6,7 @@ from django.db import models
 from .hashers import FastPasswordHasher
 
 
+ACCENTS = {"teal", "ocean", "plum", "rose", "amber", "slate"}  # a student's own colour on top of her theme
 THEMES = {"light", "dark", "high_contrast", "colour_blind", "soft", "mw3"}  # ACC-01
 
 
@@ -40,6 +41,7 @@ class User(AbstractUser):
     locked_until = models.DateTimeField(null=True, blank=True)
     language = models.CharField(max_length=2, default="en")
     theme = models.CharField(max_length=20, blank=True, default="")  # "" = she has not chosen: follow the school's default theme (Settings)
+    accent = models.CharField(max_length=12, blank=True, default="")  # "" = the school's own green
     graduated = models.BooleanField(default=False)  # ADM-01
     # Accessibility preferences (ACC-02, ACC-03, ACC-06); the app reads these and applies them.
     text_size = models.PositiveSmallIntegerField(default=100)  # percent, 100-200

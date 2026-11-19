@@ -31,12 +31,13 @@ from exams.presenters import public_question
 from notifications.services import notify
 from questions.models import Question
 from . import catalog, rules
-from .models import (AVATARS, ActivityDay, BadgeAward, ExamRewardMark, GamificationSettings, PracticeSession, Profile,
+from .models import (AVATARS, FRAMES, ActivityDay, BadgeAward, ExamRewardMark, GamificationSettings, PracticeSession, Profile,
                      ReviewProgress, XPEvent)
 
 log = logging.getLogger(__name__)
 
 PRACTICE_MIN, PRACTICE_MAX, PRACTICE_DEFAULT = 5, 20, 10  # SRS 5.3: a streak needs a quiz of at least 5 questions
+DAILY_BONUS_XP = 15  # once a day, for finishing the day's challenge
 PRACTICE_STALE_HOURS = 12  # an unfinished quiz older than this is abandoned when a new one starts
 
 
@@ -104,7 +105,7 @@ def award_xp(user, kind, points, key, exam_id=None, **detail):
 
 def xp_label(event, lang="en"):
     key = {"submit": "xp.submit", "early": "xp.early", "score": "xp.score", "improve": "xp.improve",
-           "perfect": "xp.perfect", "review": "xp.review", "practice": "xp.practice", "streak": "xp.streak"}.get(event.kind)
+           "perfect": "xp.perfect", "review": "xp.review", "practice": "xp.practice", "streak": "xp.streak", "daily": "xp.daily"}.get(event.kind)
     return t(key, lang, **(event.detail or {})) if key else event.kind
 
 
@@ -687,6 +688,13 @@ def _finish_practice(session, student, now):
         if ev:
             session.xp_awarded = ev.points
             session.save(update_fields=["xp_awarded"])
+    bonus = 0
+    if session.daily:  # the day's challenge: a bonus once a day (the key makes a second one impossible)
+        ev2 = award_xp(student, "daily", DAILY_BONUS_XP, f"daily:{today.isoformat()}")
+        if ev2:
+            bonus = ev2.points
+            session.xp_awarded += bonus
+            session.save(update_fields=["xp_awarded"])
     record_activity(student, today, "practice", cfg)  # a quiz is at least PRACTICE_MIN questions, so it counts
     new = evaluate_badges(student, cfg)
     check_level(student, cfg)
@@ -694,7 +702,75 @@ def _finish_practice(session, student, now):
     streak = rules.streak_status(activity_days(student), today, cfg["freezes"])
     return {"badges": [badge_brief(n["code"], n["scope"], n["tier"], lang) for n in new],
             "level_up": level_after if level_after["level"] > level_before else None,
-            "streak": {"current": streak["current"], "best": streak["best"]}}
+            "streak": {"current": streak["current"], "best": streak["best"]}, "daily_bonus": bonus}
+
+
+# ---------------------------------------------------------------- the day's challenge
+
+def _daily_sessions(student, today):
+    return PracticeSession.objects.filter(user=student, daily=True, started_at__date=today)
+
+
+def daily_status(student, now=None):
+    """Cheap enough for every home-screen load: what the challenge card shows."""
+    now = now or timezone.now()
+    today = timezone.localdate(now)
+    mine = list(_daily_sessions(student, today).select_related("subject").order_by("-started_at")[:3])
+    done = next((s for s in mine if s.status == PracticeSession.COMPLETED), None)
+    cur = next((s for s in mine if s.status == PracticeSession.IN_PROGRESS), None)
+    streak = rules.streak_status(activity_days(student), today, config()["freezes"])
+    return {"count": PRACTICE_MIN, "bonus_xp": DAILY_BONUS_XP, "done_today": done is not None,
+            "score_percent": round(done.correct_score / (done.question_count or 1) * 100) if done else None,
+            "in_progress": {"answered": len(cur.answers), "total": cur.question_count, "subject": cur.subject.name} if cur else None,
+            "available": Subject.objects.filter(practice_enabled=True).exists(),
+            "streak": {"current": streak["current"], "active_today": streak["active_today"], "at_risk": bool(streak["at_risk"])}}
+
+
+def _daily_subject(student, now):
+    """Her weakest subject (lowest average in published results) among those she can practise; with no results yet, a subject
+    that rotates daily, so it is not always the same one."""
+    avgs = defaultdict(list)
+    for r in Result.objects.filter(student=student).select_related("attempt", "exam"):
+        if exam_services.result_visible(r.attempt, now):
+            avgs[r.exam.subject_id].append(r.percent)
+    cands = [s for s in Subject.objects.filter(practice_enabled=True).order_by("pk") if practice_pool(student, s).count() >= PRACTICE_MIN]
+    if not cands:
+        return None
+    rnd = random.Random(f"{student.pk}:{timezone.localdate(now)}")
+    return min(cands, key=lambda s: (0, sum(avgs[s.pk]) / len(avgs[s.pk])) if avgs.get(s.pk) else (1, rnd.random()))
+
+
+def start_daily(student, now=None):
+    """Start (or resume) today's challenge: PRACTICE_MIN questions from her weakest subject, beginning with ones she got wrong
+    before. It is a normal practice quiz (5 questions, so it also keeps her streak) with a one-time XP bonus."""
+    now = now or timezone.now()
+    lang, today = lang_of(student), timezone.localdate(now)
+    mine = list(_daily_sessions(student, today).order_by("-started_at")[:5])
+    for s in mine:
+        if s.status == PracticeSession.IN_PROGRESS:
+            return s
+    if any(s.status == PracticeSession.COMPLETED for s in mine):
+        raise GamificationError(t("daily.done", lang), 409, "daily_done")
+    subject = _daily_subject(student, now)
+    if subject is None:
+        raise GamificationError(t("practice.not_enough", lang), 409, "not_enough")
+    pool = list(practice_pool(student, subject).order_by("pk"))
+    missed = set()
+    for sess in PracticeSession.objects.filter(user=student, subject=subject, status=PracticeSession.COMPLETED).order_by("-started_at")[:20]:
+        missed.update(a["qid"] for a in sess.answers if a.get("fraction", 1) < 0.9999)
+    seed = random.SystemRandom().randrange(1, 2**31)
+    rnd = random.Random(seed)
+    hard = [q for q in pool if q.pk in missed]
+    rnd.shuffle(hard)
+    first = hard[:3]  # a mix: some she missed, the rest fresh
+    rest = [q for q in pool if q not in first]
+    rnd.shuffle(rest)
+    picks = (first + rest)[:PRACTICE_MIN]
+    rnd.shuffle(picks)
+    PracticeSession.objects.filter(user=student, status=PracticeSession.IN_PROGRESS, subject=subject).update(status=PracticeSession.ABANDONED)
+    return PracticeSession.objects.create(
+        user=student, subject=subject, seed=seed, question_count=len(picks), daily=True,
+        items=[{"qid": q.pk, "payload": _practice_payload(q)} for q in picks])
 
 
 # ---------------------------------------------------------------- leaderboard (SRS 5.6)
@@ -742,8 +818,12 @@ def leaderboard(student, period="weekly", now=None, limit=10):
     entries = []
     for rank, u, xp in ranked[:limit]:
         p = profiles.get(u.pk)
+        axp = alltime.get(u.pk, 0)
+        lv = level_payload(axp, cfg, lang)["level"]
         entries.append({"rank": rank, "name": display_name(u, p), "xp": xp, "avatar": p.avatar if p else AVATARS[0],
-                        "level": level_payload(alltime.get(u.pk, 0), cfg, lang)["level"], "is_me": u.pk == student.pk})
+                        "level": lv, "is_me": u.pk == student.pk,
+                        "frame": p.frame if p and FRAMES.get(p.frame, 99) <= lv else "ring",
+                        "title": title_for(p, axp, cfg, lang) if p else ""})
     return {"enabled": True, "scope": "class", "period": period,
             "week_start": week_start(now) if period == "weekly" else None,
             "class_name": str(student.school_class) if student.school_class_id else None,
@@ -778,13 +858,30 @@ def student_summary(student, now=None):
         "next_goals": [{"code": g["code"], "name": g["name"], "subject": g["subject"], "progress": g["progress"],
                         "target": g["next_target"], "unit": g["unit"]} for g in goals],
         "leaderboard_enabled": SchoolSettings.load().leaderboard_enabled,
-        "profile": profile_payload(profile),
+        "profile": profile_payload(profile, xp, cfg, lang_of(student)),
     }
 
 
-def profile_payload(profile):
+def title_for(profile, xp, cfg, lang="en"):
+    """The title she shows: the name of the level she picked (never one she has not reached), else her current level's name."""
+    reached = level_payload(xp, cfg, lang)["level"]
+    want = profile.title_level if profile.title_level and profile.title_level <= reached else reached
+    row = next((lv for lv in level_table(cfg) if lv["level"] == want), None)
+    return (row["name_sw"] if lang == "sw" else row["name"]) if row else ""
+
+
+def profile_payload(profile, xp=None, cfg=None, lang="en"):
+    """`xp`/`cfg` are passed by callers that already have them (the home summary); otherwise they are looked up."""
+    cfg = cfg or config()
+    xp = total_xp(profile.user) if xp is None else xp
+    reached = level_payload(xp, cfg, lang)["level"]
+    frame = profile.frame if FRAMES.get(profile.frame, 99) <= reached else "ring"  # a frame whose level she has lost access to falls back
     return {"avatar": profile.avatar, "display_name": profile.display_name, "hide_from_leaderboard": profile.hide_from_leaderboard,
-            "avatars": AVATARS, "photo": photo_url(profile), "photos_enabled": SchoolSettings.load().student_photos_enabled}
+            "avatars": AVATARS, "photo": photo_url(profile), "photos_enabled": SchoolSettings.load().student_photos_enabled,
+            "frame": frame, "frames": [{"key": k, "level": lv, "unlocked": lv <= reached} for k, lv in FRAMES.items()],
+            "title": title_for(profile, xp, cfg, lang), "title_level": profile.title_level,
+            "titles": [{"level": lv["level"], "name": lv["name_sw"] if lang == "sw" else lv["name"]} for lv in level_table(cfg) if lv["level"] <= reached],
+            "goal_percent": profile.goal_percent, "goal_subject": profile.goal_subject}
 
 
 # ---------------------------------------------------------------- profile photo

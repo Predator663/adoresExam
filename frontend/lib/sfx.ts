@@ -30,6 +30,8 @@ function tone(freq: number, dur: number, vol: number, opts: { to?: number; type?
 const buzz = (ms: number) => { try { if (hapticsOn()) navigator.vibrate?.(ms); } catch { /* not on every phone */ } };
 
 export const sfx = {
+  /** any ordinary tap: a barely-there tick of the phone (no sound, so it never gets annoying) */
+  tap() { buzz(4); },
   /** an item is picked up: a soft rising "pop" */
   pick() { buzz(10); if (soundOn()) { tone(420, 0.09, 0.07, { to: 700 }); tone(840, 0.05, 0.03, { at: 0.03, type: "triangle" }); } },
   /** the item passes another one: a tiny tick */

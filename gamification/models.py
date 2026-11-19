@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+# Avatar frames and their unlock level (shown around her picture on her home screen and the class leaderboard)
+FRAMES = {"none": 1, "ring": 1, "sun": 2, "leaf": 3, "flame": 4, "aurora": 5, "crown": 7}
 AVATARS = ["owl", "lion", "giraffe", "zebra", "elephant", "flamingo", "star", "rocket", "book", "sun", "tree", "flower"]
 
 
@@ -35,6 +37,10 @@ class Profile(models.Model):
     display_name = models.CharField(max_length=30, blank=True)  # shown to classmates; empty = "Amina K."
     hide_from_leaderboard = models.BooleanField(default=False)  # each student can hide herself
     last_seen_level = models.PositiveSmallIntegerField(default=1)  # drives the level-up celebration
+    frame = models.CharField(max_length=12, default="ring")  # a key of FRAMES she has unlocked
+    title_level = models.PositiveSmallIntegerField(null=True, blank=True)  # the level NAME she shows as her title (any level she has reached); empty = her current level
+    goal_percent = models.PositiveSmallIntegerField(null=True, blank=True)  # her own target average (50-100); empty = no goal
+    goal_subject = models.CharField(max_length=60, blank=True)  # the subject the goal is about; empty = all her subjects
 
 
 class XPEvent(models.Model):
@@ -119,6 +125,7 @@ class PracticeSession(models.Model):
     question_count = models.PositiveSmallIntegerField(default=0)  # how many questions this quiz has
     correct_score = models.FloatField(default=0)  # sum of the fractions correct
     xp_awarded = models.PositiveIntegerField(default=0)
+    daily = models.BooleanField(default=False)  # the day's challenge: a short quiz from her weakest subject, with a bonus
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

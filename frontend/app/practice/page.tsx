@@ -1,13 +1,16 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import DailyCard from "@/components/daily";
 import Listen from "@/components/Listen";
 import OfflinePlay from "@/components/OfflinePractice";
 import QuestionView, { hasAnswer, initialValue } from "@/components/QuestionView";
 import Shell from "@/components/Shell";
 import { Feedback, Hero, LengthPicker, Segments, Summary, SubjectTile, buzz, usePT } from "@/components/practice";
 import Tips from "@/components/Tips";
-import { ErrorNote, Loading, useLoad } from "@/components/ui";
+import { ErrorNote } from "@/components/ui";
+import { PageSkeleton } from "@/components/student";
+import { useMine } from "@/lib/mine";
 import { api } from "@/lib/api";
 import { describe } from "@/lib/answers";
 import { listPacks } from "@/lib/offline";
@@ -76,10 +79,10 @@ const WHY: Record<string, string> = { none: "practice_why_none", not_shared: "pr
 
 export default function Practice() {
   const { t } = useSession(), { d } = usePT();
-  const subs = useLoad(() => api<any[]>("/practice/subjects/"));
-  const ov = useLoad(() => api<any>("/practice/overview/"));
+  const subs = useMine<any[]>("/practice/subjects/");
+  const ov = useMine<any>("/practice/overview/");
   const dflt = ov.data?.default_count;
-  const [game, setGame] = useState<{ st: PState; id: number } | null>(null), [err, setErr] = useState(""), [count, setCount] = useState(10), [busy, setBusy] = useState<number | null>(null);
+  const [game, setGame] = useState<{ st: PState; id: number; daily?: boolean } | null>(null), [err, setErr] = useState(""), [count, setCount] = useState(10), [busy, setBusy] = useState<number | null>(null);
   const [offline, setOffline] = useState<string | null>(null), [packs, setPacks] = useState<ReturnType<typeof listPacks>>([]), [off, setOff] = useState(false);
   useEffect(() => {
     const sync = () => { setOff(!navigator.onLine); setPacks(listPacks()); };
@@ -92,20 +95,26 @@ export default function Practice() {
     try { setGame({ st: await api<PState>("/practice/start/", { body: { subject_id: id, count } }), id }); } catch (e: any) { setErr(e.message); }
     setBusy(null);
   }
+  async function startDaily() {
+    setErr(""); setBusy(-1);
+    try { setGame({ st: await api<PState>("/practice/daily/", { body: {} }), id: 0, daily: true }); } catch (e: any) { setErr(e.message); }
+    setBusy(null);
+  }
   const saved = (id: number) => packs.some((p) => p.id === String(id) && !p.expired);
   const usable = packs.filter((p) => !p.expired);
   const noSignal = off || !!subs.error;
   useEffect(() => { if ([5, 10, 15, 20].includes(dflt)) setCount(dflt); }, [dflt]);  // the length the school chose; she can still change it
-  const exit = () => { setGame(null); subs.reload(); ov.reload(); };
+  const exit = () => { setGame(null); subs.reload(); ov.reload(); window.dispatchEvent(new Event("amani:daily")); };
   return (
     <Shell title={t("nav_practice")}>
       {offline ? <OfflinePlay packId={offline} count={count} onExit={() => setOffline(null)} /> : game ? (
-        <Play key={game.st.session_id} initial={game.st} onAgain={async () => { setGame(null); await start(game.id); }} onExit={exit} />
+        <Play key={game.st.session_id} initial={game.st} onAgain={async () => { const dl = game.daily; setGame(null); if (!dl) await start(game.id); }} onExit={exit} />
       ) : (
         <>
           {ov.data && !noSignal && <Hero o={ov.data} />}
           <p className="muted">{t("practice_intro")}</p>
           <p className="row"><Link className="btn" href="/saved/">🔖 {t("my_mistakes_link")}</Link><Link className="btn" href="/badges/">🏅 {d.seeBadges}</Link></p>
+          {!noSignal && <DailyCard onStart={startDaily} busy={busy === -1} />}
           <Tips cats={["study", "phone"]} />
           {!noSignal && <LengthPicker value={count} onChange={setCount} xp={ov.data?.xp_per_quiz ?? 0} />}
           {err && <p className="no" role="alert">⚠ {err}</p>}
@@ -126,7 +135,7 @@ export default function Practice() {
             </div>
           )}
           {!noSignal && <h2 className="pr-h">{d.pick}</h2>}
-          {subs.loading ? <Loading /> : subs.error ? (off ? null : <ErrorNote error={subs.error} retry={subs.reload} />) : !subs.data?.length ? <div className="card"><p className="muted">{t("practice_none")}</p></div> : (
+          {subs.loading ? <PageSkeleton rows={4} /> : subs.error ? (off ? null : <ErrorNote error={subs.error} retry={subs.reload} />) : !subs.data?.length ? <div className="card"><p className="muted">{t("practice_none")}</p></div> : (
             <div className="pr-grid">
               {subs.data.map((s, i) => <SubjectTile key={s.id} s={s} i={i} busy={busy === s.id} saved={saved(s.id)} why={!s.can_start && WHY[s.reason] ? t(WHY[s.reason]) : undefined} onStart={() => start(s.id)} />)}
             </div>

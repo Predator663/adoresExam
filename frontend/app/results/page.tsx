@@ -5,21 +5,23 @@ import Icon from "@/components/Icon";
 import { Pager, usePaged } from "@/components/Pager";
 import Shell from "@/components/Shell";
 import { GradeMedal } from "@/components/student";
-import { ErrorNote, Loading, useLoad } from "@/components/ui";
+import { ErrorNote } from "@/components/ui";
+import { PageSkeleton } from "@/components/student";
+import { useMine } from "@/lib/mine";
 import { api } from "@/lib/api";
 import { eatDate } from "@/lib/clock";
 import { hueOf } from "@/lib/student";
 import { useSession } from "@/lib/session";
 
 export default function Results() {
-  const { t, lang } = useSession();
-  const pg = usePaged<any>("/results/", {}, { size: 10 });
+  const { t, lang, user } = useSession();
+  const pg = usePaged<any>("/results/", {}, { size: 10, cache: String(user?.id ?? "") });
   const { rows: data, error, loading, reload } = pg;
-  const pend = useLoad(() => api<any[]>("/results/pending/"));
+  const pend = useMine<any[]>("/results/pending/");
   return (
     <Shell title={t("nav_results")}>
       {pend.data?.map((p) => <ResultsWaiting key={p.attempt_id} attemptId={p.attempt_id} title={`${p.exam} · ${p.subject}`} resultsAt={p.results_at} serverTime={p.server_time} compact />)}
-      {loading ? <Loading /> : error ? <ErrorNote error={error} retry={reload} /> : !data.length ? (pend.data?.length ? null : <div className="card sx-empty"><span className="sx-empty-ico" aria-hidden><Icon n="chart" size={26} /></span><p className="muted">{t("no_results")}</p></div>) : (
+      {loading ? <PageSkeleton rows={4} /> : error ? <ErrorNote error={error} retry={reload} /> : !data.length ? (pend.data?.length ? null : <div className="card sx-empty"><span className="sx-empty-ico" aria-hidden><Icon n="chart" size={26} /></span><p className="muted">{t("no_results")}</p></div>) : (
         <>
           <p className="muted small sx-count-line">{t("results_count", { n: pg.count })}</p>
           <div ref={pg.top} className="paged sx-rlist" aria-busy={pg.busy || undefined}>

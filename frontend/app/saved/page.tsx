@@ -5,7 +5,9 @@ import { Pager, useClientPage } from "@/components/Pager";
 import { RichHtml } from "@/components/Rich";
 import Shell from "@/components/Shell";
 import StudyQuiz from "@/components/StudyQuiz";
-import { ErrorNote, Loading, useLoad } from "@/components/ui";
+import { ErrorNote } from "@/components/ui";
+import { PageSkeleton } from "@/components/student";
+import { useMine } from "@/lib/mine";
 import { api } from "@/lib/api";
 import { describe } from "@/lib/answers";
 import type { PackQuestion } from "@/lib/marking";
@@ -42,7 +44,7 @@ function List({ cards, empty, onRetry, onRemove }: { cards: Card[]; empty: strin
 export default function SavedPage() {
   const { t } = useSession();
   const [tab, setTab] = useState<"mistakes" | "saved">("mistakes"), [quiz, setQuiz] = useState<Card[] | null>(null);
-  const mistakes = useLoad(() => api<Card[]>("/me/mistakes/")), saved = useLoad(() => api<any[]>("/me/saved/"));
+  const mistakes = useMine<Card[]>("/me/mistakes/"), saved = useMine<any[]>("/me/saved/");
   const asCards = (rows: any[] | null | undefined): Card[] => (rows || []).map((r, i) => ({ ...r, id: i + 1, saved_id: r.id }));
   const remove = async (c: Card) => { try { await api(`/me/saved/${c.saved_id}/`, { method: "DELETE" }); saved.reload(); } catch { /* try again */ } };
   const cur = tab === "mistakes" ? mistakes : saved;
@@ -55,7 +57,7 @@ export default function SavedPage() {
               <button key={k} role="tab" type="button" className={tab === k ? "on" : ""} aria-selected={tab === k} onClick={() => setTab(k)}>{l}{n ? ` (${n})` : ""}</button>)}
           </div>
           <p className="muted">{tab === "mistakes" ? t("mistakes_intro") : t("saved_intro")}</p>
-          {cur.loading ? <Loading /> : cur.error ? <ErrorNote error={cur.error} retry={cur.reload} /> :
+          {cur.loading ? <PageSkeleton rows={4} /> : cur.error ? <ErrorNote error={cur.error} retry={cur.reload} /> :
             tab === "mistakes" ? <List cards={asCards(mistakes.data)} empty={t("retry_none")} onRetry={setQuiz} />
               : <List cards={asCards(saved.data)} empty={t("saved_none")} onRetry={setQuiz} onRemove={remove} />}
           <p><Link className="btn" href="/results/">← {t("nav_results")}</Link></p>

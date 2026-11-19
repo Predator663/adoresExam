@@ -6,6 +6,7 @@ import OfflineManager from "@/components/OfflineManager";
 import Shell from "@/components/Shell";
 import Icon from "@/components/Icon";
 import PhotoPicker from "@/components/PhotoPicker";
+import { Frame, MyLook } from "@/components/personal";
 import { Row, Section, SaveBar, Seg, Switch } from "@/components/settings-ui";
 import "@/components/student-settings.css";
 import { api } from "@/lib/api";
@@ -126,6 +127,7 @@ export default function Settings() {
 
         <Block id="look" n={1} icon="sun" title={L("Look and language", "Mwonekano na lugha")} hint={L("Saved to your account, on every device.", "Huhifadhiwa kwenye akaunti yako, kila kifaa.")} h={40}>
           <Row title={t("language")}><Seg label={t("language")} value={lang} onChange={(l) => { savePrefs({ language: l }); flash(t("saved")); }} opts={[["en", "English"], ["sw", "Kiswahili"]]} /></Row>
+          {student && prof && <MyLook prof={prof} patch={patch} />}
           <Row title={t("accessibility")} hint={L("Theme, text size, spacing, dyslexia-friendly font, reduced motion, read aloud.", "Mandhari, ukubwa wa maandishi, nafasi, fonti rafiki, mwendo mdogo, kusomewa.")} stack><div className="ss-a11y"><A11yPanel /></div></Row>
         </Block>
 

@@ -24,7 +24,7 @@ from core import reports
 from core.models import SchoolSettings, audit
 from notifications.services import notify_password_changed
 from .hashers import InitialPasswordHasher
-from .models import THEMES, BulkUploadBatch, User
+from .models import ACCENTS, THEMES, BulkUploadBatch, User
 from .permissions import IsAdminRole, IsSuperAdmin
 from .throttles import LoginIPThrottle, LoginUserThrottle
 from . import temp_password
@@ -58,7 +58,7 @@ def user_payload(u):
     return {
         "id": u.pk, "username": u.username, "first_name": u.first_name, "last_name": u.last_name,
         "role": u.role, "class": str(u.school_class) if u.school_class else None,
-        "must_change_password": u.must_change_password, "language": u.language, "theme": u.theme or _school_theme(), "theme_custom": bool(u.theme),
+        "must_change_password": u.must_change_password, "language": u.language, "theme": u.theme or _school_theme(), "theme_custom": bool(u.theme), "accent": u.accent,
         "accessibility": {
             "text_size": u.text_size, "line_spacing": u.line_spacing, "dyslexia_font": u.dyslexia_font,
             "reduce_motion": u.reduce_motion, "read_aloud": u.read_aloud,
@@ -146,6 +146,10 @@ class MeView(APIView):
                 if d[f] not in allowed:  # an unknown choice is refused, not silently ignored
                     raise ValidationError({f: "Choose one of: " + ", ".join(sorted(allowed)) + "."})
                 setattr(u, f, d[f])
+        if "accent" in d:
+            if d["accent"] not in ACCENTS | {""}:
+                raise ValidationError({"accent": "Choose one of: " + ", ".join(sorted(ACCENTS)) + "."})
+            u.accent = "" if d["accent"] == "teal" else d["accent"]
         if "text_size" in d:
             try:
                 u.text_size = max(100, min(200, int(d["text_size"])))
@@ -159,7 +163,7 @@ class MeView(APIView):
         for f in ("dyslexia_font", "reduce_motion", "read_aloud"):
             if f in d:
                 setattr(u, f, d[f] if isinstance(d[f], bool) else str(d[f]).lower() in ("1", "true", "yes", "on"))
-        u.save(update_fields=["language", "theme", "text_size", "line_spacing", "dyslexia_font",
+        u.save(update_fields=["language", "theme", "accent", "text_size", "line_spacing", "dyslexia_font",
                               "reduce_motion", "read_aloud"])
         return Response(user_payload(u))
 

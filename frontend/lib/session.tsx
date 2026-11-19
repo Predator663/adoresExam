@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { api, getToken, setToken } from "./api";
 import { dict } from "./i18n";
+import { clearSwr } from "./swr";
 import { clearOfflineData, setCurrentUser } from "./offlineStore";
 import type { User } from "./types";
 
@@ -23,7 +24,7 @@ const flushers = new Set<() => Promise<unknown>>();
 export function onBeforeLogout(fn: () => Promise<unknown>) { flushers.add(fn); return () => { flushers.delete(fn); }; }
 
 const LOCAL = "amani_prefs";
-type Local = { language?: "en" | "sw"; theme?: string; text_size?: number; line_spacing?: number; dyslexia_font?: boolean; reduce_motion?: boolean; hc?: "dark" | "light" };
+type Local = { language?: "en" | "sw"; theme?: string; accent?: string; text_size?: number; line_spacing?: number; dyslexia_font?: boolean; reduce_motion?: boolean; hc?: "dark" | "light" };
 const readLocal = (): Local => { try { return JSON.parse(localStorage.getItem(LOCAL) || "{}"); } catch { return {}; } };
 
 /** ACC-01/02/06: put the student's choices on the page. Remembered on the phone too, so the login screen looks right. */
@@ -31,6 +32,7 @@ export function applyPrefs(p: Local) {
   const h = document.documentElement;
   h.dataset.theme = p.theme || "light";
   h.dataset.hc = p.hc || "dark";
+  if (p.accent && p.accent !== "teal") h.dataset.accent = p.accent; else delete h.dataset.accent;
   h.style.fontSize = `${p.text_size || 100}%`;
   h.style.setProperty("--ls", String(p.line_spacing || 1.5));
   h.classList.toggle("dyslexia", !!p.dyslexia_font);
@@ -53,7 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const l = readLocal();
     if (u) {
       setCurrentUser(u.id);  // offline downloads belong to one person: another person signing in here removes them
-      const merged: Local = { ...l, language: u.language, theme: u.theme, text_size: u.accessibility.text_size,
+      const merged: Local = { ...l, language: u.language, theme: u.theme, accent: u.accent, text_size: u.accessibility.text_size,
         line_spacing: u.accessibility.line_spacing, dyslexia_font: u.accessibility.dyslexia_font, reduce_motion: u.accessibility.reduce_motion };
       localStorage.setItem(LOCAL, JSON.stringify(merged));
       applyPrefs(merged);
@@ -75,6 +77,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await Promise.race([all, new Promise((r) => setTimeout(r, 4000))]);
     }
     try { if (getToken()) await api("/auth/logout/", { method: "POST", body: {} }); } catch { /* already out */ }
+    clearSwr();
     await clearOfflineData();  // her downloaded results and practice questions leave the phone with her
     setToken(null); setUser(null);
     if (reason) setNotice(reason);
@@ -84,7 +87,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onUnauthorized = () => {
       if (!getToken()) return;
-      setToken(null); setUser(null);
+      setToken(null); setUser(null); clearSwr();
       sessionStorage.setItem("amani_notice", dict[lang].session_ended);  // AUTH-09: logged in on another device
       if (!location.pathname.startsWith("/login")) location.href = "/login/";
     };
@@ -113,7 +116,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const cur = userRef.current || user;
       const ACC = ["text_size", "line_spacing", "dyslexia_font", "reduce_motion", "read_aloud"];
       const acc = Object.fromEntries(Object.entries(patch).filter(([k]) => ACC.includes(k)));
-      push({ ...cur, ..."language" in patch && { language: patch.language }, ..."theme" in patch && { theme: patch.theme }, accessibility: { ...cur.accessibility, ...acc } } as User);
+      push({ ...cur, ..."language" in patch && { language: patch.language }, ..."theme" in patch && { theme: patch.theme }, ..."accent" in patch && { accent: patch.accent === "teal" ? "" : patch.accent }, accessibility: { ...cur.accessibility, ...acc } } as User);
       try {
         const fresh = await api<User>("/me/", { method: "PATCH", body: patch });
         if (mine === saveSeq.current) push(fresh);

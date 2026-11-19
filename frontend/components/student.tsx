@@ -32,6 +32,21 @@ export function Skeleton({ h = 16, w = "100%", r = 10, className = "" }: { h?: n
   return <span className={`sx-skel ${className}`} style={{ height: h, width: w, borderRadius: r }} aria-hidden />;
 }
 
+/** What a screen looks like while its very first load is on the way (no old copy yet): the shape of the page, not a spinner. */
+export function PageSkeleton({ rows = 4, stats = 0 }: { rows?: number; stats?: number }) {
+  return (
+    <div className="sx-skel-page pg-skel" role="status" aria-busy="true" aria-label="Loading">
+      {stats > 0 && <div className="pg-skel-stats">{Array.from({ length: stats }, (_, i) => <Skeleton key={i} h={72} r={16} />)}</div>}
+      {Array.from({ length: rows }, (_, i) => (
+        <div className="pg-skel-row" key={i} style={{ animationDelay: `${i * 60}ms` }}>
+          <Skeleton h={44} w={44} r={12} />
+          <div className="pg-skel-lines"><Skeleton h={14} w={`${70 - (i % 3) * 12}%`} /><Skeleton h={11} w={`${45 + (i % 2) * 18}%`} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** A tiny line chart of recent percentages (oldest to newest). Shows the shape of progress without axes. */
 export function Spark({ values, label, height = 64 }: { values: number[]; label: string; height?: number }) {
   const n = values.length;

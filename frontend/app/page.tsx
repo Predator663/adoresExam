@@ -1,4 +1,6 @@
 "use client";
+import DailyCard from "@/components/daily";
+import { Frame, GoalCard } from "@/components/personal";
 import Link from "next/link";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 import HomeExams, { ExamsSkeleton } from "@/components/HomeExams";
@@ -23,10 +25,10 @@ type Summary = {
   exam_streak: { current: number; best: number };
   recent_badges: { code: string; name: string; tier: string; tier_label: string; subject: string | null; new: boolean }[];
   new_badges: number; next_goals: { code: string; name: string; subject: string | null; progress: number; target: number; unit: string }[];
-  profile?: { avatar?: string; display_name?: string; photo?: string };
+  profile?: { avatar?: string; display_name?: string; photo?: string; frame?: string; title?: string; goal_percent: number | null; goal_subject: string };
 };
 type ResultRow = { attempt_id: number; exam: string; subject: string; percent: number; grade: string; date: string };
-type Analytics = { subjects?: { subject: string; revise?: string[] }[] };
+type Analytics = { subjects?: { subject: string; revise?: string[]; average?: number; exams_taken?: number }[] };
 
 const dayKey = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date(ms));
 
@@ -93,11 +95,12 @@ function StudentHome() {
           <i className="ux-hero-blob b1" aria-hidden /><i className="ux-hero-blob b2" aria-hidden />
           <div className="ux-hero-row">
             <Ring value={s?.level.progress_percent ?? 0} size={92} stroke={5} className="sx-hero-ring ux-hero-ring" label={s ? t("xp_progress") : undefined}>
-              <ProfilePhoto photo={s?.profile?.photo} fallback={avatar} size={78} className="ux-avatar" />
+              <Frame frame={s?.profile?.frame}><ProfilePhoto photo={s?.profile?.photo} fallback={avatar} size={72} className="ux-avatar" /></Frame>
             </Ring>
             <div className="ux-hero-text">
               <p className="ux-greet">{t(greetKey())}</p>
               <h1 className="ux-name">{name} <span className="wave" aria-hidden>👋</span></h1>
+              {s?.profile?.title && <p className="pz-title">{s.profile.title}</p>}
               <p className="ux-focus" key={focus}>{focus}</p>
               {s && !s.profile?.photo && <Link href="/settings/#photo" className="ux-addphoto">📷 {lang === "sw" ? "Weka picha yako" : "Add your photo"}</Link>}
             </div>
@@ -131,6 +134,9 @@ function StudentHome() {
       </div>
 
       <aside className="sx-side ux-side">
+        <DailyCard onStart={() => { window.location.assign("/practice/"); }} />
+        <GoalCard prof={s?.profile} subjects={ana.data?.subjects} />
+
         {fresh.length > 0 && (
           <section>
             <div className="sx-sec"><h2>{t("results_ready")}</h2><Link href="/results/">{t("see_all")}</Link></div>

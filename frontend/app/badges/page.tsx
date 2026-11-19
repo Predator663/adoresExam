@@ -3,7 +3,9 @@ import { useState } from "react";
 import { Pager, useClientPage, usePaged } from "@/components/Pager";
 import Shell from "@/components/Shell";
 import { Ring } from "@/components/student";
-import { Bar, ErrorNote, Loading, Tabs, useLoad } from "@/components/ui";
+import { Bar, ErrorNote, Tabs } from "@/components/ui";
+import { PageSkeleton } from "@/components/student";
+import { useMine } from "@/lib/mine";
 import { api } from "@/lib/api";
 import { ProfilePhoto } from "@/components/PhotoPicker";
 import { AVATAR_EMOJI, BADGE_EMOJI, TIER_MARK } from "@/lib/emoji";
@@ -12,13 +14,13 @@ import { useSession } from "@/lib/session";
 /** SRS 5.4 / 5.6: badge cabinet with what to aim for next, XP history, profile. */
 export default function Badges() {
   const { t } = useSession();
-  const b = useLoad(() => api<any[]>("/gamification/badges/"));
+  const b = useMine<any[]>("/gamification/badges/");
   const xp = usePaged<any>("/gamification/xp/", {}, { size: 10 });
   const [filter, setFilter] = useState("all");
   const all = b.data || [];
   const shown = all.filter((x) => filter === "all" || (filter === "earned" ? x.earned : !x.earned));
   const bp = useClientPage(shown, 12, filter);
-  const me = useLoad(() => api<any>("/gamification/me/"));
+  const me = useMine<any>("/gamification/me/");
   const earned = all.filter((x) => x.earned).length;
   return (
     <Shell title={t("nav_badges")}>
@@ -29,7 +31,7 @@ export default function Badges() {
             {b.data && <p className="small sx-earned-line">{t("badges_earned_of", { a: earned, b: all.length })}</p>}</div>
         </div>
       )}
-      {b.loading ? <Loading /> : b.error ? <ErrorNote error={b.error} retry={b.reload} /> : (
+      {b.loading ? <PageSkeleton rows={5} /> : b.error ? <ErrorNote error={b.error} retry={b.reload} /> : (
         <>
           <Tabs tabs={[["all", t("filter_all")], ["earned", t("filter_earned")], ["progress", t("filter_progress")]]} value={filter} onChange={setFilter} />
           {!bp.rows.length ? <div className="card"><p className="muted">{t("no_badges_here")}</p></div> : (

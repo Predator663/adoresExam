@@ -14,12 +14,12 @@ const TXT = {
     level: "Level", toGo: "{n} XP to {name}", maxLevel: "Top level!", nextBadge: "Next badge", len: "How long?", lenQ: "questions", lenMin: "about {n} min", pick: "Choose a subject",
     newS: "New", mastered: "Mastered", getting: "Getting there", keepOn: "Keep going", quizzes: "quizzes", best: "best", cont: "Continue", start: "Start", starting: "Starting…", leave: "Leave quiz", saved: "Your progress is saved.",
     inRow: "{n} in a row!", check: "Check answer", next: "Next question", see: "See my results", again: "Practise again", back: "Back to subjects", levelUp: "Level up!", newBadges: "New badges!", seeBadges: "See all my badges",
-    big: ["Outstanding!", "Well done!", "Good effort!", "Keep going, you are learning!"], right: "{a} of {b} right", bestRun: "Best run", xp: "XP", noXp: "No XP now (daily limit)", streakNow: "Streak" },
+    big: ["Outstanding!", "Well done!", "Good effort!", "Keep going, you are learning!"], right: "{a} of {b} right", bestRun: "Best run", xp: "XP", noXp: "No XP now (daily limit)", streakNow: "Streak", dailyBonus: "Daily Challenge bonus" },
   sw: { today: "Leo", xpEach: "+{xp} XP kila moja", goalOf: "Mazoezi {a} kati ya {b} ya XP leo", goalDone: "Lengo la XP la leo limefikiwa. Mazoezi zaidi bado yanakusaidia kujifunza!", streak: "siku mfululizo", keep: "Fanya mazoezi leo ili usipoteze mfululizo wako!",
     level: "Kiwango", toGo: "XP {n} hadi {name}", maxLevel: "Kiwango cha juu!", nextBadge: "Beji inayofuata", len: "Muda gani?", lenQ: "maswali", lenMin: "kama dakika {n}", pick: "Chagua somo",
     newS: "Jipya", mastered: "Umelimudu", getting: "Unaelekea", keepOn: "Endelea", quizzes: "mazoezi", best: "bora", cont: "Endelea", start: "Anza", starting: "Inaanza…", leave: "Ondoka", saved: "Maendeleo yako yamehifadhiwa.",
     inRow: "{n} mfululizo!", check: "Hakiki jibu", next: "Swali linalofuata", see: "Ona matokeo yangu", again: "Fanya tena", back: "Rudi kwenye masomo", levelUp: "Umepanda kiwango!", newBadges: "Beji mpya!", seeBadges: "Ona beji zangu zote",
-    big: ["Hongera sana!", "Umefanya vizuri!", "Juhudi nzuri!", "Endelea, unajifunza!"], right: "Sahihi {a} kati ya {b}", bestRun: "Mfululizo bora", xp: "XP", noXp: "Hakuna XP sasa (kikomo cha siku)", streakNow: "Mfululizo" },
+    big: ["Hongera sana!", "Umefanya vizuri!", "Juhudi nzuri!", "Endelea, unajifunza!"], right: "Sahihi {a} kati ya {b}", bestRun: "Mfululizo bora", xp: "XP", noXp: "Hakuna XP sasa (kikomo cha siku)", streakNow: "Mfululizo", dailyBonus: "Bonasi ya Changamoto ya Leo" },
 } as const;
 export function usePT() {
   const { lang } = useSession();
@@ -126,6 +126,7 @@ export function Summary({ m, rewards, combo, sessionId, onAgain, onExit }: { m: 
         <p>{f(d.right, { a: m.fully_correct, b: m.questions })}</p>
         <div className="pr-sum-chips">
           <span className="pr-sum-chip xp">⚡ {m.xp_earned > 0 ? <b>+<CountUp to={m.xp_earned} /> {d.xp}</b> : <small>{d.noXp}</small>}</span>
+          {rewards?.daily_bonus > 0 && <span className="pr-sum-chip pr-bonus">🎯 <b>+{rewards.daily_bonus}</b> <small>{d.dailyBonus}</small></span>}
           {rewards?.streak?.current > 0 && <span className="pr-sum-chip">🔥 <b>{rewards.streak.current}</b> <small>{d.streak}</small></span>}
           {combo >= 3 && <span className="pr-sum-chip">🎯 <b>{combo}</b> <small>{d.bestRun}</small></span>}
         </div>

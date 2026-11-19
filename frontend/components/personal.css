@@ -1,0 +1,42 @@
+/* Frames around the profile picture */
+.fr{position:relative;display:inline-grid;place-items:center;border-radius:50%;isolation:isolate}
+.fr::before{content:"";position:absolute;inset:-4px;border-radius:50%;z-index:-1;pointer-events:none;
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))}
+.fr::after{content:attr(data-g);position:absolute;right:-6px;bottom:-5px;font-size:.95rem;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+.fr-none::before{display:none}
+.fr-ring::before{background:var(--primary)}
+.fr-sun::before{background:linear-gradient(135deg,#ffd44d,#f5a300)}
+.fr-leaf::before{background:linear-gradient(135deg,#7bd88f,#1f9d55)}
+.fr-flame::before{background:linear-gradient(160deg,#ffb347,#ff5a36 60%,#d62839)}
+.fr-aurora::before{background:conic-gradient(from 0deg,#6ee7f9,#a78bfa,#f472b6,#fbbf24,#6ee7f9);animation:fr-spin 6s linear infinite}
+.fr-crown::before{background:linear-gradient(135deg,#ffe27a,#d99a00);inset:-5px}
+.fr-crown::after{right:auto;left:50%;top:-14px;bottom:auto;transform:translateX(-50%) rotate(-8deg);font-size:1.05rem}
+@keyframes fr-spin{to{transform:rotate(360deg)}}
+.fr-flame::before{animation:fr-glow 2.4s ease-in-out infinite}
+@keyframes fr-glow{50%{filter:brightness(1.18)}}
+.reduce-motion .fr::before{animation:none}
+@media(prefers-reduced-motion:reduce){.fr::before{animation:none}}
+:root[data-theme=high_contrast] .fr::before{background:var(--primary)}
+
+/* settings pickers */
+.pz-swatches,.pz-frames{display:flex;flex-wrap:wrap;gap:.6rem}
+.pz-sw{display:grid;justify-items:center;gap:.3rem;border:2px solid transparent;border-radius:14px;padding:.4rem .5rem;background:transparent;color:inherit;font:inherit;font-size:.8rem;cursor:pointer;transition:transform .12s,border-color .15s}
+.pz-sw i{width:2.2rem;height:2.2rem;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+.pz-sw.on{border-color:var(--c);font-weight:700}
+.pz-sw.on i{animation:pz-pop .3s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pz-pop{from{transform:scale(.7)}to{transform:scale(1)}}
+.pz-fr{display:grid;justify-items:center;gap:.45rem;border:2px solid transparent;border-radius:14px;padding:.6rem .6rem .4rem;background:transparent;color:inherit;font:inherit;cursor:pointer;min-width:4.4rem}
+.pz-fr small{font-size:.75rem}
+.pz-fr.on{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,transparent)}
+.pz-fr:disabled{opacity:.55;cursor:not-allowed}
+.pz-fr-av{display:grid;place-items:center;width:2.8rem;height:2.8rem;border-radius:50%;background:var(--soft);font-size:1.4rem}
+.pz-goal{display:grid;gap:.6rem;justify-items:start;max-width:22rem}
+.pz-goal .input{width:100%}
+
+/* goal card on the home screen */
+.pz-goalcard{display:flex;align-items:center;gap:.9rem}
+.pz-goalcard h2{margin:0;font-size:1rem}
+.pz-goalcard p{margin:.15rem 0}
+.pz-goal-n{font-size:1.05rem}
+.pz-goal-msg{font-weight:600}
+.pz-goalcard.done{border-color:var(--primary)}

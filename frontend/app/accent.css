@@ -1,0 +1,12 @@
+/* A student's own colour on top of the light and dark themes (not the high-contrast, colour-blind, soft or other special themes). */
+:root[data-accent=ocean]:is([data-theme=light],:not([data-theme])){--primary:#1b5fa6;--on-primary:#fff;--soft:#dbe7f3;--side-bg:#0e2f55}
+:root[data-accent=plum]:is([data-theme=light],:not([data-theme])){--primary:#7b3d9c;--on-primary:#fff;--soft:#eadff2;--side-bg:#3a1650}
+:root[data-accent=rose]:is([data-theme=light],:not([data-theme])){--primary:#b3315f;--on-primary:#fff;--soft:#f4dde5;--side-bg:#521127}
+:root[data-accent=amber]:is([data-theme=light],:not([data-theme])){--primary:#9a5200;--on-primary:#fff;--soft:#f3e6d2;--side-bg:#4a2a05}
+:root[data-accent=slate]:is([data-theme=light],:not([data-theme])){--primary:#3b5772;--on-primary:#fff;--soft:#dde6ee;--side-bg:#1b2d3d}
+:root[data-accent=ocean][data-theme=dark]{--primary:#7db9f5;--on-primary:#06182b;--soft:#1b2a3a;--side-bg:#0a1119}
+:root[data-accent=plum][data-theme=dark]{--primary:#d3a2f2;--on-primary:#25093a;--soft:#2a1d33;--side-bg:#120a18}
+:root[data-accent=rose][data-theme=dark]{--primary:#f5a0bd;--on-primary:#3a0c1d;--soft:#33202a;--side-bg:#180b10}
+:root[data-accent=amber][data-theme=dark]{--primary:#f3b862;--on-primary:#2d1a00;--soft:#33291a;--side-bg:#17110a}
+:root[data-accent=slate][data-theme=dark]{--primary:#a9c4dc;--on-primary:#0d1a26;--soft:#202b35;--side-bg:#0c1116}
+body{transition:background-color .25s}

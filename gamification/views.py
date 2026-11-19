@@ -16,7 +16,7 @@ from core.pagination import envelope, page_params, paginate, wants_page
 from exams.views import _visible_result_or_404
 from questions.models import Question
 from . import adminstats, catalog, rules, services
-from .models import AVATARS, GamificationSettings
+from .models import AVATARS, FRAMES, GamificationSettings
 
 log = logging.getLogger(__name__)
 
@@ -98,8 +98,33 @@ def my_profile(request):
             if not isinstance(d["hide_from_leaderboard"], bool):
                 raise ValidationError({"hide_from_leaderboard": "Must be true or false."})
             profile.hide_from_leaderboard = d["hide_from_leaderboard"]
+        reached = services.level_payload(services.total_xp(request.user), services.config())["level"]
+        if "frame" in d:
+            if FRAMES.get(d["frame"]) is None:
+                raise ValidationError({"frame": "Choose one of the frames in the list."})
+            if FRAMES[d["frame"]] > reached:
+                raise ValidationError({"frame": f"This frame unlocks at level {FRAMES[d['frame']]}."})
+            profile.frame = d["frame"]
+        if "title_level" in d:
+            v = d["title_level"]
+            if v in (None, ""):
+                profile.title_level = None
+            else:
+                if not isinstance(v, int) or isinstance(v, bool) or not 1 <= v <= reached:
+                    raise ValidationError({"title_level": "You can only show the name of a level you have reached."})
+                profile.title_level = v
+        if "goal_percent" in d:
+            v = d["goal_percent"]
+            if v in (None, "", 0):
+                profile.goal_percent = None
+            else:
+                if not isinstance(v, int) or isinstance(v, bool) or not 40 <= v <= 100:
+                    raise ValidationError({"goal_percent": "Choose a goal between 40 and 100 percent."})
+                profile.goal_percent = v
+        if "goal_subject" in d:
+            profile.goal_subject = " ".join(str(d["goal_subject"] or "").split())[:60]
         profile.save()
-    return Response(services.profile_payload(profile))
+    return Response(services.profile_payload(profile, lang=services.lang_of(request.user)))
 
 
 @api_view(["POST", "DELETE"])
@@ -120,7 +145,7 @@ def my_photo(request):
             services.set_photo(profile, f)
         except services.GamificationError as e:
             return _err(e)
-    return Response(services.profile_payload(profile))
+    return Response(services.profile_payload(profile, lang=services.lang_of(request.user)))
 
 
 @api_view(["GET"])
@@ -195,6 +220,19 @@ def practice_start(request):
         session = services.start_practice(
             request.user, d.get("subject_id"), d.get("count", services.PRACTICE_DEFAULT), d.get("topic") or None,
             d.get("difficulty") or None, restart=d.get("restart") is True)
+    except services.GamificationError as e:
+        return _err(e)
+    return Response(services.practice_state(session), status=201)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsStudent])
+def practice_daily(request):
+    """The day's challenge. GET = the card (done today? in progress? streak at risk?); POST = start or resume it."""
+    if request.method == "GET":
+        return Response(services.daily_status(request.user))
+    try:
+        session = services.start_daily(request.user)
     except services.GamificationError as e:
         return _err(e)
     return Response(services.practice_state(session), status=201)

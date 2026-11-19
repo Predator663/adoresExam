@@ -5,6 +5,8 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useMessages } from "@/lib/messages";
 import { useSession } from "@/lib/session";
+import { prefetch, WARM } from "@/lib/swr";
+import { sfx } from "@/lib/sfx";
 import { useAppName } from "@/lib/brand";
 import type { ExamCard } from "@/lib/types";
 import A11yPanel from "./A11yPanel";
@@ -95,6 +97,31 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
   const msgs = useMessages(!!user);
   const focus = !!bare && !path.startsWith("/staff");  // exam, first password, demo: no menus, nothing to distract
   const side = !!user && !focus;
+
+  // Student screens feel instant: touching or hovering a menu item starts loading its data before the tap lands, and every tap on a
+  // button, tab or menu item gives a tiny haptic tick (the Haptics switch in Settings turns it off). Not during an exam.
+  useEffect(() => {
+    if (!isStudent || focus || !user) return;
+    const uid = user.id;
+    const warm = (e: Event) => {
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      const href = new URL(a.href, location.href).pathname.replace(/\/?$/, "/");
+      WARM[href]?.forEach((p) => prefetch(uid, p));
+    };
+    const tick = (e: Event) => {
+      const el = (e.target as HTMLElement | null)?.closest?.(".btn, .tab, .chip, .side-link, .bottom a, .ux-card, .dd-item, button");
+      if (el && !(el as HTMLButtonElement).disabled) sfx.tap();
+    };
+    document.addEventListener("pointerover", warm, { passive: true });
+    document.addEventListener("touchstart", warm, { passive: true });
+    document.addEventListener("focusin", warm);
+    document.addEventListener("pointerdown", tick, { passive: true });
+    return () => {
+      document.removeEventListener("pointerover", warm); document.removeEventListener("touchstart", warm);
+      document.removeEventListener("focusin", warm); document.removeEventListener("pointerdown", tick);
+    };
+  }, [isStudent, focus, user]);
 
   useEffect(() => {
     if (!ready) return;
@@ -217,8 +244,10 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
           </div>
         </header>
         <main id="main" className="page" tabIndex={-1}>
-          {title && <h1 className="page-title">{title}</h1>}
-          {children}
+          <div key={path} className="pg-in">
+            {title && <h1 className="page-title">{title}</h1>}
+            {children}
+          </div>
         </main>
         {!focus && <Footer />}
       </div>
