@@ -17,16 +17,20 @@
 .pp-cam{position:absolute;right:-2px;bottom:-2px;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--primary);color:var(--on-primary);font-size:1rem;border:3px solid var(--surface);box-shadow:0 2px 8px rgba(0,0,0,.10);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
 .pp-btn:hover .pp-cam{transform:scale(1.18) rotate(-8deg)}
 .pp-drop{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:.5rem;border-radius:50%;background:color-mix(in srgb,var(--primary) 88%,transparent);color:var(--on-primary);font-weight:800;font-size:.8rem;animation:pp-fade .2s both}
-.pp-side{display:grid;gap:.25rem;justify-items:start;min-width:0;flex:1 1 180px}
-.pp-link{min-height:42px}
-.pp-priv{margin:.2rem 0 0}
+.pp-side{display:grid;gap:.4rem;justify-items:start;min-width:0;flex:1 1 180px}
+.pp-acts{display:flex;flex-wrap:wrap;gap:.45rem;min-width:0;max-width:100%}
+.pp-link{min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.2}
+.pp-camera{display:none}
+@media(pointer:coarse){.pp-camera{display:inline-flex;align-items:center;justify-content:center}}
+.pp-priv{margin:.2rem 0 0;overflow-wrap:anywhere}
 .pp-msg{margin:0;font-weight:800;animation:pp-rise .35s cubic-bezier(.2,.8,.2,1) both}
 
 .pp-crop{display:grid;gap:clamp(.4rem,1.6dvh,.7rem);justify-items:center;width:100%;max-width:420px;margin:0 auto;animation:pp-fade .25s both}
 .pp-crop h2{margin:0;font-size:clamp(1.05rem,2.6dvh,1.3rem)}
 @media(max-height:560px){.pp-tip{display:none}.pp-load{padding:1.5rem 0}}
 .pp-crop .row{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--surface) 30%);padding-top:.4rem}
-.pp-crop .row{width:100%}
+.pp-crop .row{width:100%;display:flex;gap:.5rem;flex-wrap:wrap}.pp-crop .row .btn{flex:1 1 120px;min-width:0}.pp-crop .row .grow{flex:2 1 160px}
+.pp-crop .no,.pp-crop .muted{max-width:100%;overflow-wrap:anywhere;text-align:center}
 .pp-load{display:flex;gap:.6rem;align-items:center;padding:3rem 0}
 .pp-stage{position:relative;width:min(320px,100%,calc(100dvh - 350px));min-width:150px;aspect-ratio:1;flex:none;border-radius:50%;overflow:hidden;touch-action:none;cursor:grab;outline-offset:4px;box-shadow:0 4px 14px rgba(0,0,0,.14);animation:pp-pop .45s cubic-bezier(.3,1.4,.5,1) both}
 .pp-stage:active{cursor:grabbing}

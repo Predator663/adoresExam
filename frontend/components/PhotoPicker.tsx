@@ -9,10 +9,10 @@ import { useSession } from "@/lib/session";
 import "./photo.css";
 
 const TXT = {
-  en: { add: "Add your photo", change: "Change photo", remove: "Remove photo", title: "Your photo", drag: "Drag to move. Pinch or use the slider to zoom.", zoom: "Zoom", rotate: "Rotate",
+  en: { add: "Add your photo", camera: "Take a photo", change: "Change photo", remove: "Remove photo", title: "Your photo", drag: "Drag to move. Pinch or use the slider to zoom.", zoom: "Zoom", rotate: "Rotate",
     save: "Save photo", saving: "Saving…", cancel: "Cancel", saved: "Photo saved!", removed: "Photo removed.", drop: "Drop your photo here", reading: "Opening your photo…",
-    bad: "We could not open that picture. Please use a JPG or PNG photo.", privacy: "Only you and your teachers can see this photo. Classmates see your avatar.", label: "Profile photo" },
-  sw: { add: "Weka picha yako", change: "Badilisha picha", remove: "Ondoa picha", title: "Picha yako", drag: "Buruta kuisogeza. Tumia vidole viwili au kitelezi kukuza.", zoom: "Kuza", rotate: "Zungusha",
+    bad: "We could not open that picture. Please use a JPG or PNG photo (iPhone HEIC photos: choose \"Most Compatible\" or take a new one).", privacy: "Only you and your teachers can see this photo. Classmates see your avatar.", label: "Profile photo" },
+  sw: { add: "Weka picha yako", camera: "Piga picha", change: "Badilisha picha", remove: "Ondoa picha", title: "Picha yako", drag: "Buruta kuisogeza. Tumia vidole viwili au kitelezi kukuza.", zoom: "Kuza", rotate: "Zungusha",
     save: "Hifadhi picha", saving: "Inahifadhi…", cancel: "Ghairi", saved: "Picha imehifadhiwa!", removed: "Picha imeondolewa.", drop: "Dondosha picha yako hapa", reading: "Inafungua picha…",
     bad: "Picha hiyo haikufunguka. Tafadhali tumia picha ya JPG au PNG.", privacy: "Wewe na walimu wako tu mnaweza kuiona picha hii. Wanafunzi wenzako wanaona alama yako.", label: "Picha ya wasifu" },
 } as const;
@@ -137,15 +137,17 @@ function Cropper({ file, tx, onCancel, onSaved }: { file: File; tx: (typeof TXT)
 export default function PhotoPicker({ photo, fallback, onChange }: { photo?: string; fallback: ReactNode; onChange: (profile: any) => void }) {
   const { lang } = useSession();
   const tx = TXT[lang === "sw" ? "sw" : "en"];
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLInputElement>(null), cam = useRef<HTMLInputElement>(null), tm = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(tm.current), []);
   const [file, setFile] = useState<File | null>(null), [drag, setDrag] = useState(false), [msg, setMsg] = useState(""), [err, setErr] = useState(""), [spin, setSpin] = useState(false);
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 3000); };
+  const flash = (m: string) => { setMsg(m); clearTimeout(tm.current); tm.current = setTimeout(() => setMsg(""), 3000); };
   const pick = (f?: File | null) => { setErr(""); if (!f) return; if (!f.type.startsWith("image/") && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) { setErr(tx.bad); return; } setFile(f); };
   const saved = (p: any) => { setFile(null); onChange(p); flash(tx.saved); };
   async function remove() { setSpin(true); try { onChange(await api("/gamification/profile/photo/", { method: "DELETE" })); flash(tx.removed); } catch (e: any) { setErr(e.message); } setSpin(false); }
   return (
     <div className={`pp-pick ${drag ? "over" : ""}`} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files?.[0]); }}>
       <input ref={input} className="sr-only" type="file" accept="image/*" aria-label={tx.label} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={cam} className="sr-only" type="file" accept="image/*" capture="user" tabIndex={-1} aria-hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
       <button type="button" className={`pp-btn ${photo ? "has" : ""} ${spin ? "busy" : ""}`} onClick={() => input.current?.click()} aria-label={photo ? tx.change : tx.add}>
         <span className="pp-ring" aria-hidden />
         <span key={photo || "none"} className="pp-face"><ProfilePhoto photo={photo} fallback={<span className="pp-emoji">{fallback}</span>} size={96} className="pp-emoji-wrap" /></span>
@@ -153,8 +155,11 @@ export default function PhotoPicker({ photo, fallback, onChange }: { photo?: str
         {drag && <span className="pp-drop">{tx.drop}</span>}
       </button>
       <div className="pp-side">
-        <button type="button" className="btn pp-link" onClick={() => input.current?.click()}>{photo ? tx.change : tx.add}</button>
-        {photo && <button type="button" className="btn ghost pp-link" disabled={spin} onClick={remove}>{tx.remove}</button>}
+        <div className="pp-acts">
+          <button type="button" className="btn pp-link" onClick={() => input.current?.click()}>{photo ? tx.change : tx.add}</button>
+          <button type="button" className="btn pp-link pp-camera" onClick={() => cam.current?.click()}>📷 {tx.camera}</button>
+          {photo && <button type="button" className="btn ghost pp-link" disabled={spin} onClick={remove}>{tx.remove}</button>}
+        </div>
         <p className="muted small pp-priv">🔒 {tx.privacy}</p>
         {msg && <p className="ok pp-msg" role="status">✓ {msg}</p>}
         {err && <p className="no" role="alert">⚠ {err}</p>}

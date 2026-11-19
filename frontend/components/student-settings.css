@@ -1,7 +1,7 @@
 /* Student/staff "More" page. Reuses the Settings cards (settings.css). */
 .ss{display:grid;gap:1rem;max-width:760px;margin:0 auto;padding-bottom:.5rem;--e:cubic-bezier(.2,.8,.2,1)}
 .ss-anchor{scroll-margin-top:72px;min-width:0}
-.ss-hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:1rem;padding:1.2rem;border-radius:26px;color:var(--on-primary);background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 55%,#000));box-shadow:var(--shadow);animation:st-rise .5s var(--e) both}
+.ss-hero{position:relative;overflow:hidden;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ring text" "side side";align-items:center;column-gap:1rem;row-gap:.8rem;padding:1.2rem;border-radius:26px;color:var(--on-primary);background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 55%,#000));box-shadow:var(--shadow);animation:st-rise .5s var(--e) both}
 .ss-hero-av{position:relative;z-index:1;flex:none}
 .ss-hero .sx-bigavatar{width:80px;height:80px;font-size:2.6rem;background:rgba(255,255,255,.92);color:#0a3b2c;border-color:rgba(255,255,255,.7)}
 .ss-hero-t{position:relative;z-index:1;display:grid;gap:.1rem;min-width:0}
@@ -47,4 +47,21 @@
 :root[data-theme=high_contrast] .ss-hero .ss-orb{display:none}
 .ss-hero-t small,.ss-hero-t span{opacity:1}
 /* narrow phones: stack photo above the text so nothing is squeezed */
-@media(max-width:420px){.ss-hero{flex-wrap:wrap}.ss-hero .pp-pick{gap:.7rem}}
+
+/* ---- hero layout (all screens): the picker's pieces become grid items of the hero ---- */
+.ss-hero-av,.ss-hero .pp-pick{display:contents}
+.ss-hero-av>.sx-bigavatar,.ss-hero .pp-btn{grid-area:ring;z-index:1}
+.ss-hero-t{grid-area:text}
+.ss-hero .pp-side{grid-area:side;position:relative;z-index:1;width:100%;flex:none}
+.ss-hero:has(.pp-pick.over){box-shadow:0 0 0 3px var(--on-primary)}
+@media(min-width:560px){
+  .ss-hero{grid-template-areas:"ring text" "ring side";row-gap:.5rem;column-gap:1.3rem}
+}
+
+/* ---- text inside cards never runs past the card ---- */
+.ss .st-card,.ss .st-row,.ss .st-row-t,.ss .st-row-c{min-width:0;max-width:100%}
+.ss .st-card>header>div{min-width:0}
+.ss .st-card h2,.ss .st-card p,.ss .st-row-t b,.ss .st-row-t small,.ss-tiles a span,.ss-hero-t *{overflow-wrap:anywhere;word-break:normal;hyphens:auto}
+.ss-tiles a{min-width:0}
+.ss .st-row-t b{line-height:1.3}
+.ss .input{max-width:100%;min-width:0}
