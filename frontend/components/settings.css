@@ -1,5 +1,5 @@
 /* Settings page. Colours come from the theme variables; motion stops under "reduce motion". */
-.st{--e:cubic-bezier(.2,.8,.2,1);display:grid;gap:1rem;grid-template-columns:minmax(0,1fr);padding-bottom:6rem}
+.st{--e:cubic-bezier(.2,.8,.2,1);display:grid;gap:1rem;grid-template-columns:minmax(0,1fr);padding-bottom:.5rem}
 @media(min-width:960px){.st{grid-template-columns:260px minmax(0,1fr);gap:1.4rem;align-items:start}}
 
 /* navigation: a pill bar on a phone, a sticky side list on a computer */
@@ -132,4 +132,4 @@
 .reduce-motion .st *,.reduce-motion .st-savebar,.reduce-motion .st-savebar *{animation:none!important;transition:none!important}
 
 /* phones: float the save bar above the fixed bottom menu instead of covering it */
-@media(max-width:699.98px){.st-savebar{bottom:calc(58px + env(safe-area-inset-bottom));padding-bottom:.5rem}}
+@media(max-width:699.98px){.is-student .st-savebar{bottom:calc(64px + env(safe-area-inset-bottom));padding-bottom:.5rem}}

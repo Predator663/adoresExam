@@ -231,7 +231,8 @@ tbody tr:last-child td{border-bottom:0}
 }
 @media(min-width:700px){.bottom{display:none}}
 @media(max-width:699.98px){
-  .page{padding:1rem .85rem 6rem}
+  .page{padding:1rem .85rem 1.2rem}
+  .app.focus .page{padding-bottom:6rem}
   .page-title{font-size:1.4rem}
   .row2{grid-template-columns:1fr}
   .modal-back{align-items:end;padding:0}
@@ -304,7 +305,9 @@ input[type=file].input{padding:.45rem .6rem;min-height:52px}
 }
 @media(min-width:640px){.foot.compact .foot-bar{flex-direction:column}}
 .login-stack{width:100%;max-width:420px}
-@media(max-width:699.98px){.app.with-side .foot{padding-bottom:calc(5.2rem + env(safe-area-inset-bottom))}}
+@media(max-width:699.98px){.app.is-student.with-side .foot{padding-bottom:calc(5.2rem + env(safe-area-inset-bottom))}}
+/* staff: while the save bar is up (unsaved changes / error) keep the footer reachable above it */
+.app:not(.is-student):has(.st-savebar.show) .foot{padding-bottom:calc(6rem + env(safe-area-inset-bottom))}
 .doc{max-width:760px}
 .doc .lead{font-size:1.15rem;line-height:1.6}
 .doc h2{margin:1.8rem 0 .5rem;padding-top:.2rem}
