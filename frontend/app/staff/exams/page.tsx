@@ -1,5 +1,6 @@
 "use client";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
+import CalendarDownload from "@/components/CalendarDownload";
 import ExamForm from "@/components/ExamForm";
 import { Pager, useClientPage } from "@/components/Pager";
 import Shell from "@/components/Shell";
@@ -66,6 +67,19 @@ export default function Exams() {
   const staffList = useLoad(() => (admin ? api<any[]>("/teachers/") : Promise.resolve([])), [admin]);  // the Teacher filter lists every teacher account, not only those who already wrote an exam
   const [q, setQ] = useState(""), [status, setStatus] = useState("all"), [cls, setCls] = useState(""), [subject, setSubject] = useState(""), [teacher, setTeacher] = useState("");
   const [sort, setSort] = useState("smart");
+  const [dup, setDup] = useState<number | null>(null), [dupErr, setDupErr] = useState(""), [note, setNote] = useState("");
+
+  /** A fresh draft copy (same subject, settings and questions; no dates, no results). It opens straight away so it can be renamed and scheduled. */
+  async function duplicate(e: Exam) {
+    if (dup !== null) return;
+    setDup(e.id); setDupErr(""); setNote("");
+    try {
+      const copy = await api<Exam>(`/exams/${e.id}/duplicate/`, { method: "POST", body: {} });
+      setNote(`Copy created: “${copy.title}”. Rename it and set its date when you are ready.`);
+      setEdit(copy.id);
+    } catch (err: any) { setDupErr(err?.message || "We could not duplicate this exam. Please try again."); }
+    setDup(null);
+  }
 
   useEffect(() => {
     const p = new URLSearchParams(location.search);
@@ -116,10 +130,13 @@ export default function Exams() {
         <div className="ex2">
           <div className="ex2-head">
             <div className="ex2-hint"><h2>Exams</h2><p className="muted small">{list.loading ? "Loading…" : `${all.length} exam${all.length === 1 ? "" : "s"} in total`}</p></div>
+            <CalendarDownload path="/exams/calendar/" query={filtered && rows.length && rows.length <= 400 ? `ids=${rows.map((r) => r.id).join(",")}` : ""} />
             <button className="btn" onClick={list.reload} aria-label="Refresh">↻<span className="ex2-hide-s"> Refresh</span></button>
             <button className="btn primary" onClick={() => setEdit("new")}>+ New exam</button>
           </div>
 
+          {note && <p className="ex2-note" role="status">✓ {note}</p>}
+          {dupErr && <p className="no" role="alert">⚠ {dupErr}</p>}
           {list.error ? <ErrorNote error={list.error} retry={list.reload} /> : (
             <>
               <div className="ex2-kpis" role="group" aria-label="Quick filters">
@@ -192,7 +209,10 @@ export default function Exams() {
                         ) : e.created_by_name && e.status === "draft" ? (
                           <p className="ex2-by muted">✏️ Draft by {e.created_by_name} · not submitted yet</p>
                         ) : null}
-                        <button className={`btn ex2-open ${e.awaiting_scheduling && admin ? "primary" : ""}`} onClick={() => setEdit(e.id)}>{e.awaiting_scheduling && admin ? "Review" : "Open"} →</button>
+                        <div className="ex2-actions">
+                          <button className={`btn ex2-open ${e.awaiting_scheduling && admin ? "primary" : ""}`} onClick={() => { setNote(""); setEdit(e.id); }}>{e.awaiting_scheduling && admin ? "Review" : "Open"} →</button>
+                          <button type="button" className="btn ex2-dup" disabled={dup !== null} onClick={() => duplicate(e)} title="Make a draft copy of this exam" aria-label={`Duplicate ${e.title}`}>{dup === e.id ? <i className="spinner" aria-hidden /> : <span aria-hidden>⧉</span>}<span className="ex2-hide-s"> Duplicate</span></button>
+                        </div>
                       </article>))}
                   </div>)}
               <Pager {...pg.pager} />

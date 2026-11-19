@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CalendarDownload from "@/components/CalendarDownload";
 import { examStatus } from "@/components/ExamBanner";
 import Icon from "@/components/Icon";
 import { Monogram } from "@/components/student";
@@ -190,6 +191,7 @@ export default function HomeExams({ cards }: { cards: ExamCard[] }) {
 
   return (
     <div className="ux-exams">
+      {(live.length > 0 || upcoming.length > 0) && <div className="ux-cal-row"><CalendarDownload path="/student/exams/calendar/" /></div>}
       {featured ? <NextUpCard card={featured} /> : (
         <div className="ux-empty"><span className="ux-empty-ico" aria-hidden><Icon n="calendar" size={28} /></span><div><b>{t("no_exams_title")}</b><p className="muted small">{t("no_upcoming")}</p></div></div>
       )}

@@ -12,6 +12,7 @@ urlpatterns = [
     path("exams/not-submitted/export/", notsubmitted.not_submitted_export),
     path("exams/not-submitted/", notsubmitted.not_submitted),
     path("student/exams/", views.student_exams),
+    path("student/exams/calendar/", views.student_calendar),
     path("student/exams/<int:exam_id>/start/", views.student_start),
     path("student/exams/<int:exam_id>/device-check/", views.student_device_check),
     path("attempts/<int:attempt_id>/", views.attempt_current),

@@ -82,6 +82,15 @@ def student_exams(request):
     return Response([_exam_card(e, request.user, now, retake=e.pk in allowed) for e in exams])
 
 
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def student_calendar(request):
+    """The student's own exams (her class, or given to her by name) as a PDF timetable or an .ics file for her phone."""
+    u = request.user
+    who = _person(u) + (f" · {u.school_class}" if getattr(u, "school_class_id", None) else "")
+    return _calendar_download(request, services.exams_for_student(u), who, with_classes=False)
+
+
 # What the phone check on the pre-exam screen may report (anything else is stored as "other"/"unknown": it is only a hint for a teacher).
 _GPS_WORDS = {"ok", "weak", "insecure", "unsupported", "in_app", "policy", "site_denied", "services_off", "no_signal", "unknown"}
 _OS_WORDS = {"android", "ios", "other"}
@@ -432,6 +441,37 @@ def _teaches(user, subject_id):
     return user.is_admin_role or TeacherAssignment.objects.filter(teacher=user, subject_id=subject_id).exists()
 
 
+# ---------------------------------------------------------------- exam calendar (PDF timetable / .ics)
+def _calendar_download(request, exams, audience, with_classes):
+    """The exams as a designed PDF calendar (?file=pdf, default) or an .ics file for the phone's calendar app (?file=ics).
+    Drafts and exams without a date are never listed. Past exams are left out unless ?all=1."""
+    from django.utils.text import slugify
+    from analytics.views import _download, _logo_bytes
+    from . import calendar_export as cx
+    kind = request.query_params.get("file", "pdf")
+    if kind not in ("pdf", "ics"):
+        raise ValidationError({"detail": "Choose PDF or calendar file (.ics)."})
+    now = timezone.localtime()
+    exams = exams.exclude(status=Exam.DRAFT).filter(start_at__isnull=False).select_related("subject").prefetch_related("classes")
+    if request.query_params.get("all") != "1":
+        exams = exams.filter(Q(end_at__gte=now.replace(hour=0, minute=0, second=0, microsecond=0)) | Q(end_at__isnull=True, start_at__gte=now))
+    events = []
+    for e in exams.order_by("start_at")[:400]:
+        n, marks = e.question_stats()
+        start = timezone.localtime(e.start_at)
+        events.append({"id": e.pk, "title": e.title, "subject": e.subject.name, "start": start, "end": start + timedelta(minutes=e.duration_minutes),
+                       "duration": e.duration_minutes, "questions": n, "marks": marks, "status": e.status,
+                       "classes": [str(c) for c in e.classes.all()] if with_classes else []})
+    school = SchoolSettings.load()
+    meta = {"school": school.school_name, "address": school.address, "contact": " | ".join(x for x in (school.contact_email, school.contact_phone) if x),
+            "logo": _logo_bytes(school), "audience": audience, "tz_label": "Times in East Africa Time (EAT)", "tz_name": str(timezone.get_current_timezone()),
+            "generated": now.strftime("%d %b %Y, %H:%M"), "host": request.get_host().split(":")[0]}
+    name = f"{slugify(school.school_name) or 'school'}_exam-calendar_{now:%Y-%m-%d}"
+    if kind == "ics":
+        return _download(cx.ics(meta, events), "text/calendar; charset=utf-8", f"{name}.ics")
+    return _download(cx.pdf(meta, events, now.date()), "application/pdf", f"{name}.pdf")
+
+
 class ExamViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffUser]
     serializer_class = ExamSerializer
@@ -516,6 +556,50 @@ class ExamViewSet(viewsets.ModelViewSet):
         exam.save(update_fields=["submitted_at", "submitted_by"])
         audit(request.user, "exam.submit", exam.pk, title=exam.title)
         return Response({"submitted_at": exam.submitted_at, "submitted_by_name": _person(request.user)})
+
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        """A fresh DRAFT copy of an exam: same subject, settings and questions, but no dates, no results and not submitted.
+        A teacher gets the teacher-editable parts only (the administrator adds term, classes and dates, as for any new exam);
+        an administrator's copy keeps the term, classes and named students too. The copy is named "Copy of ..." unless a title is sent."""
+        src = self.get_object()
+        if not _teaches(request.user, src.subject_id):
+            raise PermissionDenied()
+        admin = request.user.is_admin_role
+        title = str(request.data.get("title") or "").strip()[:200]
+        if not title:
+            base = f"Copy of {src.title}"[:190]
+            title, k = base, 1
+            while Exam.objects.filter(title=title).exists():
+                k += 1
+                title = f"{base} ({k})"
+        keep = {f: getattr(src, f) for f in ("duration_minutes", "shuffle_questions", "shuffle_options", "allow_skip", "partial_marks",
+                                             "negative_marking", "negative_fraction")}
+        if admin:
+            keep.update({f: getattr(src, f) for f in ("pass_mark_percent", "rules_text", "late_entry_minutes", "time_warnings", "term")})
+        with transaction.atomic():
+            new = Exam.objects.create(title=title, subject=src.subject, status=Exam.DRAFT, created_by=request.user, **keep)
+            if admin:
+                new.classes.set(src.classes.all())
+                new.students.set(src.students.all())
+            rows = list(src.questions.filter(voided=False).order_by("position"))
+            ExamQuestion.objects.bulk_create([ExamQuestion(exam=new, position=i, source_id=q.source_id, payload=json.loads(json.dumps(q.payload)))
+                                              for i, q in enumerate(rows, start=1)])
+        audit(request.user, "exam.duplicate", new.pk, source=src.pk, title=new.title, questions=len(rows))
+        return Response(self.get_serializer(new).data, status=201)
+
+    @action(detail=False, methods=["get"], url_path="calendar")
+    def exam_calendar(self, request):
+        """Staff: the scheduled exams as a PDF/.ics calendar. A teacher gets the exams of the subjects she teaches (get_queryset);
+        ?ids=1,2,3 limits it to the exams currently shown in the list."""
+        qs = self.get_queryset()
+        ids = [int(x) for x in str(request.query_params.get("ids", "")).split(",") if x.strip().isdigit()][:400]
+        if ids:
+            qs = qs.filter(pk__in=ids)
+        u = request.user
+        who = _person(u)
+        audience = (f"{who} · Administrator · all exams" if u.is_admin_role else f"{who} · Teacher") + (" · selected exams" if ids else "")
+        return _calendar_download(request, qs, audience, with_classes=True)
 
     # ---- the question picker: approved questions of this exam's subject, paged and filtered ----
     @action(detail=True, methods=["get"])
