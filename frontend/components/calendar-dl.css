@@ -20,10 +20,18 @@
 .cal-msg{margin:0;min-height:1.1rem;font-size:.82rem;font-weight:700;overflow-wrap:anywhere}
 .cal-msg:empty{display:none}
 @keyframes cal-in{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
-/* phones: the menu is a sheet at the bottom of the screen, so it can never run off either edge */
-@media(max-width:520px){.cal-pop{position:fixed;top:auto;left:.8rem;right:.8rem;bottom:calc(.8rem + env(safe-area-inset-bottom));width:auto;z-index:60;box-shadow:0 -10px 40px rgba(0,0,0,.28)}}
-@media(prefers-reduced-motion:reduce){.cal-pop,.cal-item,.cal-caret{animation:none!important;transition:none!important}}
-.reduce-motion .cal-pop,.reduce-motion .cal-item,.reduce-motion .cal-caret{animation:none!important;transition:none!important}
+/* phones: the menu is a sheet at the bottom of the screen (drawn into <body> by the component, above the bottom menu bar) */
+.cal-back{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.42);animation:cal-fade .2s both}
+@media(max-width:520px){
+  .cal-pop{position:fixed;top:auto;left:.7rem;right:.7rem;bottom:calc(.7rem + env(safe-area-inset-bottom));width:auto;max-height:85dvh;overflow:auto;z-index:96;box-shadow:0 -10px 40px rgba(0,0,0,.3);animation:cal-sheet .3s cubic-bezier(.2,.8,.2,1) both}
+  .cal-item{min-height:68px}
+}
+.cal-close{min-height:46px;width:100%}
+@media(min-width:521px){.cal-close,.cal-back{display:none}}
+@keyframes cal-fade{from{opacity:0}to{opacity:1}}
+@keyframes cal-sheet{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.cal-back,.cal-pop,.cal-item,.cal-caret{animation:none!important;transition:none!important}}
+.reduce-motion .cal-back,.reduce-motion .cal-pop,.reduce-motion .cal-item,.reduce-motion .cal-caret{animation:none!important;transition:none!important}
 /* the home screen row and the staff header */
 .ux-cal-row{display:flex;justify-content:flex-end;margin:0 0 .6rem}
 .ex2-head .cal-dl{flex:none}
