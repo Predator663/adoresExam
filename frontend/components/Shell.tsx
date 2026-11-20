@@ -129,6 +129,8 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
     else if (user.must_change_password && !path.startsWith("/change-password")) location.replace("/change-password/");
   }, [ready, user, path]);
   useEffect(() => { setDrawer(false); }, [path]);
+  // the menu is taller than a short laptop screen: bring the current page's link into view (e.g. Page visits, near the bottom)
+  useEffect(() => { const t = setTimeout(() => document.querySelector(".side .side-link.on")?.scrollIntoView({ block: "nearest", inline: "nearest" }), 80); return () => clearTimeout(t); }, [path]);
   useEffect(() => {
     if (!drawer) return;
     const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
@@ -177,7 +179,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
       { href: "/staff/monitor/", icon: "activity", label: "Live monitor" }, { href: "/staff/analytics/", icon: "chart", label: "Analytics" },
       ...(admin ? [] : [{ href: "/messages/", icon: "mail", label: "Messages" }]) ] },
     ...(admin ? [{ title: "Administration", items: [
-      { href: "/staff/people/", icon: "users", label: "People" }, { href: "/staff/guardians/", icon: "phone", label: "Parents" }, { href: "/staff/messages/", icon: "mail", label: "Messages" }, { href: "/staff/school/", icon: "building", label: "School analytics" }, { href: "/staff/gamification/", icon: "trophy", label: "Gamification" }, { href: "/staff/online/", icon: "radar", label: "Who is online" }, { href: "/staff/logins/", icon: "activity", label: "Login activity" }, ...(user.role === "super_admin" ? [{ href: "/staff/lockouts/", icon: "lock", label: "Locked accounts" }] : []), { href: "/staff/reports/", icon: "download", label: "Download results" }, { href: "/staff/not-submitted/", icon: "file", label: "Not submitted" },
+      { href: "/staff/people/", icon: "users", label: "People" }, { href: "/staff/guardians/", icon: "phone", label: "Parents" }, { href: "/staff/messages/", icon: "mail", label: "Messages" }, { href: "/staff/school/", icon: "building", label: "School analytics" }, { href: "/staff/gamification/", icon: "trophy", label: "Gamification" }, { href: "/staff/online/", icon: "radar", label: "Who is online" }, { href: "/staff/logins/", icon: "activity", label: "Login activity" }, { href: "/staff/visits/", icon: "eye", label: "Page visits" }, ...(user.role === "super_admin" ? [{ href: "/staff/lockouts/", icon: "lock", label: "Locked accounts" }] : []), { href: "/staff/reports/", icon: "download", label: "Download results" }, { href: "/staff/not-submitted/", icon: "file", label: "Not submitted" },
       { href: "/staff/audit/", icon: "shield", label: "Audit log" }, { href: "/staff/settings/", icon: "sliders", label: "Settings" } ] }] : []),
     { title: "App", items: [{ href: "/install/", icon: "download", label: "Install the app" }] },
   ];

@@ -108,3 +108,21 @@ class Presence(models.Model):
     language = models.CharField(max_length=12, blank=True)
     standalone = models.BooleanField(default=False)  # opened from the home screen (installed app)
     page = models.CharField(max_length=80, blank=True)
+
+
+class PageVisit(models.Model):
+    """One stay on one screen of the app by a student (see core/pagevisits.py). Written by the app itself, read only by administrators
+    (Staff > Page visits). Only the screen's address inside the app is kept: no search text, no answers, nothing she typed."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="page_visits")
+    uid = models.CharField(max_length=36)  # made by the app, so a retried upload never counts a visit twice
+    path = models.CharField(max_length=120, db_index=True)  # "/results/", "/exam/" (ids are replaced by :id)
+    screen = models.CharField(max_length=60, blank=True)  # the name people know it by: "Results"
+    entered_at = models.DateTimeField(db_index=True)
+    seconds = models.PositiveIntegerField(default=0)  # time the screen was actually visible
+    device_type = models.CharField(max_length=10, blank=True)  # mobile | tablet | desktop
+    standalone = models.BooleanField(default=False)  # opened from the home screen (installed app)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "-entered_at"], name="pagevisit_user_time_idx")]
+        constraints = [models.UniqueConstraint(fields=["user", "uid"], name="pagevisit_unique_uid")]

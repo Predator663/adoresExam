@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.db.models import Q
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework.decorators import api_view, authentication_classes, parser_classes, permission_classes
@@ -16,7 +16,8 @@ from accounts.permissions import IsAdminRole
 from . import i18n
 from . import grading
 from .pagination import page_params, wants_page
-from .models import AuditLog, Presence, SchoolSettings, audit
+from .models import AuditLog, PageVisit, Presence, SchoolSettings, audit
+from . import pagevisits
 from .presence import ONLINE_SECONDS, record as record_presence
 
 ONLINE_WINDOW_SECONDS = 90
@@ -314,3 +315,105 @@ def audit_log(request):
 def i18n_catalog(request, lang):
     """ACC-08: server-side English or Swahili text, badge and level names, for the app to use. Public, no secrets."""
     return Response(i18n.catalog_for(lang))
+
+
+# ---------------------------------------------------------------- page visits (which screens students open, and for how long)
+@api_view(["POST"])
+def page_visits_in(request):
+    """The app sends a student's finished screen visits in small batches. Only students are logged; everyone else gets a quiet 204.
+    At most one upload every 3 seconds per person (a retry after a failed upload is fine, rows carry their own id)."""
+    if request.user.role != "student":
+        return Response(status=204)
+    if not cache.add(f"pv:w:{request.user.pk}", 1, 3):
+        return Response({"detail": "Too many uploads."}, status=429)
+    n = pagevisits.record(request, request.data.get("visits") if hasattr(request.data, "get") else None)
+    return Response({"saved": n})
+
+
+def _visit_qs(request):
+    p = request.query_params
+    qs = PageVisit.objects.select_related("user__school_class")
+    if p.get("class"):
+        qs = qs.filter(user__school_class_id=p["class"])
+    if p.get("user", "").isdigit():
+        qs = qs.filter(user_id=int(p["user"]))
+    for word in (p.get("q") or "").split():
+        qs = qs.filter(Q(user__username__icontains=word) | Q(user__first_name__icontains=word) | Q(user__last_name__icontains=word))
+    if p.get("screen"):
+        qs = qs.filter(screen=p["screen"])
+    if p.get("path"):
+        qs = qs.filter(path__icontains=p["path"].strip()[:60])
+    if p.get("device") in ("mobile", "tablet", "desktop"):
+        qs = qs.filter(device_type=p["device"])
+    if p.get("installed") in ("1", "0"):
+        qs = qs.filter(standalone=p["installed"] == "1")
+    try:
+        if int(p.get("min_seconds", 0)) > 0:
+            qs = qs.filter(seconds__gte=int(p["min_seconds"]))
+    except ValueError:
+        pass
+    for key, lookup in (("from", "entered_at__date__gte"), ("to", "entered_at__date__lte")):
+        try:
+            d = parse_date(p.get(key, ""))
+        except ValueError:
+            d = None
+        if d:
+            qs = qs.filter(**{lookup: d})
+    return qs
+
+
+def _visit_row(v):
+    c = v.user.school_class
+    return {"id": v.pk, "at": v.entered_at, "user_id": v.user_id, "student": v.user.get_full_name() or v.user.username, "username": v.user.username,
+            "class": f"{c.name} {c.stream}".strip() if c else "", "path": v.path, "screen": v.screen, "seconds": v.seconds,
+            "device_type": v.device_type, "installed": v.standalone}
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def page_visits(request):
+    """Administrators: the log of screens students opened. Filters: q (name or username), class, user, screen (exact name), path (part of the
+    address), device, installed (1/0), min_seconds, from / to (YYYY-MM-DD); sort=longest; paging as the audit log; ?file=csv downloads up to 20,000 rows."""
+    qs = _visit_qs(request).order_by("-seconds" if request.query_params.get("sort") == "longest" else "-entered_at", "-id")
+    if request.query_params.get("file") == "csv":
+        import csv
+        from analytics.views import _download
+        buf = io.StringIO()
+        buf.write("\ufeff")  # so Excel reads the accents
+        w = csv.writer(buf)
+        w.writerow(["When (EAT)", "Student", "Username", "Class", "Screen", "Address", "Seconds on screen", "Device", "Installed app"])
+        for v in qs[:20000]:
+            r = _visit_row(v)
+            w.writerow([timezone.localtime(r["at"]).strftime("%Y-%m-%d %H:%M:%S"), r["student"], r["username"], r["class"], r["screen"], r["path"],
+                        r["seconds"], r["device_type"], "yes" if r["installed"] else "no"])
+        audit(request.user, "export.page_visits", "", filters={k: v for k, v in request.query_params.items() if k != "file"})
+        return _download(buf.getvalue().encode("utf-8"), "text/csv; charset=utf-8", f"page-visits_{timezone.localtime():%Y-%m-%d}.csv")
+    total = qs.count()
+    page = pages = None
+    if wants_page(request):
+        page, limit = page_params(request, 25)
+        pages = max(1, -(-total // limit))
+        page = min(page, pages)
+        offset = (page - 1) * limit
+    else:
+        limit, offset = 100, 0
+    return Response({"count": total, **({"page": page, "pages": pages, "page_size": limit} if page else {}),
+                     "results": [_visit_row(v) for v in qs[offset:offset + limit]]})
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def page_visits_summary(request):
+    """The same filters as the log, boiled down: totals, the most opened screens, the most active students and visits per day."""
+    qs = _visit_qs(request)
+    tot = qs.aggregate(n=Count("id"), students=Count("user", distinct=True), secs=Sum("seconds"), avg=Avg("seconds"))
+    screens = [{"screen": r["screen"], "path": r["path"], "visits": r["n"], "students": r["s"], "avg_seconds": int(r["avg"] or 0)}
+               for r in qs.values("screen", "path").annotate(n=Count("id"), s=Count("user", distinct=True), avg=Avg("seconds")).order_by("-n")[:10]]
+    people = [{"user_id": r["user_id"], "student": f"{r['user__first_name']} {r['user__last_name']}".strip() or r["user__username"], "username": r["user__username"],
+               "visits": r["n"], "seconds": int(r["secs"] or 0)}
+              for r in qs.values("user_id", "user__first_name", "user__last_name", "user__username").annotate(n=Count("id"), secs=Sum("seconds")).order_by("-n")[:10]]
+    from django.db.models.functions import TruncDate
+    days = [{"day": r["d"], "visits": r["n"]} for r in qs.annotate(d=TruncDate("entered_at")).values("d").annotate(n=Count("id")).order_by("-d")[:31]][::-1]
+    names = sorted(PageVisit.objects.values_list("screen", flat=True).distinct())
+    return Response({"visits": tot["n"], "students": tot["students"], "total_seconds": int(tot["secs"] or 0), "avg_seconds": int(tot["avg"] or 0),
+                     "top_screens": screens, "top_students": people, "by_day": days, "screens": names})

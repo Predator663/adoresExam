@@ -4,6 +4,8 @@ import { SessionProvider } from "@/lib/session";
 import { BrandProvider } from "@/lib/brand";
 import OfflineBar from "@/components/OfflineBar";
 import SwRegister from "@/components/SwRegister";
+import PageTracker from "@/components/PageTracker";
+import AutoInstall from "@/components/AutoInstall";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import "./globals.css";
 import "./pg-motion.css";
@@ -21,7 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <SessionProvider><BrandProvider><OfflineBar />{children}</BrandProvider></SessionProvider>
+        <SessionProvider><BrandProvider><OfflineBar />{children}<PageTracker /><AutoInstall /></BrandProvider></SessionProvider>
         <MaintenanceGate />
         <SwRegister />
       </body>
