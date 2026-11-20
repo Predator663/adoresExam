@@ -12,6 +12,7 @@ from academics.models import TeacherAssignment
 from accounts.permissions import IsAdminRole, IsStaffUser
 from core.models import audit
 from exams import timing
+from . import shares
 from .models import Question, QuestionImage, QuestionVersion
 from .validation import clean_prompt, validate_question
 
@@ -91,12 +92,17 @@ class QuestionViewSet(viewsets.ModelViewSet):
         p = self.request.query_params
         qs = Question.objects.select_related("created_by")
         if not u.is_admin_role:
-            # A teacher only ever sees the subjects she is assigned to ...
-            qs = qs.filter(subject_id__in=TeacherAssignment.objects.filter(teacher=u).values("subject_id"))
-            # ... and, of her colleagues' questions, only the approved ones (their drafts stay private).
-            # `ids` is the exam builder re-loading its own saved paper, so it is not narrowed further.
-            if not p.get("ids"):
-                qs = qs.filter(Q(created_by=u) | Q(status=Question.APPROVED))
+            # A teacher only ever sees HER OWN questions, in the subjects she is assigned to. A colleague's question reaches her only
+            # through a request the owner approved (questions/shares.py), and then only inside the exam builder, never in this list.
+            # `ids` is the exam builder re-loading its own saved paper: it may also contain questions shared with her, or questions
+            # already in an exam of her subjects (for example one an administrator built).
+            assigned = TeacherAssignment.objects.filter(teacher=u).values("subject_id")
+            qs = qs.filter(subject_id__in=assigned)
+            if p.get("ids"):
+                from exams.models import ExamQuestion
+                qs = qs.filter(Q(created_by=u) | Q(pk__in=shares.shared_ids(u)) | Q(pk__in=ExamQuestion.objects.filter(exam__subject_id__in=assigned).values("source_id")))
+            else:
+                qs = qs.filter(created_by=u)
         if p.get("scope") == "mine":
             qs = qs.filter(created_by=u)
         elif p.get("scope") == "others":  # exclude() keeps questions whose author account was deleted

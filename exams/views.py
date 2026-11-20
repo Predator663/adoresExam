@@ -20,6 +20,7 @@ from accounts.permissions import IsAdminRole, IsStaffUser, IsStudent
 from core.models import SchoolSettings, audit
 from core.pagination import paginate
 from core.views import online_ids
+from questions import shares
 from questions.models import Question
 from questions.views import QuestionSerializer
 from proctoring import services as proctoring
@@ -606,22 +607,27 @@ class ExamViewSet(viewsets.ModelViewSet):
     def bank(self, request, pk=None):
         exam = self.get_object()
         p = request.query_params
-        # What the picker can show: every approved question of the subject, plus this teacher's OWN unapproved ones
-        # (shown with a "Draft" label; they cannot go into the paper until approved). Colleagues' drafts stay private.
-        base = Question.objects.filter(subject=exam.subject).filter(
-            Q(status=Question.APPROVED) | Q(created_by=request.user, status__in=[Question.DRAFT, Question.SUBMITTED]))
-        topics = sorted(set(base.exclude(topic="").values_list("topic", flat=True)))
-        # Two shelves: the questions this teacher wrote, and those written by her colleagues for the same subject.
-        # exclude() keeps questions whose author account was deleted on the "others" shelf.
-        mine_count = base.filter(created_by=request.user).count()
-        counts = {"mine": mine_count, "others": base.count() - mine_count}
+        me, admin = request.user, request.user.is_admin_role
         scope = p.get("scope")
-        if scope == "mine":
-            base_scoped = base.filter(created_by=request.user)
-        elif scope == "others":
-            base_scoped = base.exclude(created_by=request.user)
+        if admin:
+            # An administrator may use any approved question of the subject (plus her own unapproved ones, labelled "Draft").
+            base = Question.objects.filter(subject=exam.subject).filter(Q(status=Question.APPROVED) | Q(created_by=me, status__in=[Question.DRAFT, Question.SUBMITTED]))
+            mine_count = base.filter(created_by=me).count()
+            counts = {"mine": mine_count, "shared": 0, "others": base.count() - mine_count}
+            base_scoped = base.filter(created_by=me) if scope == "mine" else base.exclude(created_by=me) if scope == "others" else base
         else:
-            base_scoped = base
+            # A teacher uses her OWN questions (drafts shown, cannot be added until approved) and those other teachers SHARED with her.
+            # Everyone else's approved questions are listed only so she can ask for them ("others": answers hidden, request button).
+            allq = Question.objects.filter(subject=exam.subject)
+            shared = shares.shared_ids(me)
+            shelves = {"mine": allq.filter(created_by=me),
+                       "shared": allq.filter(pk__in=shared, status=Question.APPROVED),
+                       "others": allq.filter(status=Question.APPROVED, created_by__isnull=False).exclude(created_by=me).exclude(pk__in=shared)}
+            counts = {k: v.count() for k, v in shelves.items()}
+            scope = scope if scope in shelves else "mine"
+            base = shelves["mine"] | shelves["shared"]
+            base_scoped = shelves[scope]
+        topics = sorted(set(base_scoped.exclude(topic="").values_list("topic", flat=True)))
         qs = base_scoped.annotate(used_count=Count("examquestion", filter=~Q(examquestion__exam=exam), distinct=True),
                            last_used=Max("examquestion__exam__start_at", filter=~Q(examquestion__exam=exam)))
         for f in ("topic", "difficulty", "qtype", "form_level"):
@@ -644,6 +650,8 @@ class ExamViewSet(viewsets.ModelViewSet):
         page = min(page, pages)
         rows = list(qs[(page - 1) * size: page * size])
         data = QuestionSerializer(rows, many=True, context={"request": request}).data  # adds is_mine / created_by_name
+        status = shares.status_map(me, [q.pk for q in rows]) if scope == "others" else {}
+        data = [dict(shares.hidden(row), share=status.get(row["id"])) for row in data] if scope == "others" and not admin else data
         for row, q in zip(data, rows):
             row["used_count"], row["last_used"] = q.used_count, q.last_used
         return Response({"count": count, "page": page, "pages": pages, "page_size": size, "scope": scope or "",
@@ -682,7 +690,7 @@ class ExamViewSet(viewsets.ModelViewSet):
         exclude = {int(x) for x in request.data.get("exclude", []) if str(x).isdigit()}
         rng, out = random.SystemRandom(), []
         for rule in request.data.get("rules", []):
-            pool = Question.objects.filter(subject=exam.subject, status=Question.APPROVED).exclude(pk__in=exclude)
+            pool = shares.usable(request.user, Question.objects.filter(subject=exam.subject, status=Question.APPROVED)).exclude(pk__in=exclude)
             for f in ("topic", "difficulty", "form_level"):
                 if rule.get(f):
                     pool = pool.filter(**{f: rule[f]})
@@ -704,9 +712,13 @@ class ExamViewSet(viewsets.ModelViewSet):
         ids = [int(x) for x in request.data.get("question_ids", []) if str(x).isdigit()]
         found = {q.pk: q for q in Question.objects.filter(pk__in=ids, subject=exam.subject)}
         chosen = {i: found[i] for i in ids if i in found}  # keeps the order the teacher picked
+        not_allowed = shares.blocked(request.user, list(chosen), exam)  # a teacher uses her own questions, or ones a colleague approved for her
+        if not_allowed:
+            raise ValidationError({"question_ids": "You can only use your own questions, or questions another teacher has approved for you. "
+                                                   f"Ask the owner first. Not allowed: {not_allowed}"})
         rng = random.SystemRandom()
         for rule in request.data.get("rules", []):
-            pool = Question.objects.filter(subject=exam.subject, status=Question.APPROVED).exclude(pk__in=chosen)
+            pool = shares.usable(request.user, Question.objects.filter(subject=exam.subject, status=Question.APPROVED)).exclude(pk__in=chosen)
             for f in ("topic", "difficulty", "form_level"):
                 if rule.get(f):
                     pool = pool.filter(**{f: rule[f]})

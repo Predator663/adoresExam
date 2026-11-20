@@ -1,0 +1,58 @@
+.shr-box{display:grid;gap:.35rem;justify-items:start;min-width:0;max-width:100%}
+.shr{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .7rem;border-radius:99px;font-size:.82rem;font-weight:700;overflow-wrap:anywhere;max-width:100%}
+.shr.ok{background:color-mix(in srgb,var(--primary) 14%,var(--surface));color:var(--primary)}
+.shr.wait{background:var(--soft);color:var(--text)}
+.shr.wait i{width:8px;height:8px;border-radius:50%;background:#f59e0b;animation:shr-pulse 1.6s infinite}
+.shr.no{background:color-mix(in srgb,var(--bad,#c0392b) 12%,var(--surface));color:var(--bad,#c0392b)}
+.shr-ask{min-height:44px}
+.shr-form{display:grid;gap:.5rem;width:min(26rem,100%);animation:shr-in .22s both}
+.shr-form textarea{resize:vertical;min-height:3.2rem}
+.shr-acts{display:flex;gap:.45rem;flex-wrap:wrap}
+.shr-acts .btn{min-height:44px;flex:1 1 7rem}
+@keyframes shr-pulse{0%{box-shadow:0 0 0 0 rgba(245,158,11,.55)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes shr-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.shr.wait i,.shr-form{animation:none}}
+.reduce-motion .shr.wait i,.reduce-motion .shr-form{animation:none}
+/* inside the exam builder's question cards */
+.bld-askinfo{margin:.2rem 0 .6rem;padding:.65rem .85rem;border-radius:14px;background:var(--soft);font-size:.88rem;overflow-wrap:anywhere}
+.qc-ask{display:grid;align-content:start;min-width:min(100%,12rem)}
+
+/* ---- Questions page: find / requests */
+@keyframes qr-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes qr-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.qr{display:grid;gap:.8rem;min-width:0}
+.qr-info{margin:0;padding:.7rem .9rem;border-radius:14px;background:var(--soft);overflow-wrap:anywhere}
+.qr-seg{display:inline-flex;padding:3px;border-radius:14px;background:var(--soft);gap:2px;justify-self:start;max-width:100%}
+.qr-seg button{min-height:42px;padding:0 1rem;border:0;border-radius:11px;background:none;color:var(--muted);font:inherit;font-weight:800;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+.qr-seg button.on{background:var(--surface);color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.14)}
+.qr-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:.6rem}
+.qr-list{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));transition:opacity .2s}
+.qr-list[aria-busy]{opacity:.55}
+.qr-card{display:grid;gap:.5rem;align-content:start;min-width:0;padding:1rem;border:1px solid var(--border);border-radius:18px;background:var(--surface);animation:qr-up .4s calc(var(--i,0)*45ms) cubic-bezier(.2,.8,.2,1) both;transition:border-color .2s,box-shadow .2s,transform .2s}
+.qr-card:hover{border-color:var(--primary);box-shadow:0 8px 22px rgba(0,0,0,.08);transform:translateY(-1px)}
+.qr-card header{display:flex;align-items:center;gap:.65rem;min-width:0}
+.qr-card header>div{display:grid;min-width:0;flex:1}
+.qr-card header b,.qr-card header small{overflow-wrap:anywhere}
+.qr-card header small{color:var(--muted)}
+.qr-av{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:50%;background:var(--primary);color:var(--on-primary);font-weight:800}
+.qr-st{flex:none;padding:.2rem .6rem;border-radius:99px;font-size:.74rem;font-weight:800;background:var(--soft);color:var(--text)}
+.qr-st.st-approved{background:color-mix(in srgb,var(--primary) 16%,var(--surface));color:var(--primary)}
+.qr-st.st-pending{background:#fef3c7;color:#92400e}
+.qr-st.st-denied,.qr-st.st-revoked{background:color-mix(in srgb,var(--bad,#c0392b) 14%,var(--surface));color:var(--bad,#c0392b)}
+.qr-card blockquote{margin:0;padding:.45rem .7rem;border-left:3px solid var(--primary);background:var(--soft);border-radius:0 10px 10px 0;font-style:italic;overflow-wrap:anywhere}
+.qr-text{margin:0;overflow-wrap:anywhere}
+.qr-meta{display:flex;flex-wrap:wrap;gap:.3rem;margin:0}
+.qr-act{display:grid;gap:.5rem}
+.qr-btns{display:flex;flex-wrap:wrap;gap:.45rem}
+.qr-btns .btn{min-height:44px;flex:1 1 8rem}
+.qr-reply{margin:0;overflow-wrap:anywhere}
+.qr-skels{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr))}
+.qr-skel{min-height:9rem;border-radius:18px;background:linear-gradient(90deg,var(--soft) 25%,color-mix(in srgb,var(--soft) 55%,var(--surface)) 50%,var(--soft) 75%);background-size:200% 100%;animation:qr-shimmer 1.4s linear infinite}
+.qtabs{display:flex;flex-wrap:wrap;gap:.5rem}
+.qtabs button{position:relative;display:inline-flex;align-items:center;gap:.45rem;min-height:46px;padding:0 1rem;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font:inherit;font-weight:800;cursor:pointer;transition:border-color .2s,background .2s,transform .2s}
+.qtabs button:hover{border-color:var(--primary)}
+.qtabs button.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.qtabs em{font-style:normal;display:grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#ef4444;color:#fff;font-size:.72rem;font-weight:800;animation:qr-pop .25s both}
+@keyframes qr-pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.qr-card,.qr-skel,.qtabs em{animation:none!important}.qr-card{transition:none}}
+.reduce-motion .qr-card,.reduce-motion .qr-skel,.reduce-motion .qtabs em{animation:none!important}

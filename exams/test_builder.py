@@ -1,4 +1,4 @@
-"""The exam builder's two question shelves (mine / others) and the teacher's server-side draft."""
+"""The exam builder's question shelves (mine / shared with me / other teachers') and the teacher's server-side draft."""
 from django.contrib.auth.hashers import make_password
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -50,19 +50,21 @@ class BuilderTests(TestCase):
         seen = {x["id"] for x in other.get(f"/api/exams/{self.exam.pk}/bank/", {"scope": "others"}).json()["results"]}
         self.assertNotIn(mine_draft.pk, seen)
 
-    def test_others_shelf_has_colleagues_approved_questions_of_this_subject(self):
+    def test_others_shelf_has_colleagues_approved_questions_but_hides_their_answers(self):
         r = self.bank(scope="others")
         self.assertEqual({x["id"] for x in r["results"]}, {x.pk for x in self.theirs})
         self.assertFalse(any(x["is_mine"] for x in r["results"]))
         self.assertEqual(r["results"][0]["created_by_name"], "b")
+        self.assertEqual(r["results"][0]["answer"], {})  # she must ask before she can see the answer
+        self.assertIsNone(r["results"][0]["share"])
 
     def test_counts_cover_both_shelves_whatever_the_filters(self):
         r = self.bank(scope="mine", q="nothing matches this")
         self.assertEqual(r["count"], 0)
-        self.assertEqual(r["counts"], {"mine": 2, "others": 1})  # b's private draft is on nobody else's shelf
+        self.assertEqual(r["counts"], {"mine": 2, "shared": 0, "others": 1})  # b's private draft is on nobody else's shelf
 
-    def test_no_scope_still_returns_everything_approved(self):
-        self.assertEqual(self.bank()["count"], 3)
+    def test_no_scope_means_my_own_questions(self):
+        self.assertEqual({x["id"] for x in self.bank()["results"]}, {x.pk for x in self.mine})
 
     def test_draft_round_trip_is_per_teacher(self):
         url = f"/api/exams/{self.exam.pk}/draft/"

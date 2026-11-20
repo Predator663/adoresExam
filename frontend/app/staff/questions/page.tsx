@@ -1,6 +1,7 @@
 "use client";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 import QuestionEditor from "@/components/QuestionEditor";
+import QuestionRequests from "@/components/QuestionRequests";
 import { Pager, usePaged } from "@/components/Pager";
 import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
@@ -18,6 +19,10 @@ export default function Questions() {
   const { user } = useSession();
   const admin = user?.role === "admin" || user?.role === "super_admin";
   const [edit, setEdit] = useState<number | "new" | null>(null);
+  // A teacher sees only her own questions here. Other teachers' questions are reached by asking: "find" and "requests" are those two screens.
+  const [tab, setTab] = useState<"mine" | "find" | "requests">("mine");
+  const counts = useLoad(() => (admin ? Promise.resolve(null) : api<{ incoming_pending: number; outgoing_pending: number; shared_with_me: number }>("/question-shares/counts/")), [admin, tab]);
+  const other = !admin && tab !== "mine";
   const [f, setF] = useState({ scope: admin ? "" : "mine", subject: "", form_level: "", topic: "", difficulty: "", qtype: "", status: "", q: "" });
   const allSubjects = useLoad(() => api<any[]>("/subjects/"));
   const classes = useLoad(() => api<any[]>("/classes/"));  // the Form filter lists the forms the school really has
@@ -33,7 +38,7 @@ export default function Questions() {
   const list = usePaged<any>("/questions/", f, { size: 10 });
   const [msg, setMsg] = useState(""), [note, setNote] = useState("");
   useEffect(() => { if (admin) setF((x) => (x.scope === "mine" ? { ...x, scope: "" } : x)); }, [admin]);  // the session may load after the first render
-  useEffect(() => { const e = new URLSearchParams(location.search).get("edit"); if (e) setEdit(e === "new" ? "new" : Number(e)); }, []);
+  useEffect(() => { const sp = new URLSearchParams(location.search), e = sp.get("edit"); if (e) setEdit(e === "new" ? "new" : Number(e)); if (sp.get("tab") === "requests" || sp.get("tab") === "find") setTab(sp.get("tab") as "find" | "requests"); }, []);
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
   async function act(id: number, what: "submit" | "approve" | "reject") {
     setMsg(""); try { await api(`/questions/${id}/${what}/`, { body: {} }); list.reload(); } catch (e: any) { setMsg(e.message); }
@@ -68,12 +73,21 @@ export default function Questions() {
             <button className="btn primary" onClick={() => setEdit("new")}>+ New question</button>
           </div>
 
-          <div className="ex2-kpis" role="group" aria-label="Whose questions">
+          {!admin && (
+            <div className="qtabs" role="tablist" aria-label="Questions">
+              <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "on" : ""} onClick={() => setTab("mine")}>✏️ My questions</button>
+              <button type="button" role="tab" aria-selected={tab === "find"} className={tab === "find" ? "on" : ""} onClick={() => setTab("find")}>📨 Find questions</button>
+              <button type="button" role="tab" aria-selected={tab === "requests"} className={tab === "requests" ? "on" : ""} onClick={() => setTab("requests")}>🔔 Requests{!!counts.data?.incoming_pending && <em aria-label={`${counts.data.incoming_pending} waiting for your answer`}>{counts.data.incoming_pending}</em>}</button>
+            </div>
+          )}
+          {other && <QuestionRequests mode={tab as "find" | "requests"} onChanged={counts.reload} />}
+          <div hidden={other} className="ex2-rest">
+          {admin && <div className="ex2-kpis" role="group" aria-label="Whose questions">
             {scopes.map(([k, l]) => (
               <button key={k || "all"} type="button" className={`ex2-kpi s-${k === "mine" ? "approved" : k === "others" ? "scheduled" : "draft"} ${f.scope === k ? "on" : ""}`} aria-pressed={f.scope === k} onClick={() => set("scope", k)}>
                 <span className="ex2-kico" aria-hidden>{k === "mine" ? "✏️" : k === "others" ? "👥" : "📚"}</span><span className="q2-kl">{l}</span>
               </button>))}
-          </div>
+          </div>}
           {!admin && !subjects.data?.length && !assigned.loading && <p className="muted small">You are not assigned to any subject yet, so there are no questions to show. Ask an administrator to assign you.</p>}
 
           <div className="card ex2-bar">
@@ -153,6 +167,7 @@ export default function Questions() {
                 <Pager {...list.pager} />
               </>
             )}
+          </div>
         </div>
       )}
     </Shell>

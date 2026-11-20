@@ -53,7 +53,7 @@ class QuestionValidationTests(TestCase):
 
 
 class QuestionBankScopeTests(TestCase):
-    """A teacher sees only her assigned subjects; her own questions apart from colleagues'; only she edits or deletes hers."""
+    """A teacher sees only HER OWN questions in her assigned subjects (a colleague's only via an approved request, see test_question_shares); only she edits or deletes hers."""
 
     def setUp(self):
         from django.contrib.auth.hashers import make_password
@@ -94,15 +94,17 @@ class QuestionBankScopeTests(TestCase):
         self.assertNotIn(self.eng_q.pk, self.ids(self.ann))
         self.assertIn(self.eng_q.pk, self.ids(self.ben))
 
-    def test_mine_and_others_are_separate(self):
+    def test_a_teacher_only_sees_her_own_questions(self):
+        self.assertEqual(self.ids(self.ann), {self.ann_q.pk, self.ann_draft.pk})
         self.assertEqual(self.ids(self.ann, "?scope=mine"), {self.ann_q.pk, self.ann_draft.pk})
-        self.assertEqual(self.ids(self.ann, "?scope=others"), {self.ben_q.pk})  # the colleague's draft stays private
+        self.assertEqual(self.ids(self.ann, "?scope=others"), set())  # a colleague's questions are never listed
+        self.assertEqual(self.ids(self.ben), {self.ben_q.pk, self.ben_draft.pk, self.eng_q.pk})
 
     def test_only_the_author_can_edit_delete_or_submit(self):
         c = self.client(self.ann)
-        self.assertEqual(c.patch(f"/api/questions/{self.ben_q.pk}/", {"marks": 5}, format="json").status_code, 403)
-        self.assertEqual(c.delete(f"/api/questions/{self.ben_q.pk}/").status_code, 403)
-        self.assertEqual(c.post(f"/api/questions/{self.ben_q.pk}/submit/", {}, format="json").status_code, 403)
+        self.assertEqual(c.patch(f"/api/questions/{self.ben_q.pk}/", {"marks": 5}, format="json").status_code, 404)  # not even visible to her
+        self.assertEqual(c.delete(f"/api/questions/{self.ben_q.pk}/").status_code, 404)
+        self.assertEqual(c.post(f"/api/questions/{self.ben_q.pk}/submit/", {}, format="json").status_code, 404)
         self.assertEqual(c.patch(f"/api/questions/{self.ann_q.pk}/", {"marks": 5}, format="json").status_code, 200)
         self.assertEqual(c.delete(f"/api/questions/{self.ann_q.pk}/").status_code, 204)
         self.assertEqual(c.get(f"/api/questions/{self.eng_q.pk}/").status_code, 404)  # not her subject
@@ -110,8 +112,8 @@ class QuestionBankScopeTests(TestCase):
     def test_can_edit_flag_drives_the_buttons(self):
         rows = {r["id"]: r for r in self.client(self.ann).get("/api/questions/").json()}
         self.assertTrue(rows[self.ann_q.pk]["can_edit"] and rows[self.ann_q.pk]["is_mine"])
-        self.assertFalse(rows[self.ben_q.pk]["can_edit"])
-        self.assertEqual(rows[self.ben_q.pk]["created_by_name"], "Ben")
+        self.assertNotIn(self.ben_q.pk, rows)  # a colleague's question is not in her list at all
+        self.assertEqual(rows[self.ann_q.pk]["created_by_name"], "Ann")
 
     def test_admin_keeps_full_control(self):
         self.assertTrue({self.eng_q.pk, self.ben_draft.pk} <= self.ids(self.admin))

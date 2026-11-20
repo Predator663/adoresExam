@@ -54,3 +54,26 @@ class QuestionImage(models.Model):
     alt_text = models.CharField(max_length=300)  # QB-03: required for screen readers
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class QuestionShare(models.Model):
+    """A teacher's request to use ANOTHER teacher's question in her exams. Teachers only see and use their own questions; this is
+    the only way across: the owner approves or denies. An approved share lets the requester put that question into her own exam
+    papers (the exam keeps its own copy, so a later edit by the owner does not change a paper already built). The owner can revoke it."""
+
+    PENDING, APPROVED, DENIED, REVOKED, CANCELLED = "pending", "approved", "denied", "revoked", "cancelled"
+    STATUSES = [(PENDING, "Waiting"), (APPROVED, "Approved"), (DENIED, "Denied"), (REVOKED, "Withdrawn"), (CANCELLED, "Cancelled")]
+
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="shares")
+    requester = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="question_requests")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="question_requests_received")
+    status = models.CharField(max_length=10, choices=STATUSES, default=PENDING)
+    note = models.CharField(max_length=300, blank=True)  # the requester's message to the owner
+    reply = models.CharField(max_length=300, blank=True)  # the owner's message back
+    requested_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-requested_at", "-id"]
+        indexes = [models.Index(fields=["owner", "status"], name="qshare_owner_status_idx"), models.Index(fields=["requester", "status"], name="qshare_req_status_idx")]
+        constraints = [models.UniqueConstraint(fields=["question", "requester"], name="qshare_one_per_pair")]
