@@ -1,0 +1,8 @@
+HOME PACKAGE (paper exams) - deploy notes
+1. Backend: python manage.py migrate_schemas   (adds exams.0009_papersheet), then restart gunicorn.
+2. Frontend: npm run build.
+3. New pages: /staff/exams/package/?id=<exam id> (pick students, create codes, print) and /staff/paper/ (scan, key in answers).
+   Buttons: "Home package (paper)" on live/closed/published exams; "Home packages" in the admin menu.
+4. Tests (not run here): python manage.py test exams.test_paper exams.test_corrections
+Limits: paper attempts have time_taken 0; no student notification; camera scanning needs Chrome (BarcodeDetector),
+on iPhones type the code; USB scanners work in the code box; print layout tested in Chromium only. Print one package first.

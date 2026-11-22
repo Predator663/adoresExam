@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from . import notsubmitted, views
+from . import notsubmitted, paper, views
 
 router = DefaultRouter()
 router.register("exams", views.ExamViewSet, basename="exam")
@@ -11,6 +11,10 @@ urlpatterns = [
     path("exams/not-submitted/options/", notsubmitted.not_submitted_options),
     path("exams/not-submitted/export/", notsubmitted.not_submitted_export),
     path("exams/not-submitted/", notsubmitted.not_submitted),
+    path("exams/<int:exam_id>/paper-package/", paper.package_view),
+    path("exams/<int:exam_id>/paper-sheets/", paper.sheets_view),
+    path("paper/scan/", paper.scan_view),
+    path("paper/answers/", paper.answers_view),
     path("student/exams/", views.student_exams),
     path("student/exams/calendar/", views.student_calendar),
     path("student/exams/<int:exam_id>/start/", views.student_start),

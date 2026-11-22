@@ -32,7 +32,7 @@ from accounts.permissions import IsAdminRole
 from core import notsubmitted_report
 from core.models import SchoolSettings, audit
 from . import services
-from .models import Attempt, Exam, ExamGrant
+from .models import Attempt, Exam, ExamGrant, PaperSheet
 
 STATUS_LABEL = {"none": "Did not sit", "writing": "Still writing", "auto": "Not submitted: time ran out"}
 SORTS = ("name", "class", "status", "index")
@@ -92,11 +92,12 @@ def collect(request):
     for a in exam.attempts.order_by("attempt_no"):
         latest[a.student_id] = a
     people = {s.pk: s for s in eligible}
+    paper = set(PaperSheet.objects.filter(exam=exam, received_at__isnull=False).values_list("student_id", flat=True))  # her printed home package came back
 
     def status_of(s):
         a = latest.get(s.pk)
         if a is None:
-            return "none"
+            return "submitted" if s.pk in paper else "none"
         if a.status == Attempt.IN_PROGRESS:
             return "writing"
         return "auto" if a.status == Attempt.AUTO_SUBMITTED else "submitted"
@@ -132,7 +133,7 @@ def collect(request):
                      "status": states[s.pk], "status_label": STATUS_LABEL[states[s.pk]],
                      "started_at": a.started_at if a else None, "attempt_no": a.attempt_no if a else None,
                      "started_text": timezone.localtime(a.started_at).strftime("%d %b, %H:%M") if a else "-",
-                     "retake_allowed": s.pk in allowed, "parents": guardians.get(s.pk, [])})
+                     "retake_allowed": s.pk in allowed, "paper": s.pk in paper, "parents": guardians.get(s.pk, [])})
 
     by_class = {}
     for s in eligible:  # every class of the exam, whatever class is picked, so the person can switch between them

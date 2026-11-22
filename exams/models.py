@@ -217,3 +217,24 @@ class ResultChange(models.Model):
     class Meta:
         ordering = ["-id"]
 
+
+
+class PaperSheet(models.Model):
+    """The printed home package of ONE student for ONE exam (exams/paper.py), for students without a smartphone or internet.
+    `code` is printed on every page and as a barcode. Scanning it marks the sheet RECEIVED (she counts as submitted); then an
+    administrator keys in her answers, which become an ordinary Attempt that is auto-marked like any other (`attempt`)."""
+
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="paper_sheets")
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="paper_sheets")
+    code = models.CharField(max_length=12, unique=True)  # 8 characters from an alphabet without look-alikes (0/O, 1/I/L)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    received_at = models.DateTimeField(null=True, blank=True)  # the barcode was scanned: her sheet is back
+    received_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    attempt = models.OneToOneField(Attempt, null=True, blank=True, on_delete=models.SET_NULL, related_name="paper_sheet")  # set once her answers are keyed in
+    entered_at = models.DateTimeField(null=True, blank=True)
+    entered_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        unique_together = [("exam", "student")]
+        ordering = ["student__first_name", "student__last_name", "id"]

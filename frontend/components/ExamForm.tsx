@@ -27,6 +27,7 @@ function Admin({ exam, reload }: { exam: any; reload: () => void }) {
       <div className="row">
         {st === "scheduled" && <button className="btn" onClick={() => run(() => api(`/exams/${exam.id}/unschedule/`, { body: {} }), "Back to draft.")}>Unschedule</button>}
         {st === "live" && <button className="btn danger" onClick={() => { const r = window.prompt("Close this live exam NOW? Give a reason:"); if (r) run(() => api(`/exams/${exam.id}/close/`, { body: { confirm: true, reason: r } }), "Exam closed."); }}>Close exam now</button>}
+        {(st === "live" || st === "closed" || st === "published") && <a className="btn" href={`/staff/exams/package/?id=${exam.id}`}>🖨 Home package (paper)</a>}
         {(st === "closed" || st === "published") && <button className="btn" onClick={() => downloadFile(`/exports/exams/${exam.id}/results/`, `results-${exam.id}.xlsx`).catch((e) => setErrs([e.message]))}>⬇ Results (Excel)</button>}
       </div>
       {(st === "closed" || st === "published") && paper.data && (
