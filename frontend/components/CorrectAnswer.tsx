@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { Modal, useLoad } from "@/components/ui";
 import { api, friendly } from "@/lib/api";
+import { eatDate } from "@/lib/clock";
 import { plain } from "@/lib/staff";
 import "./correct-answer.css";
 
@@ -12,6 +13,15 @@ const pct = (n: number) => `${Math.round(n * 10) / 10}%`;
 
 /** The class's own answers next to the key: a key that almost nobody matches is the usual sign that the key is wrong. */
 function Bar({ n, total }: { n: number; total: number }) { return <i className="ca-bar"><u style={{ width: `${total ? Math.max(2, (n / total) * 100) : 0}%` }} /></i>; }
+
+/** One accepted answer per line. Keeps the raw text while typing (trimming and dropping empty lines on every keystroke would eat spaces and Enter, so "Dar es Salaam" could not be typed). */
+function Lines({ label, rows, value, onChange }: { label: string; rows: number; value: string[]; onChange: (v: string[]) => void }) {
+  const [raw, setRaw] = useState(value.join("\n"));
+  return (
+    <label className="field"><span>{label}</span>
+      <textarea className="input" rows={rows} value={raw} onChange={(e) => { setRaw(e.target.value); onChange(e.target.value.split("\n").map((x) => x.trim()).filter(Boolean)); }} /></label>
+  );
+}
 
 function KeyEditor({ k, ans, setAns, content, setContent }: { k: any; ans: any; setAns: (a: any) => void; content: any; setContent: (c: any) => void }) {
   const dist: Record<string, number> = k.stats?.choices || {}, total = k.stats?.answered || 0;
@@ -39,11 +49,9 @@ function KeyEditor({ k, ans, setAns, content, setContent }: { k: any; ans: any; 
     </div>
   );
   if (t === "fill_blank") {
-    const lines = (ans.accepted || []).join("\n");
     return (
       <div className="ca-fill">
-        <label className="field"><span>Accepted answers (one per line)</span>
-          <textarea className="input" rows={4} value={lines} onChange={(e) => setAns({ ...ans, accepted: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
+        <Lines label="Accepted answers (one per line)" rows={4} value={ans.accepted || []} onChange={(v) => setAns({ ...ans, accepted: v })} />
         <div className="grid2">
           <label className="field"><span>Number answer: value (optional)</span><input className="input" type="number" step="any" value={ans.numeric?.value ?? ""} onChange={(e) => setAns({ ...ans, numeric: e.target.value === "" ? null : { value: Number(e.target.value), tolerance: ans.numeric?.tolerance ?? 0 } })} /></label>
           <label className="field"><span>… and how far off is still right</span><input className="input" type="number" step="any" min={0} disabled={!ans.numeric} value={ans.numeric?.tolerance ?? 0} onChange={(e) => setAns({ ...ans, numeric: { value: ans.numeric?.value ?? 0, tolerance: Math.abs(Number(e.target.value)) } })} /></label>
@@ -51,12 +59,35 @@ function KeyEditor({ k, ans, setAns, content, setContent }: { k: any; ans: any; 
       </div>
     );
   }
+  if (t === "fill_multi" && k.content?.mode === "bank") {
+    // Students choose words from a bank, so the right answer must be one of the bank's words (the bank itself cannot change).
+    const bank: any[] = k.content.bank || [], norm = (x: string) => String(x).trim().toLowerCase().replace(/\s+/g, " ");
+    const pick = (bid: string, wid: string) => {
+      const w = bank.find((x) => x.id === wid);
+      if (!w) return;
+      const blanks = { ...ans.blanks, [bid]: { accepted: [w.text] } };
+      const used = new Set(Object.values(blanks).flatMap((b: any) => (b.accepted || []).map(norm)));
+      setAns({ ...ans, blanks, distractors: bank.map((x) => x.text).filter((tx) => !used.has(norm(tx))) }); // the other words are the wrong ones
+    };
+    return (
+      <div className="ca-fill">
+        <p className="muted small">Students chose words from a word bank. Pick the right word for each blank.</p>
+        {(k.content.blanks || []).map((b: any, i: number) => {
+          const cur = bank.find((x) => norm(x.text) === norm(ans.blanks?.[b.id]?.accepted?.[0] ?? ""));
+          return (
+            <label key={b.id} className="field"><span>Blank {i + 1}</span>
+              <select className="input" value={cur?.id || ""} onChange={(e) => pick(b.id, e.target.value)}>
+                <option value="" disabled>Choose a word…</option>{bank.map((w) => <option key={w.id} value={w.id}>{w.text}</option>)}</select></label>
+          );
+        })}
+      </div>
+    );
+  }
   if (t === "fill_multi") return (
     <div className="ca-fill">
       {(k.content.blanks || []).map((b: any, i: number) => (
-        <label key={b.id} className="field"><span>Blank {i + 1}: accepted answers (one per line)</span>
-          <textarea className="input" rows={2} value={(ans.blanks?.[b.id]?.accepted || []).join("\n")}
-            onChange={(e) => setAns({ ...ans, blanks: { ...ans.blanks, [b.id]: { accepted: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) } } })} /></label>))}
+        <Lines key={b.id} label={`Blank ${i + 1}: accepted answers (one per line)`} rows={2} value={ans.blanks?.[b.id]?.accepted || []}
+          onChange={(v) => setAns({ ...ans, blanks: { ...ans.blanks, [b.id]: { accepted: v } } })} />))}
     </div>
   );
   if (t === "matching") return (
@@ -88,16 +119,16 @@ function Summary({ r, done }: { r: any; done?: boolean }) {
       <div className="ca-stats">
         <div><b>{r.students}</b><span>results re-marked</span></div>
         <div className={r.changed ? "chg" : ""}><b>{r.changed}</b><span>changed</span></div>
-        <div className="up"><b>▲ {r.up}</b><span>went up</span></div>
-        <div className="down"><b>▼ {r.down}</b><span>went down</span></div>
+        <div className="ca-up"><b>▲ {r.up}</b><span>went up</span></div>
+        <div className="ca-down"><b>▼ {r.down}</b><span>went down</span></div>
       </div>
-      {(r.pass_gained > 0 || r.pass_lost > 0) && <p className="ca-pass">{r.pass_gained > 0 && <span className="up">{r.pass_gained} now pass</span>}{r.pass_lost > 0 && <span className="down">{r.pass_lost} no longer pass</span>}</p>}
+      {(r.pass_gained > 0 || r.pass_lost > 0) && <p className="ca-pass">{r.pass_gained > 0 && <span className="ca-up">{r.pass_gained} now pass</span>}{r.pass_lost > 0 && <span className="ca-down">{r.pass_lost} no longer pass</span>}</p>}
       {r.rows.length > 0 && (
         <div className="ca-rows" role="table" aria-label="Students whose result changes">
           {r.rows.map((x: any) => (
             <div key={x.attempt_id} className="ca-row" role="row">
               <span className="ca-who"><b>{x.student}</b><small>{x.class}</small></span>
-              <span className="ca-chg">{pct(x.before.percent)} <i aria-hidden>→</i> <b className={x.after.percent >= x.before.percent ? "up" : "down"}>{pct(x.after.percent)}</b><small>{x.before.grade} → {x.after.grade}{x.before.passed !== x.after.passed ? (x.after.passed ? " · now passes" : " · no longer passes") : ""}</small></span>
+              <span className="ca-chg">{pct(x.before.percent)} <i aria-hidden>→</i> <b className={x.after.percent >= x.before.percent ? "ca-up" : "ca-down"}>{pct(x.after.percent)}</b><small>{x.before.grade} → {x.after.grade}{x.before.passed !== x.after.passed ? (x.after.passed ? " · now passes" : " · no longer passes") : ""}</small></span>
             </div>))}
         </div>
       )}
@@ -166,7 +197,12 @@ function Dialog({ exam, q, onClose, onDone }: { exam: any; q: any; onClose: () =
 
 /** The "fix a wrong answer" section of an exam's admin panel (closed or published exams): a button per question, and the history of corrections. */
 export default function CorrectAnswer({ exam, paper, reload }: { exam: any; paper: any[]; reload: () => void }) {
-  const [open, setOpen] = useState<any>(null), [showAll, setShowAll] = useState<number | null>(null);
+  const [open, setOpen] = useState<any>(null), [showAll, setShowAll] = useState<number | null>(null), [full, setFull] = useState<Record<number, any[]>>({}), [loadingFull, setLoadingFull] = useState(false);
+  async function loadFull() {
+    setLoadingFull(true);
+    try { const all = await api<any[]>(`/exams/${exam.id}/corrections/?full=1`); const m: Record<number, any[]> = {}; all.forEach((c) => { m[c.id] = c.changes; }); setFull(m); } catch { /* the first 20 stay visible */ }
+    setLoadingFull(false);
+  }
   const hist = useLoad(() => api<any[]>(`/exams/${exam.id}/corrections/`), [exam.id]);
   return (
     <div className="ca-panel">
@@ -179,11 +215,15 @@ export default function CorrectAnswer({ exam, paper, reload }: { exam: any; pape
         <div className="ca-hist"><h3>Corrections made</h3>
           {hist.data.map((c) => (
             <article key={c.id} className="ca-h">
-              <header><b>Question {c.number}</b><span>{new Date(c.created_at).toLocaleString()} · {c.by}</span></header>
+              <header><b>Question {c.number}</b><span>{eatDate(c.created_at, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {c.by}</span></header>
               <p>“{c.reason}”</p>
               <p className="small muted">{c.students} results re-marked · {c.changed} changed (▲ {c.up} · ▼ {c.down}){c.notified ? ` · ${c.notified} told` : ""}{c.bank_updated ? " · bank fixed" : ""}</p>
               {c.changes.length > 0 && <button type="button" className="linkbtn" onClick={() => setShowAll(showAll === c.id ? null : c.id)}>{showAll === c.id ? "Hide students ▲" : "Show students ▼"}</button>}
-              {showAll === c.id && <ul className="ca-hl">{c.changes.map((x: any, i: number) => <li key={i}><b>{x.student}</b> <small>{x.class}</small> {pct(x.before.percent)} → {pct(x.after.percent)}</li>)}</ul>}
+              {showAll === c.id && (
+                <>
+                  <ul className="ca-hl">{(full[c.id] || c.changes).map((x: any, i: number) => <li key={i}><b>{x.student}</b> <small>{x.class}</small> {pct(x.before.percent)} → {pct(x.after.percent)}</li>)}</ul>
+                  {!full[c.id] && c.changed > c.changes.length && <button type="button" className="linkbtn" disabled={loadingFull} onClick={() => loadFull()}>{loadingFull ? "Loading…" : `Show all ${c.changed} students`}</button>}
+                </>)}
             </article>))}
         </div>
       )}

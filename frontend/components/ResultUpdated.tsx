@@ -1,6 +1,7 @@
 "use client";
 /* A student's result that was re-marked after an administrator corrected a wrong answer key (server: exams/corrections.py).
    The banner says what it was, what it is now and why; the chip marks it in the results list. English and Swahili. */
+import { eatDate } from "@/lib/clock";
 import { useSession } from "@/lib/session";
 import "./result-updated.css";
 
@@ -16,14 +17,14 @@ export function ResultUpdatedBanner({ updated, percent, grade }: { updated: any;
   if (!updated) return null;
   const p = updated.previous || {}, up = percent >= (p.percent ?? percent);
   return (
-    <section className={`ru ${up ? "up" : "down"}`} role="status" aria-live="polite">
+    <section className={`ru ${up ? "ru-up" : "ru-down"}`} role="status" aria-live="polite">
       <span className="ru-ic" aria-hidden>{up ? "▲" : "▼"}</span>
       <div className="ru-body">
         <b>{tx.title}</b>
         <p>{tx.body}</p>
         <p className="ru-nums"><span>{tx.was}: <b>{r1(p.percent ?? 0)}%</b> ({tx.grade} {p.grade})</span><i aria-hidden>→</i><span>{tx.now}: <b>{r1(percent)}%</b> ({tx.grade} {grade})</span></p>
         {updated.reason && <p className="ru-why">{tx.why}{updated.question_number ? ` (${tx.q} ${updated.question_number})` : ""}: “{updated.reason}”</p>}
-        {updated.at && <small>{tx.on} {new Date(updated.at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small>}
+        {updated.at && <small>{tx.on} {eatDate(updated.at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }, lang)}</small>}
       </div>
     </section>
   );

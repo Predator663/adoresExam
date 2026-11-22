@@ -97,12 +97,13 @@ def sync_exam(exam, now=None):
 
 # ---------------------------------------------------------------- marking
 
-def compute_result(attempt):
+def compute_result(attempt, questions=None):
+    """`questions`: the exam's questions, when the caller marks many attempts of one exam and has loaded them once."""
     exam = attempt.exam
     answers = {a.exam_question_id: a for a in attempt.answers.all()}
     score = total = 0.0
     topics, touched = {}, []
-    for eq in exam.questions.all():
+    for eq in (questions if questions is not None else exam.questions.all()):
         if eq.voided:  # EXM-08: a voided question counts for nobody
             continue
         p = eq.payload
@@ -183,8 +184,9 @@ def end_attempt(attempt_id, admin, mark="submitted", reason="", now=None):
 
 
 def recompute_exam_results(exam):
-    for a in exam.attempts.exclude(status=Attempt.IN_PROGRESS).select_related("exam", "student"):
-        compute_result(a)
+    paper = list(exam.questions.all())
+    for a in exam.attempts.exclude(status=Attempt.IN_PROGRESS).select_related("exam", "student").prefetch_related("answers"):
+        compute_result(a, paper)
 
 
 # ---------------------------------------------------------------- starting

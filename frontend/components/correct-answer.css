@@ -31,7 +31,7 @@
 .ca-stats div{display:grid;gap:.1rem;padding:.6rem;border-radius:12px;background:var(--soft);text-align:center}
 .ca-stats b{font-size:1.3rem;font-variant-numeric:tabular-nums}
 .ca-stats span{font-size:.75rem;color:var(--muted)}
-.up{color:var(--primary)}.down{color:var(--bad,#c0392b)}
+.ca-up{color:var(--primary)}.ca-down{color:var(--bad,#c0392b)}
 .ca-pass{display:flex;flex-wrap:wrap;gap:.8rem;margin:0;font-weight:700}
 .ca-rows{display:grid;gap:.3rem;max-height:18rem;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:.3rem}
 .ca-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.2rem .8rem;padding:.4rem .5rem;border-radius:8px}
@@ -40,7 +40,7 @@
 .ca-who small,.ca-chg small{color:var(--muted);font-size:.74rem}
 .ca-chg{text-align:right;font-variant-numeric:tabular-nums}
 .ca-chg i{font-style:normal;opacity:.6}
-.ca-also{padding:.6rem .8rem;border-radius:12px;background:#fef3c7;color:#78350f}
+.ca-also{padding:.6rem .8rem;border-radius:12px;background:color-mix(in srgb,var(--warn) 16%,var(--surface));color:var(--text);border:1px solid var(--warn)}
 .ca-also ul{margin:.3rem 0;padding-left:1.2rem}
 .ca-done{font-weight:700}
 .ca-panel{display:grid;gap:.5rem}

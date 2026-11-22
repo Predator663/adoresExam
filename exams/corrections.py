@@ -26,10 +26,10 @@ from core.sanitize import clean_html
 from questions.models import Question, QuestionVersion
 from questions.validation import validate_question
 from . import services
-from .models import Attempt, Exam, ExamCorrection, ExamQuestion, Result, ResultChange
+from .models import Answer, Attempt, Exam, ExamCorrection, ExamQuestion, Result, ResultChange, SavedQuestion
 from .services import ExamError
 
-ID_KEYS = ("options", "left", "right", "items")  # lists of choices whose ids students' answers refer to
+ID_KEYS = ("options", "left", "right", "items", "blanks", "bank")  # lists of choices whose ids students' answers refer to
 MAX_ROWS = 200  # students listed in a preview / history (the counts are always for everybody)
 
 
@@ -44,6 +44,13 @@ def _msg(e):
 
 def _ids(content):
     return {k: sorted(str(i.get("id")) for i in content.get(k, [])) for k in ID_KEYS if isinstance(content.get(k), list)}
+
+
+def _norm(p):
+    """The correctable parts, with a missing explanation equal to an empty one (so "nothing changed" is detected)."""
+    v = view(p)
+    v["explanation"] = v.get("explanation") or ""
+    return v
 
 
 def view(payload):
@@ -65,6 +72,10 @@ def build_payload(payload, changes):
         new["content"], new["answer"] = validate_question(new["qtype"], content, answer, new.get("prompt", ""))
     except ValidationError as e:
         raise ExamError(_msg(e), 400, "invalid_answer")
+    old_bank = (payload.get("content") or {}).get("bank")
+    if new["qtype"] == "fill_multi" and (payload.get("content") or {}).get("mode") == "bank" and isinstance(old_bank, list):
+        # students' answers are word-bank ids: validate_question rebuilds the bank from the accepted answers, which would change what each id means
+        new["content"] = {**new["content"], "mode": "bank", "bank": copy.deepcopy(old_bank)}
     if "marks" in changes and changes["marks"] not in (None, ""):
         try:
             m = float(changes["marks"])
@@ -138,23 +149,26 @@ def correct(exam_id, eq_id, changes, reason, by, *, preview=False, notify=True, 
             raise ExamError("This question was voided, so it counts for nobody. Nothing to correct.", 409, "voided")
         before = copy.deepcopy(eq.payload)
         after = build_payload(before, changes)
-        if after == before:
+        if _norm(after) == _norm(before):
             raise ExamError("That is exactly what is saved already: nothing to correct.", 400, "no_change")
 
-        attempts = list(exam.attempts.exclude(status=Attempt.IN_PROGRESS).select_related("exam", "student__school_class"))
+        attempts = list(exam.attempts.exclude(status=Attempt.IN_PROGRESS).select_related("exam", "student__school_class").prefetch_related("answers"))
         old = {r.attempt_id: _snap(r) for r in Result.objects.filter(attempt_id__in=[a.pk for a in attempts])}
         eq.payload = after
         eq.save(update_fields=["payload"])
+        paper = list(exam.questions.all())  # loaded once for every student (compute_result would otherwise reload every question's JSON per student)
         corr = ExamCorrection.objects.create(exam=exam, exam_question=eq, number=eq.position, by=by, reason=reason[:300], before=view(before), after=view(after))
 
         moved, up, down = [], 0, 0
         for a in attempts:
-            res = services.compute_result(a)  # the same marking as the first time; also re-marks each Answer
+            res = services.compute_result(a, paper)  # the same marking as the first time; also re-marks each Answer
             now_snap, prev = _snap(res), old.get(a.pk)
             if prev is None or not _moved(prev, now_snap):
                 continue
-            res.revision, res.corrected_at, res.previous = res.revision + 1, now, prev
-            res.save(update_fields=["revision", "corrected_at", "previous"])
+            if exam.status == Exam.PUBLISHED and services.result_visible(a, now):
+                # only a result she has already been able to see is "updated": otherwise she would be shown a mark she never saw
+                res.revision, res.corrected_at, res.previous = res.revision + 1, now, prev
+                res.save(update_fields=["revision", "corrected_at", "previous"])
             ResultChange.objects.create(correction=corr, result=res, student=a.student, before=prev, after=now_snap)
             up += now_snap["percent"] > prev["percent"]
             down += now_snap["percent"] < prev["percent"]
@@ -166,14 +180,15 @@ def correct(exam_id, eq_id, changes, reason, by, *, preview=False, notify=True, 
             except Exception:
                 pass
         corr.students, corr.changed, corr.up, corr.down = len(attempts), len(moved), up, down
+        _refresh_saved(eq, after, [a.pk for a in attempts])
 
         bank, future, also = False, 0, []
         if eq.source_id:
             q = Question.objects.select_for_update().filter(pk=eq.source_id).first()
             if q and update_bank and q.answer == before.get("answer"):
-                q.answer, q.content, q.marks, q.explanation = after["answer"], after["content"], after.get("marks", q.marks), after.get("explanation", q.explanation)
+                q.answer, q.content, q.explanation = after["answer"], after["content"], after.get("explanation", q.explanation)  # marks are this exam's own
                 q.version += 1
-                q.save(update_fields=["answer", "content", "marks", "explanation", "version"])
+                q.save(update_fields=["answer", "content", "explanation", "version"])
                 QuestionVersion.objects.create(question=q, version=q.version, edited_by=by, snapshot={
                     f: getattr(q, f) for f in ("subject_id", "form_level", "topic", "subtopic", "difficulty", "marks", "language", "qtype", "prompt", "content", "answer", "explanation")})
                 bank = True
@@ -181,7 +196,7 @@ def correct(exam_id, eq_id, changes, reason, by, *, preview=False, notify=True, 
                 if other.payload.get("answer") != before.get("answer"):
                     continue  # that exam already has a different key: leave it alone
                 if other.exam.status in (Exam.DRAFT, Exam.SCHEDULED) and update_bank:
-                    other.payload = {**other.payload, "answer": after["answer"], "content": after["content"], "marks": after.get("marks", other.payload.get("marks")),
+                    other.payload = {**other.payload, "answer": after["answer"], "content": after["content"],
                                      "explanation": after.get("explanation", other.payload.get("explanation", ""))}
                     other.save(update_fields=["payload"])
                     future += 1
@@ -206,6 +221,19 @@ def correct(exam_id, eq_id, changes, reason, by, *, preview=False, notify=True, 
         if notify:
             transaction.on_commit(lambda: _tell(info, tell))
     return out
+
+
+def _refresh_saved(eq, after, attempt_ids):
+    """Students bookmark questions from their review; the bookmark keeps a private COPY of the answer key. Bring those copies up to date,
+    so nobody keeps studying the old, wrong answer."""
+    saved = list(SavedQuestion.objects.filter(attempt_id__in=attempt_ids, number=eq.position))
+    if not saved:
+        return
+    got = dict(Answer.objects.filter(exam_question=eq, attempt_id__in=attempt_ids).values_list("attempt_id", "marks_awarded"))
+    for sv in saved:
+        sv.snapshot = {**sv.snapshot, "answer": after["answer"], "content": after["content"], "marks": after.get("marks", sv.snapshot.get("marks")),
+                       "explanation": after.get("explanation", ""), "marks_awarded": got.get(sv.attempt_id) or 0}
+    SavedQuestion.objects.bulk_update(saved, ["snapshot"])
 
 
 def _tell(info, tell):

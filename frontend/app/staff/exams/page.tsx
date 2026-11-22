@@ -61,6 +61,7 @@ export default function Exams() {
   const { user, lang } = useSession();
   const admin = user?.role === "admin" || user?.role === "super_admin";
   const [edit, setEdit] = useState<number | "new" | null>(null);
+  useEffect(() => { const v = new URLSearchParams(location.search).get("id"); if (v && /^\d+$/.test(v)) setEdit(Number(v)); }, []); // a notification link opens that exam
   const list = useLoad(() => api<Exam[]>("/exams/"));
   const classes = useLoad(() => api<any[]>("/classes/"));
   const subjects = useLoad(() => api<any[]>("/subjects/"));

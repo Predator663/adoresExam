@@ -2,6 +2,7 @@
 Run:  python manage.py test exams.test_corrections"""
 from datetime import timedelta
 
+from django.test import SimpleTestCase
 from django.utils import timezone
 
 from academics.models import TeacherAssignment
@@ -11,8 +12,9 @@ from gamification import rules, services as gam
 from gamification.models import XPEvent
 from notifications.models import Notification
 from questions.models import Question
-from . import services
-from .models import Answer, Attempt, Exam, ExamCorrection, ExamQuestion, Result, ResultChange
+from core.models import SchoolSettings
+from . import corrections, services
+from .models import Answer, Attempt, Exam, ExamCorrection, ExamQuestion, Result, ResultChange, SavedQuestion
 from .tests import Base, mcq
 
 
@@ -46,7 +48,8 @@ class CorrectionTests(Base):
 
     def fix(self, **extra):
         body = {"exam_question_id": self.q1.pk, "answer": {"correct": "b"}, "reason": "Option B is the right answer, the key had a typo", **extra}
-        return self.client_for(self.admin).post(f"/api/exams/{self.exam.pk}/correct-question/", body, format="json")
+        with self.captureOnCommitCallbacks(execute=True):  # the notifications are sent after the commit; a TestCase never commits by itself
+            return self.client_for(self.admin).post(f"/api/exams/{self.exam.pk}/correct-question/", body, format="json")
 
     def test_before_state(self):
         self.assertEqual((self.res("amina").percent, self.res("zawadi").percent), (50.0, 100.0))
@@ -203,3 +206,58 @@ class CorrectionTests(Base):
         self.assertEqual(d["answer"], {"correct": "a"})
         self.assertEqual(d["stats"]["answered"], 2)
         self.assertEqual(d["stats"]["choices"], {"a": 1, "b": 1})
+
+
+    def test_bookmarked_copies_get_the_corrected_answer(self):
+        sv = SavedQuestion.objects.create(student=self.amina, attempt=self.att["amina"], number=1,
+                                          snapshot={"answer": {"correct": "a"}, "content": self.q1.payload["content"], "marks": 2, "explanation": "old", "marks_awarded": 0})
+        self.fix()
+        sv.refresh_from_db()
+        self.assertEqual((sv.snapshot["answer"], sv.snapshot["marks_awarded"]), ({"correct": "b"}, 2))
+
+    # ---- a correction BEFORE results are released: nobody may be shown a mark she never saw
+    def test_a_correction_before_release_shows_no_updated_banner(self):
+        st = SchoolSettings.load()
+        st.result_delay_minutes = 30
+        st.save()
+        now = timezone.now()
+        Exam.objects.filter(pk=self.exam.pk).update(status=Exam.CLOSED, start_at=now - timedelta(hours=2), end_at=now - timedelta(minutes=1))
+        r = self.fix()
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertFalse(r.json()["visible_now"])
+        a = self.res("amina")
+        self.assertEqual((a.percent, a.revision, a.previous), (100.0, 0, None))  # re-marked, but she never saw 50%
+        self.assertEqual(Notification.objects.filter(kind="result_updated").count(), 0)
+        self.assertEqual(ExamCorrection.objects.get().changed, 2)  # the admin's history still records it
+
+
+class BuildPayloadTests(SimpleTestCase):
+    def test_a_missing_explanation_equals_an_empty_one(self):
+        base = {"answer": {"correct": "a"}, "content": {}, "marks": 1}
+        self.assertEqual(corrections._norm(base), corrections._norm({**base, "explanation": ""}))
+
+    def test_the_word_bank_keeps_its_ids_and_words(self):
+        bank = [{"id": "w1", "text": "x"}, {"id": "w2", "text": "y"}, {"id": "w3", "text": "z"}]
+        p = {"qtype": "fill_multi", "prompt": "A [[1]] B [[2]]", "marks": 2,
+             "content": {"blanks": [{"id": "1"}, {"id": "2"}], "mode": "bank", "bank": bank, "hint": "", "width": "medium"},
+             "answer": {"blanks": {"1": {"accepted": ["x"]}, "2": {"accepted": ["y"]}}, "distractors": ["z"], "case_sensitive": False, "ignore_punct": False, "partial": None}}
+        new = corrections.build_payload(p, {"answer": {**p["answer"], "blanks": {"1": {"accepted": ["q", "x"]}, "2": {"accepted": ["y"]}}}})
+        self.assertEqual(new["content"]["bank"], bank)  # students' answers are word ids: they must still mean the same words
+        self.assertEqual(new["answer"]["blanks"]["1"]["accepted"], ["q", "x"])
+
+    def test_choosing_another_bank_word_as_the_right_one(self):
+        bank = [{"id": "w1", "text": "x"}, {"id": "w2", "text": "y"}, {"id": "w3", "text": "z"}]
+        p = {"qtype": "fill_multi", "prompt": "A [[1]] B [[2]]", "marks": 2,
+             "content": {"blanks": [{"id": "1"}, {"id": "2"}], "mode": "bank", "bank": bank, "hint": "", "width": "medium"},
+             "answer": {"blanks": {"1": {"accepted": ["x"]}, "2": {"accepted": ["y"]}}, "distractors": ["z"], "case_sensitive": False, "ignore_punct": False, "partial": None}}
+        new = corrections.build_payload(p, {"answer": {**p["answer"], "blanks": {"1": {"accepted": ["z"]}, "2": {"accepted": ["y"]}}, "distractors": ["x"]}})
+        self.assertEqual(new["answer"]["blanks"]["1"]["accepted"], ["z"])
+        self.assertEqual(new["content"]["bank"], bank)
+
+    def test_several_answers_and_ordering(self):
+        opts = [{"id": i, "text": i} for i in "abc"]
+        m = {"qtype": "mcq_multi", "prompt": "p", "marks": 2, "content": {"options": opts}, "answer": {"correct": ["a"]}}
+        self.assertEqual(corrections.build_payload(m, {"answer": {"correct": ["b", "a"]}})["answer"], {"correct": ["a", "b"]})
+        o = {"qtype": "ordering", "prompt": "p", "marks": 2, "content": {"items": opts}, "answer": {"order": ["a", "b", "c"]}}
+        new = corrections.build_payload(o, {"content": {"items": [opts[2], opts[0], opts[1]]}})
+        self.assertEqual(new["answer"], {"order": ["c", "a", "b"]})

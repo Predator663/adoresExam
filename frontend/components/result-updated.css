@@ -1,7 +1,7 @@
 .ru{display:flex;gap:.8rem;align-items:flex-start;margin:0 0 .8rem;padding:.9rem 1rem;border-radius:18px;border:1px solid color-mix(in srgb,var(--primary) 40%,var(--border));background:color-mix(in srgb,var(--primary) 9%,var(--surface));animation:ru-in .5s cubic-bezier(.2,.8,.2,1) both}
-.ru.down{border-color:#f59e0b;background:#fffbeb;color:#78350f}
+.ru.ru-down{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,var(--surface));color:var(--text)}
 .ru-ic{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:12px;background:var(--primary);color:var(--on-primary);font-size:1rem;animation:ru-pulse 1.8s .5s 2}
-.ru.down .ru-ic{background:#f59e0b;color:#fff}
+.ru.ru-down .ru-ic{background:var(--warn);color:var(--surface)}
 .ru-body{display:grid;gap:.25rem;min-width:0}
 .ru-body p{margin:0;overflow-wrap:anywhere}
 .ru-nums{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .7rem;font-variant-numeric:tabular-nums}
