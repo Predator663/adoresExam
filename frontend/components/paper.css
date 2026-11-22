@@ -56,6 +56,17 @@
 .pp-line{display:inline-block;flex:1;min-width:60mm;border-bottom:1.5px solid #000;height:7mm}.pp-line.short{flex:none;min-width:34mm}
 .pp-end{margin:1rem 0 0;text-align:center;font:italic 9pt Arial,sans-serif}
 
+/* On screen the package is a preview of the A4 page: always A4 wide, shrunk to fit a phone, so it never pushes the page sideways. */
+@media screen{
+  .hp{max-width:100%;overflow-x:hidden}
+  .pp-all{max-width:100%;overflow-x:auto;justify-items:start}
+  .pp-pack{width:210mm;max-width:none;table-layout:fixed;flex:none}
+}
+@media screen and (max-width:860px){.pp-pack{zoom:.8}}
+@media screen and (max-width:700px){.pp-pack{zoom:.62}}
+@media screen and (max-width:520px){.pp-pack{zoom:.44}}
+@media screen and (max-width:400px){.pp-pack{zoom:.38}}
+
 @media print{
   @page{size:A4;margin:10mm 8mm 12mm}
   html,body{background:#fff!important}
