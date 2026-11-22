@@ -1,0 +1,15 @@
+.ru{display:flex;gap:.8rem;align-items:flex-start;margin:0 0 .8rem;padding:.9rem 1rem;border-radius:18px;border:1px solid color-mix(in srgb,var(--primary) 40%,var(--border));background:color-mix(in srgb,var(--primary) 9%,var(--surface));animation:ru-in .5s cubic-bezier(.2,.8,.2,1) both}
+.ru.down{border-color:#f59e0b;background:#fffbeb;color:#78350f}
+.ru-ic{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:12px;background:var(--primary);color:var(--on-primary);font-size:1rem;animation:ru-pulse 1.8s .5s 2}
+.ru.down .ru-ic{background:#f59e0b;color:#fff}
+.ru-body{display:grid;gap:.25rem;min-width:0}
+.ru-body p{margin:0;overflow-wrap:anywhere}
+.ru-nums{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .7rem;font-variant-numeric:tabular-nums}
+.ru-nums i{font-style:normal;opacity:.6}
+.ru-why{font-style:italic}
+.ru small{opacity:.75}
+.ru-chip{display:inline-flex;align-items:center;gap:.25rem;margin-top:.2rem;padding:.12rem .55rem;border-radius:99px;font-size:.74rem;font-weight:800;background:color-mix(in srgb,var(--primary) 14%,var(--surface));color:var(--primary);overflow-wrap:anywhere}
+@keyframes ru-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes ru-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 50%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media(prefers-reduced-motion:reduce){.ru,.ru-ic{animation:none}}
+.reduce-motion .ru,.reduce-motion .ru-ic{animation:none}

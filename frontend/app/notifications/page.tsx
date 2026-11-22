@@ -13,7 +13,7 @@ import { useSession } from "@/lib/session";
 /** NOT-01: in-app notifications (upcoming exams, exam start, results ready, password changes, badges). */
 export default function Notifications() {
   const { t, lang, user } = useSession();
-  const ico = (k: string) => (k === "results_ready" || k === "results" ? "chart" : k === "exam_reminder" || k === "exam_start" ? "calendar" : k === "badge" || k === "level_up" ? "medal" : k === "password" ? "key" : "bell");
+  const ico = (k: string) => (k === "results_ready" || k === "results" || k === "result_updated" ? "chart" : k === "exam_reminder" || k === "exam_start" ? "calendar" : k === "badge" || k === "level_up" ? "medal" : k === "password" ? "key" : "bell");
   const pg = usePaged<any>("/notifications/", {}, { size: 20, cache: String(user?.id ?? "") });
   const { data, error, loading, reload } = pg;
   useEffect(() => { if (data?.unread) api("/notifications/read/", { body: { all: true } }).then(() => window.dispatchEvent(new Event("amani:notifications"))).catch(() => {}); }, [data]);

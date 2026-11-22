@@ -24,7 +24,7 @@ from questions import shares
 from questions.models import Question
 from questions.views import QuestionSerializer
 from proctoring import services as proctoring
-from . import services
+from . import corrections, services
 from .sections import letters, qtype_rank
 from . import timing
 from .models import Answer, Attempt, AttemptEvent, BuilderDraft, Exam, ExamGrant, ExamQuestion, Result, SavedQuestion
@@ -230,6 +230,10 @@ def _result_payload(attempt, result):
                     "percent": round(v[0] / v[1] * 100, 1) if v[1] else 0} for t, v in result.topic_stats.items()],
     }
     out["revise"] = [t["topic"] for t in sorted(out["topics"], key=lambda t: t["percent"]) if t["percent"] < 60][:3]  # RES-04
+    if result.revision:  # re-marked after a correction: show what it was and why
+        ch = result.changes.select_related("correction").order_by("-id").first()
+        out["updated"] = {"at": result.corrected_at, "revision": result.revision, "previous": result.previous,
+                          "reason": ch.correction.reason if ch else "", "question_number": ch.correction.number if ch else None}
     if s.show_class_position and attempt.student.school_class_id:
         mine = others.filter(student__school_class_id=attempt.student.school_class_id)
         out["class_position"] = mine.filter(score__gt=result.score).count() + 1
@@ -245,7 +249,8 @@ def my_results(request):
     for r in Result.objects.filter(student=request.user).select_related("attempt__exam__subject"):
         if services.result_visible(r.attempt, now):
             rows.append({"attempt_id": r.attempt_id, "exam": r.exam.title, "subject": r.exam.subject.name,
-                         "percent": r.percent, "grade": r.grade, "date": r.exam.start_at})
+                         "percent": r.percent, "grade": r.grade, "date": r.exam.start_at,
+                         "updated": r.revision > 0, "previous_percent": (r.previous or {}).get("percent") if r.revision else None})
     rows.sort(key=lambda x: x["date"], reverse=True)
     return Response(paginate(request, rows) or rows)
 
@@ -827,6 +832,39 @@ class ExamViewSet(viewsets.ModelViewSet):
         services.recompute_exam_results(exam)
         audit(request.user, "question.void", eq.pk, exam=exam.pk, reason=reason)
         return Response({"ok": True, "total_marks": exam.total_marks})
+
+    # ---- a wrong answer key found after the exam: fix it and re-mark everything (exams/corrections.py) ----
+    @action(detail=True, methods=["get"], url_path="question-key", permission_classes=[IsAdminRole])
+    def question_key(self, request, pk=None):
+        """The question with its CURRENT answer key and how the class answered it, for the correction screen (administrators only)."""
+        exam = self.get_object()
+        return Response(corrections.key_info(get_object_or_404(exam.questions, pk=request.query_params.get("eq"))))
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminRole], url_path="correct-question")
+    def correct_question(self, request, pk=None):
+        """Fix a question's answer key (and optionally its marks or explanation) after the exam closed. Every result of the exam is re-marked
+        in one transaction and the students whose result moved are told. `preview: true` shows the effect and changes nothing.
+        Body: exam_question_id, answer, [content], [marks], [explanation], reason, [preview], [notify], [update_bank]."""
+        exam = self.get_object()
+        d = request.data
+        try:
+            eq_id = int(d.get("exam_question_id"))
+        except (TypeError, ValueError):
+            raise ValidationError({"detail": "Choose the question to correct."})
+        changes = {k: d[k] for k in ("answer", "content", "marks", "explanation") if k in d}
+        try:
+            return Response(corrections.correct(exam.pk, eq_id, changes, d.get("reason"), request.user, preview=d.get("preview") is True,
+                                                notify=d.get("notify") is not False, update_bank=d.get("update_bank") is not False))
+        except ExamError as e:
+            return Response({"detail": e.message, "code": e.code}, status=e.status)
+
+    @action(detail=True, methods=["get"])
+    def corrections(self, request, pk=None):
+        """Every correction made to this exam's questions, newest first, with the students each one moved (staff of the subject)."""
+        exam = self.get_object()
+        if not _teaches(request.user, exam.subject_id):
+            raise PermissionDenied()
+        return Response(corrections.history(exam, full=request.query_params.get("full") == "1"))
 
     @action(detail=True, methods=["post"], permission_classes=[IsAdminRole])
     def grant(self, request, pk=None):

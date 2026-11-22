@@ -150,6 +150,11 @@ class Result(models.Model):
     scale_snapshot = models.JSONField()  # GRD-04: the scale in force when marked
     time_taken_seconds = models.PositiveIntegerField(default=0)
     topic_stats = models.JSONField(default=dict)  # {topic: [earned, possible]}  (RES-04)
+    # A correction of the answer key re-marks the result (exams/corrections.py). `revision` counts those re-marks (0 = never corrected),
+    # `previous` is what the result was BEFORE the latest one, so the student can be shown "updated: 50% -> 80%".
+    revision = models.PositiveSmallIntegerField(default=0)
+    corrected_at = models.DateTimeField(null=True, blank=True)
+    previous = models.JSONField(null=True, blank=True)  # {score, total, percent, grade, passed}
 
     class Meta:
         indexes = [models.Index(fields=["exam", "-score"])]
@@ -175,3 +180,40 @@ class AttemptEvent(models.Model):
     attempt = models.ForeignKey(Attempt, on_delete=models.CASCADE, related_name="events")
     kind = models.CharField(max_length=20)  # left_screen | returned
     at = models.DateTimeField(auto_now_add=True)
+
+
+class ExamCorrection(models.Model):
+    """A fix to one question's answer key (or marks) AFTER the exam closed, with everything it changed (exams/corrections.py).
+    Kept forever: who corrected what, why, what it was before and after, and how many results moved."""
+
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="corrections")
+    exam_question = models.ForeignKey(ExamQuestion, null=True, on_delete=models.SET_NULL, related_name="corrections")
+    number = models.PositiveIntegerField()  # the question's number in the paper
+    by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    reason = models.CharField(max_length=300)
+    before = models.JSONField(default=dict)  # {answer, content, marks, explanation} as it was
+    after = models.JSONField(default=dict)   # ... and as it is now
+    students = models.PositiveIntegerField(default=0)  # results re-marked
+    changed = models.PositiveIntegerField(default=0)   # results whose score, grade or pass/fail moved
+    up = models.PositiveIntegerField(default=0)
+    down = models.PositiveIntegerField(default=0)
+    notified = models.PositiveIntegerField(default=0)
+    bank_updated = models.BooleanField(default=False)  # the question in the question bank was fixed too
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+
+class ResultChange(models.Model):
+    """One student's result before and after one correction."""
+
+    correction = models.ForeignKey(ExamCorrection, on_delete=models.CASCADE, related_name="changes")
+    result = models.ForeignKey(Result, on_delete=models.CASCADE, related_name="changes")
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    before = models.JSONField()  # {score, total, percent, grade, passed}
+    after = models.JSONField()
+
+    class Meta:
+        ordering = ["-id"]
+

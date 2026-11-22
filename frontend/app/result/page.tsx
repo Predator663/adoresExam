@@ -1,4 +1,5 @@
 "use client";
+import { ResultUpdatedBanner } from "@/components/ResultUpdated";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Icon from "@/components/Icon";
@@ -58,6 +59,7 @@ function Detail({ id }: { id: number }) {
     <>
       {d.passed && <Confetti once={`result-${id}`} />}
       <Link href="/results/" className="sx-back">← {t("nav_results")}</Link>
+      <ResultUpdatedBanner updated={d.updated} percent={d.percent} grade={d.grade} />
       <section className={`sx-rhero rs-hero ${d.passed ? "passed" : ""}`}>
         <i className="rs-blob" aria-hidden />
         <div className="sx-rhero-top"><span>{d.subject}</span></div>

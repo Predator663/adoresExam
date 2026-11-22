@@ -364,6 +364,41 @@ def reward_attempt(attempt, now=None):
     return True
 
 
+def reconcile_exam_rewards(attempt, result):
+    """An administrator corrected a question and this student's result changed (exams/corrections.py): make the XP that exam earned her
+    match her NEW percentage, so the ledger never keeps paying for a wrong mark. Score XP and the improvement / perfect-score bonuses are
+    re-settled (raised, lowered or removed); XP for submitting and finishing early does not depend on the mark. A badge she already
+    earned is never taken away; a badge the new mark now earns is given. Does nothing if her rewards for this exam were never processed
+    (they will simply use the corrected result when they are). Returns True if it touched anything."""
+    if attempt.attempt_no != 1:
+        return False
+    mark = ExamRewardMark.objects.filter(user=attempt.student, exam_id=attempt.exam_id).first()
+    if mark is None:
+        return False
+    cfg, student, exam = config(), attempt.student, attempt.exam
+    xp = cfg["xp"]
+
+    def settle(kind, key, points, **detail):
+        ev = XPEvent.objects.filter(user=student, key=key).first()
+        if points > 0 and ev is None:
+            XPEvent.objects.create(user=student, kind=kind, points=points, key=key, exam_id=exam.pk, detail=detail)
+        elif points > 0 and (ev.points != points or ev.detail != detail):
+            ev.points, ev.detail = points, detail
+            ev.save(update_fields=["points", "detail"])
+        elif points <= 0 and ev is not None:
+            ev.delete()
+
+    prev = previous_percent(student, exam)
+    settle("score", f"score:{exam.pk}", rules.score_xp(result.percent, xp["score_per_percent"], xp["score_max"]), percent=int(result.percent + 0.5))
+    settle("improve", f"improve:{exam.pk}", xp["improvement"] if prev is not None and result.percent > prev + 1e-9 else 0)
+    settle("perfect", f"perfect:{exam.pk}", xp["perfect_score"] if result.percent >= 100 - 1e-9 else 0)
+    new_badges = evaluate_badges(student, cfg) or []
+    if new_badges:
+        mark.badges = list(mark.badges or []) + list(new_badges)
+        mark.save(update_fields=["badges"])
+    return True
+
+
 def reward_pending_for(student, now=None):
     """Process any published exam this student has not been rewarded for yet. Called when she opens her
     home page or results, so correctness never depends on the cron job."""

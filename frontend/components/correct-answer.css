@@ -1,0 +1,57 @@
+/* Admin: fix a wrong answer key (CorrectAnswer.tsx). Theme colours only. */
+.ca{display:grid;gap:.8rem;min-width:0;max-width:44rem}
+.ca h2,.ca h3{margin:0}
+.ca-q{padding:.7rem .9rem;border-radius:14px;background:var(--soft)}
+.ca-prompt{margin:.2rem 0 0;overflow-wrap:anywhere}
+.ca-opts,.ca-tf{display:grid;gap:.5rem}
+.ca-opt{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"mk tx" "mk pk";gap:.1rem .7rem;align-items:center;width:100%;padding:.7rem .8rem;border:2px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font:inherit;text-align:left;cursor:pointer;min-height:56px;transition:border-color .2s,background .2s,transform .15s}
+.ca-opt:hover{border-color:var(--primary)}
+.ca-opt:active{transform:scale(.99)}
+.ca-opt.on{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 10%,var(--surface))}
+.ca-mark{grid-area:mk;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:2px solid var(--border);font-weight:800;color:var(--on-primary)}
+.ca-opt.on .ca-mark{background:var(--primary);border-color:var(--primary)}
+.ca-otext{grid-area:tx;overflow-wrap:anywhere;font-weight:700}
+.ca-picked{grid-area:pk;display:grid;gap:.25rem;color:var(--muted);font-size:.78rem}
+.ca-bar{display:block;height:6px;border-radius:99px;background:var(--soft);overflow:hidden}
+.ca-bar u{display:block;height:100%;border-radius:99px;background:color-mix(in srgb,var(--primary) 70%,#fff)}
+.ca-tf{grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))}
+.ca-fill,.ca-match{display:grid;gap:.6rem}
+.ca-order{display:grid;gap:.4rem;margin:0;padding-left:1.4rem}
+.ca-order li{display:flex;align-items:center;gap:.4rem;padding:.4rem .5rem;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.ca-order .btn{min-height:40px;min-width:40px;padding:0}
+.ca-more{border:1px solid var(--border);border-radius:14px;padding:.5rem .8rem}
+.ca-more summary{cursor:pointer;font-weight:700;min-height:36px;display:flex;align-items:center}
+.ca-opt2{display:grid;gap:.45rem}
+.ca-opt2 label{display:flex;gap:.55rem;align-items:flex-start;overflow-wrap:anywhere}
+.ca-opt2 input{margin-top:.25rem;flex:none;width:18px;height:18px}
+.ca-acts{display:flex;flex-wrap:wrap;gap:.5rem}
+.ca-acts .btn{min-height:46px;flex:1 1 9rem}
+.ca-preview{display:grid;gap:.5rem;padding:.8rem;border:2px solid var(--primary);border-radius:16px;animation:ca-in .3s cubic-bezier(.2,.8,.2,1) both}
+.ca-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(6.5rem,1fr));gap:.5rem}
+.ca-stats div{display:grid;gap:.1rem;padding:.6rem;border-radius:12px;background:var(--soft);text-align:center}
+.ca-stats b{font-size:1.3rem;font-variant-numeric:tabular-nums}
+.ca-stats span{font-size:.75rem;color:var(--muted)}
+.up{color:var(--primary)}.down{color:var(--bad,#c0392b)}
+.ca-pass{display:flex;flex-wrap:wrap;gap:.8rem;margin:0;font-weight:700}
+.ca-rows{display:grid;gap:.3rem;max-height:18rem;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:.3rem}
+.ca-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.2rem .8rem;padding:.4rem .5rem;border-radius:8px}
+.ca-row:nth-child(odd){background:var(--soft)}
+.ca-who,.ca-chg{display:grid;min-width:0}
+.ca-who small,.ca-chg small{color:var(--muted);font-size:.74rem}
+.ca-chg{text-align:right;font-variant-numeric:tabular-nums}
+.ca-chg i{font-style:normal;opacity:.6}
+.ca-also{padding:.6rem .8rem;border-radius:12px;background:#fef3c7;color:#78350f}
+.ca-also ul{margin:.3rem 0;padding-left:1.2rem}
+.ca-done{font-weight:700}
+.ca-panel{display:grid;gap:.5rem}
+.ca-line{display:flex;align-items:center;gap:.6rem}
+.ca-line .btn{min-height:44px;flex:none}
+.ca-hist{display:grid;gap:.5rem}
+.ca-h{padding:.7rem .85rem;border:1px solid var(--border);border-radius:14px;display:grid;gap:.2rem;animation:ca-in .3s both}
+.ca-h header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.2rem .8rem}
+.ca-h header span{color:var(--muted);font-size:.8rem}
+.ca-h p{margin:0;overflow-wrap:anywhere}
+.ca-hl{margin:.2rem 0 0;padding-left:1.1rem;display:grid;gap:.15rem;font-variant-numeric:tabular-nums}
+@keyframes ca-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.ca-preview,.ca-h,.ca-opt{animation:none;transition:none}}
+.reduce-motion .ca-preview,.reduce-motion .ca-h,.reduce-motion .ca-opt{animation:none;transition:none}

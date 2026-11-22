@@ -1,4 +1,5 @@
 "use client";
+import { ResultUpdatedChip } from "@/components/ResultUpdated";
 import Link from "next/link";
 import ResultsWaiting from "@/components/ResultsWaiting";
 import Icon from "@/components/Icon";
@@ -32,6 +33,7 @@ export default function Results() {
                   <b className="sx-rtitle">{r.exam}</b>
                   <span className="muted small"><span className="sx-subj">{r.subject}</span> · {eatDate(r.date, { day: "numeric", month: "short", year: "numeric" }, lang)}</span>
                   <span className="sx-rbar" role="presentation"><i style={{ width: `${Math.max(2, Math.min(100, r.percent))}%` }} /></span>
+                  {r.updated && <ResultUpdatedChip previous={r.previous_percent} percent={r.percent} />}
                 </span>
                 <b className="sx-pct">{Math.round(r.percent)}%</b>
                 <Icon n="chevron" size={16} />

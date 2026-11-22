@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import CorrectAnswer from "./CorrectAnswer";
 import ExamBuilder from "./ExamBuilder";
 import ExamWindowPicker from "./ExamWindowPicker";
 import { useToast } from "./SubmitFlow";
@@ -30,6 +31,7 @@ function Admin({ exam, reload }: { exam: any; reload: () => void }) {
       </div>
       {(st === "closed" || st === "published") && paper.data && (
         <>
+          <CorrectAnswer exam={exam} paper={paper.data} reload={() => { reload(); paper.reload(); }} />
           <h3>Void a faulty question</h3>
           <p className="muted small">Every affected result is recalculated automatically.</p>
           {paper.data.map((p) => <div key={p.id} className="row" style={{ margin: ".3rem 0" }}><span className="grow small">{p.position}. {plain(p.prompt).slice(0, 80)}{p.voided ? ` — VOIDED (${p.void_reason})` : ""}</span>
