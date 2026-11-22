@@ -144,13 +144,15 @@ function ProxMap({ students, alerts, links, threshold, labels, streets, focusReq
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const pinch = useRef<{ d: number; k: number } | null>(null);
 
-  const origin = useMemo(() => {
-    const f = students.filter((s) => s.fresh);
-    const src = f.length ? f : students;
-    if (!src.length) return { lat: 0, lng: 0, c: 1 };
-    const lat = src.reduce((s, p) => s + p.lat, 0) / src.length, lng = src.reduce((s, p) => s + p.lng, 0) / src.length;
-    return { lat, lng, c: Math.cos((lat * Math.PI) / 180) };
-  }, [students.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The map's zero point is chosen ONCE, when the first positions arrive, and never moved afterwards. It used to be recomputed whenever the
+  // number of students changed, which shifted every dot (and, zoomed in, jumped the whole picture by many pixels) each time a student joined or lost signal.
+  const originRef = useRef<{ lat: number; lng: number; c: number } | null>(null);
+  if (!originRef.current && students.length) {
+    const f = students.filter((s) => s.fresh), src = f.length ? f : students;
+    const lat = src.reduce((a, p) => a + p.lat, 0) / src.length, lng = src.reduce((a, p) => a + p.lng, 0) / src.length;
+    originRef.current = { lat, lng, c: Math.cos((lat * Math.PI) / 180) };
+  }
+  const origin = originRef.current ?? { lat: 0, lng: 0, c: 1 };
   const xy = useCallback((p: { lat: number; lng: number }) => ({ x: (p.lng - origin.lng) * MPD * origin.c, y: -(p.lat - origin.lat) * MPD }), [origin]);
   const world = useMemo(() => new Map(students.map((s) => [s.id, xy(s)])), [students, xy]);
 
@@ -229,6 +231,7 @@ function ProxMap({ students, alerts, links, threshold, labels, streets, focusReq
   for (let x = Math.ceil(x0 / step) * step; x <= x1 && gx.length < 60; x += step) gx.push(x);
   for (let y = Math.ceil(y0 / step) * step; y <= y1 && gy.length < 60; y += step) gy.push(y);
   const barM = niceStep(90 / view.k), barPx = barM * view.k;
+  const maxR = Math.max(size.w, size.h) * 1.5;  // a circle much bigger than the view only costs painting time (and its dashes flicker), so it is not drawn
 
   const relOf = new Map<number, PL>();
   links.forEach((l) => { relOf.set(l.a, l); relOf.set(l.b, l); });
@@ -239,17 +242,25 @@ function ProxMap({ students, alerts, links, threshold, labels, streets, focusReq
   const tipAlert = tipS ? inAlert.get(tipS.id) : undefined;
   const cls = (s: PS) => (inAlert.has(s.id) ? "al" : !s.fresh ? "st" : s.poor ? "po" : s.moving ? "mv" : "ok");
   const clusters = (() => {
-    const cell = 26, bins = new Map<string, { members: PS[]; sx: number; sy: number }>(), singles: PS[] = [];
-    for (const st of students) {
+    // Dots merge into one count bubble only when they REALLY overlap on screen (closer than R px). Panning never changes who merges with whom,
+    // and a bubble keeps the id of its lowest-numbered student, so nothing flickers between "bubble" and "dots" while zooming near close students.
+    const R = 22, bins = new Map<string, number[]>(), cl: { ax: number; ay: number; members: PS[]; sx: number; sy: number }[] = [], singles: PS[] = [];
+    for (const st of [...students].sort((p, q) => p.id - q.id)) {
       const w = world.get(st.id); if (!w) continue;
       const X = sx(w.x), Y = sy(w.y);
       if (X < -60 || Y < -60 || X > size.w + 60 || Y > size.h + 60) continue;
       if (inAlert.has(st.id) || tip === st.id) { singles.push(st); continue; }
-      const key = `${Math.floor(X / cell)}:${Math.floor(Y / cell)}`, b = bins.get(key) || { members: [], sx: 0, sy: 0 };
-      b.members.push(st); b.sx += X; b.sy += Y; bins.set(key, b);
+      const cx = Math.floor(X / R), cy = Math.floor(Y / R);
+      let hit = -1;
+      for (let i = cx - 1; i <= cx + 1 && hit < 0; i++) for (let j = cy - 1; j <= cy + 1 && hit < 0; j++) {
+        for (const idx of bins.get(`${i}:${j}`) || []) if (Math.hypot(cl[idx].ax - X, cl[idx].ay - Y) < R) { hit = idx; break; }
+      }
+      if (hit >= 0) { const c = cl[hit]; c.members.push(st); c.sx += X; c.sy += Y; continue; }
+      cl.push({ ax: X, ay: Y, members: [st], sx: X, sy: Y });
+      const k = `${cx}:${cy}`; bins.set(k, [...(bins.get(k) || []), cl.length - 1]);
     }
     const groups: { key: string; x: number; y: number; members: PS[] }[] = [];
-    bins.forEach((b, key) => { if (b.members.length === 1) singles.push(b.members[0]); else groups.push({ key, x: b.sx / b.members.length, y: b.sy / b.members.length, members: b.members }); });
+    for (const c of cl) { if (c.members.length === 1) singles.push(c.members[0]); else groups.push({ key: String(c.members[0].id), x: c.sx / c.members.length, y: c.sy / c.members.length, members: c.members }); }
     return { groups, singles };
   })();
   usePlaceVersion();
@@ -322,8 +333,8 @@ function ProxMap({ students, alerts, links, threshold, labels, streets, focusReq
               onPointerDown={(e) => e.stopPropagation()} onMouseEnter={() => setTip(s.id)} onMouseLeave={() => setTip((t) => (t === s.id ? null : t))}
               onFocus={() => setTip(s.id)} onBlur={() => setTip((t) => (t === s.id ? null : t))} onClick={() => setTip(s.id)}
               onKeyDown={(e) => e.key === "Escape" && setTip(null)}>
-              {s.accuracy * view.k > 12 && <circle className="ac-acc" r={Math.min(s.accuracy * view.k, 240)} />}
-              {inAlert.has(s.id) && <circle className="ac-ring" r={Math.min(threshold * view.k, 600)} />}
+              {s.accuracy * view.k > 12 && s.accuracy * view.k < maxR && <circle className={`ac-acc${s.accuracy * view.k > 150 ? " big" : ""}`} r={s.accuracy * view.k} />}
+              {inAlert.has(s.id) && threshold * view.k < maxR && <circle className={`ac-ring${threshold * view.k > 150 ? " big" : ""}`} r={threshold * view.k} />}
               {moving && <circle className="ac-ripple" r={9} />}
               {moving && s.heading != null && s.speed != null && s.speed > 0.5 && <path className="ac-arrow" d="M0,-20 L5,-12 L-5,-12 Z" transform={`rotate(${s.heading})`} />}
               <circle className="ac-dot" r={9} />
@@ -500,7 +511,7 @@ export default function AntiCheat({ exams }: { exams: AcExam[] }) {
         </div>
 
         <div className={`acx-mapcol ${!wide && panel !== "map" ? "acx-off" : ""}`}>
-          <ProxMap students={data?.students ?? []} alerts={data?.alerts ?? []} links={data?.links ?? []} threshold={data?.alert_meters ?? 20} labels={labels} streets={streets && !geocoderOff} focusReq={focus} />
+          <ProxMap key={examId ?? 0} students={data?.students ?? []} alerts={data?.alerts ?? []} links={data?.links ?? []} threshold={data?.alert_meters ?? 20} labels={labels} streets={streets && !geocoderOff} focusReq={focus} />
           {streets && !geocoderOff && <PlaceSummary students={data?.students ?? []} />}
           <p className="ac-legend" aria-hidden="true">
             <span><i className="d ok" />still</span><span><i className="d mv" />moving</span><span><i className="d al" />too close</span><span><i className="d po" />rough position</span><span><i className="d st" />no recent update</span>

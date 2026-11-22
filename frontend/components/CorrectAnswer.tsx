@@ -1,7 +1,7 @@
 "use client";
 /* Admin: a wrong answer key found AFTER the exam. Pick the question, fix the key, see exactly who it changes (a preview that changes
    nothing), then apply: every result is re-marked in one go and the students whose result moved are told. Server: exams/corrections.py. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal, useLoad } from "@/components/ui";
 import { api, friendly } from "@/lib/api";
 import { eatDate } from "@/lib/clock";
@@ -152,17 +152,20 @@ function Dialog({ exam, q, onClose, onDone }: { exam: any; q: any; onClose: () =
     setBusy(false);
   }
   const edited = () => { setRes(null); setErr(""); };
+  const previewRef = useRef<HTMLDivElement>(null), errRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (res && !applied) previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [res, applied]); // on a phone the preview opens below the fold
+  useEffect(() => { if (err) errRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [err]);
   const pub = exam.status === "published";
 
   return (
     <Modal label={`Fix the answer to question ${q.position}`} onClose={onClose}>
       <div className="ca">
-        <h2>Fix the answer to question {q.position}</h2>
+        <div className="ca-head"><h2>Fix the answer to question {q.position}</h2><button type="button" className="btn ca-x" aria-label="Close" onClick={onClose}>✕</button></div>
         {key.error ? <p className="no" role="alert">⚠ {key.error}</p> : !k ? <p className="muted">Loading…</p> : applied && res ? (
           <>
             <p className="ok ca-done" role="status">✓ Corrected. Every result was re-marked{res.visible_now ? res.changed ? " and the students whose result moved were told." : "." : ". Students will see the corrected marks when results are published."}</p>
             <Summary r={res} done />
-            <button type="button" className="btn primary" onClick={onClose}>Close</button>
+            <div className="ca-acts"><button type="button" className="btn primary" onClick={onClose}>Close</button></div>
           </>
         ) : (
           <>
@@ -178,9 +181,9 @@ function Dialog({ exam, q, onClose, onDone }: { exam: any; q: any; onClose: () =
               <label><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /> Tell the students whose result changes{pub ? "" : " (once results are published they see the corrected mark anyway)"}</label>
               <label><input type="checkbox" checked={bank} onChange={(e) => setBank(e.target.checked)} /> Fix the question in the question bank and in exams not started yet</label>
             </div>
-            {err && <p className="no" role="alert">⚠ {err}</p>}
+            {err && <p ref={errRef} className="no" role="alert">⚠ {err}</p>}
             {res && !applied && (
-              <div className="ca-preview"><h3>What this will change</h3><Summary r={res} />
+              <div ref={previewRef} className="ca-preview"><h3>What this will change</h3><Summary r={res} />
                 <p className="small muted">{pub ? "Results are published: students see the new mark straight away." : "Results are not published yet: nothing is shown to students until then."} Nothing has been changed yet.</p></div>
             )}
             <div className="ca-acts">

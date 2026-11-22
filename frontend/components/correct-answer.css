@@ -55,3 +55,25 @@
 @keyframes ca-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.ca-preview,.ca-h,.ca-opt{animation:none;transition:none}}
 .reduce-motion .ca-preview,.reduce-motion .ca-h,.reduce-motion .ca-opt{animation:none;transition:none}
+
+/* Phones: the dialog is a bottom sheet. Title and the action buttons stay in view while the middle scrolls; one scroll area only. */
+.ca-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;position:sticky;top:-1rem;z-index:3;margin:-1rem -1rem 0;padding:.8rem 1rem .6rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.ca-head h2{font-size:1.1rem;line-height:1.25;overflow-wrap:anywhere}
+.ca-x{flex:none;min-width:44px;min-height:44px;padding:0;font-size:1.1rem}
+.ca-acts{position:sticky;bottom:-1rem;z-index:3;margin:0 -1rem -1rem;padding:.7rem 1rem calc(.7rem + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border)}
+.ca input,.ca textarea,.ca select{font-size:16px;max-width:100%} /* 16px: iPhones zoom the page in on smaller text */
+.modal:has(.ca){overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.ca-preview{scroll-margin-top:4.5rem}
+.ca-line .grow{min-width:0;overflow-wrap:anywhere}
+@media(max-width:700px){
+  .ca{gap:.7rem}
+  .ca-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ca-rows{max-height:none;overflow:visible;border:0;padding:0}
+  .ca-row{flex-direction:column;align-items:flex-start}
+  .ca-chg{text-align:left}
+  .ca-acts{flex-direction:column-reverse}
+  .ca-acts .btn{flex:none;width:100%}
+  .ca-opt{padding:.6rem .7rem;min-height:52px}
+  .ca-line{gap:.4rem}
+  .ca-h header{flex-direction:column}
+}
