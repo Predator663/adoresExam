@@ -77,3 +77,5 @@
   .ca-line{gap:.4rem}
   .ca-h header{flex-direction:column}
 }
+
+.modal-back:has(.ca){z-index:200}

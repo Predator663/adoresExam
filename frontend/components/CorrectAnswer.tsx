@@ -2,6 +2,7 @@
 /* Admin: a wrong answer key found AFTER the exam. Pick the question, fix the key, see exactly who it changes (a preview that changes
    nothing), then apply: every result is re-marked in one go and the students whose result moved are told. Server: exams/corrections.py. */
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Modal, useLoad } from "@/components/ui";
 import { api, friendly } from "@/lib/api";
 import { eatDate } from "@/lib/clock";
@@ -230,7 +231,8 @@ export default function CorrectAnswer({ exam, paper, reload }: { exam: any; pape
             </article>))}
         </div>
       )}
-      {open && <Dialog exam={exam} q={open} onClose={() => setOpen(null)} onDone={() => { hist.reload(); reload(); }} />}
+      {/* in document.body, so no parent (page animation, stacking order) can trap it under the top bar or make it scroll with the page */}
+      {open && createPortal(<Dialog exam={exam} q={open} onClose={() => setOpen(null)} onDone={() => { hist.reload(); reload(); }} />, document.body)}
     </div>
   );
 }
