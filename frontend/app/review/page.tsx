@@ -3,11 +3,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Pager, useClientPage } from "@/components/Pager";
 import Shell from "@/components/Shell";
+import { MatchPairs } from "@/components/ReviewParts";
 import { RichHtml } from "@/components/Rich";
 import { ErrorNote, Loading, useLoad, useQuery } from "@/components/ui";
 import { api } from "@/lib/api";
 import { describe } from "@/lib/answers";
 import { useSession } from "@/lib/session";
+import "@/components/exam-review.css";
 
 /** RES-05: read-only review; also tells the server which questions she has seen (Mistake Master badge, review XP). */
 function Review({ id }: { id: number }) {
@@ -50,7 +52,7 @@ function Review({ id }: { id: number }) {
       <Link href={`/result/?id=${id}`}>← {t("back")}</Link> · <Link href="/saved/">🔖 {t("my_mistakes_link")}</Link>
       <h1>{t("review_answers")}</h1>
       {toast && <p className="hint pop" role="status">⭐ {toast}</p>}
-      <div ref={pg.top}>{pg.rows.map((q) => {
+      <div ref={pg.top} className="rvp">{pg.rows.map((q) => {
         const full = q.marks_awarded >= q.marks - 1e-9, part = q.marks_awarded > 0 && !full;
         return (
           <article key={q.number} data-n={q.number} className="card">
@@ -60,8 +62,15 @@ function Review({ id }: { id: number }) {
             <RichHtml html={q.prompt} className="prompt" />
             {q.voided ? <p className="hint">{t("voided_note")}</p> : (
               <>
-                <p className={full ? "ok" : "no"}>{full ? "✓" : part ? "◐" : "✗"} {t("your_answer")}: {q.timed_out ? t("q_timed_out") : q.skipped ? t("skipped") : describe(q.type, q.content, q.your_response, t)}</p>
-                {!full && <p><b>{t("correct_answer")}:</b> {describe(q.type, q.content, q.correct_answer, t)}</p>}
+                {q.type === "matching" && !q.timed_out && !q.skipped ? (
+                  <>
+                    <p className={full ? "ok" : part ? "rv-mid" : "no"}>{full ? "✓" : part ? <i className="rv-half" /> : "✗"} {t("your_answer")}:</p>
+                    <MatchPairs q={q} />
+                  </>
+                ) : (
+                  <p className={full ? "ok" : part ? "rv-mid" : "no"}>{full ? "✓" : part ? <i className="rv-half" /> : "✗"} {t("your_answer")}: {q.timed_out ? t("q_timed_out") : q.skipped ? t("skipped") : describe(q.type, q.content, q.your_response, t)}</p>
+                )}
+                {!full && q.type !== "matching" && <p><b>{t("correct_answer")}:</b> {describe(q.type, q.content, q.correct_answer, t)}</p>}
                 {q.explanation && <div className="hint"><b>{t("explanation")}:</b> <RichHtml html={q.explanation} /></div>}
               </>
             )}

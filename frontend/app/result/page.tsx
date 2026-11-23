@@ -2,6 +2,7 @@
 import { ResultUpdatedBanner } from "@/components/ResultUpdated";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import ExamReview from "@/components/ExamReview";
 import Icon from "@/components/Icon";
 import Shell from "@/components/Shell";
 import { GradeMedal, Ring } from "@/components/student";
@@ -12,6 +13,7 @@ import { BADGE_EMOJI, TIER_MARK } from "@/lib/emoji";
 import { resultMessageKey } from "@/lib/student";
 import { useSession } from "@/lib/session";
 import "@/components/result.css";
+import "@/components/exam-review.css";
 
 /** Fades a block in the first time it scrolls into view (shows at once when IntersectionObserver is missing). */
 function Reveal({ children, className = "", d = 0, style }: { children: ReactNode; className?: string; d?: number; style?: CSSProperties }) {
@@ -46,6 +48,9 @@ function Detail({ id }: { id: number }) {
   const { data: d, error, err, loading, reload } = useLoad(() => api<any>(`/results/${id}/`), [id]);
   const [dl, setDl] = useState("");
   const now = useNow(1000);
+  const [tab, setTab] = useState<"summary" | "exam">("summary");
+  useEffect(() => { if (new URLSearchParams(location.search).get("tab") === "exam") setTab("exam"); }, []);
+  const pick = (x: "summary" | "exam") => { setTab(x); window.scrollTo({ top: 0, behavior: "smooth" }); };
   if (loading) return <Loading />;
   if (err?.code === "not_ready") {
     const at = err.data?.results_at ? new Date(err.data.results_at).getTime() : 0;
@@ -78,6 +83,14 @@ function Detail({ id }: { id: number }) {
         </div>
       </section>
 
+      {d.full_exam && (
+        <div className="rv-tabs" role="tablist" data-on={tab === "exam" ? "1" : "0"}>
+          <i aria-hidden />
+          <button type="button" role="tab" aria-selected={tab === "summary"} onClick={() => pick("summary")}>{t("rv_tab_summary")}</button>
+          <button type="button" role="tab" aria-selected={tab === "exam"} onClick={() => pick("exam")}>{t("rv_tab_exam")}</button>
+        </div>
+      )}
+      {d.full_exam && tab === "exam" ? <ExamReview id={id} /> : (<div className="rv-pane">
       <Reveal className="sx-stats rs-stats">
         <div className="sx-stat"><Icon n="clock" size={20} /><b>{mins}:{String(secs).padStart(2, "0")}</b><span>{t("time_taken")}</span></div>
         <div className="sx-stat"><Icon n="users" size={20} /><b><CountUp to={Math.round(d.class_average_percent)} />%</b><span>{t("class_average")}</span></div>
@@ -116,6 +129,7 @@ function Detail({ id }: { id: number }) {
         <button className="btn big" onClick={() => downloadFile(`/results/${id}/slip/?file=pdf`, `result-slip-${id}.pdf`).catch((e) => setDl(e.message))}><Icon n="download" size={18} /> {t("download_slip")}</button>
       </div>
       {dl && <p className="no" role="alert">{dl}</p>}
+      </div>)}
     </>
   );
 }

@@ -159,6 +159,12 @@ const en: Dict = {
   tt12_t: "Keep your streak", tt12_b: "Do a practice quiz of 5 or more questions each day to keep your streak alive.",
   col_a: "Column A", col_b: "Column B",
   order_drag: "Hold ⠿ and drag an item to move it, or use the arrows.", drag_handle: "Drag item",
+  rv_tab_summary: "Summary", rv_tab_exam: "Full exam", rv_show_answers: "Show answers", rv_hint: "Turn on Show answers to see what was right, the correct answers and the explanations.",
+  rv_f_all: "All", rv_f_right: "Correct", rv_f_part: "Partly right", rv_f_wrong: "Wrong", rv_f_skip: "Skipped", rv_filter: "Show questions", rv_jump: "Jump to a question", rv_top: "Back to the top",
+  rv_right: "Correct", rv_partly: "Partly correct", rv_wrong: "Wrong", rv_not_answered: "Not answered", rv_accepted: "Correct answer", rv_belongs: "Belongs here",
+  rv_questions: "{n} questions", rv_minutes: "{n} minutes", rv_score: "Your score", rv_section: "Section {l}", rv_none_here: "No questions here.",
+  rv_l_ok: "Right", rv_l_mid: "Right, but the question is only partly correct", rv_l_bad: "Wrong",
+  rv_off_title: "The full exam is not available", rv_off: "Your school has switched off the full exam view for this exam. You can still review your answers one question at a time.",
 };
 
 const sw: Dict = {
@@ -318,6 +324,12 @@ const sw: Dict = {
   tt12_t: "Linda mfululizo wako", tt12_b: "Fanya zoezi la maswali 5 au zaidi kila siku ili mfululizo wako uendelee.",
   col_a: "Safu A", col_b: "Safu B",
   order_drag: "Shikilia ⠿ na uburute kipengee ili kukihamisha, au tumia mishale.", drag_handle: "Buruta kipengee",
+  rv_tab_summary: "Muhtasari", rv_tab_exam: "Mtihani mzima", rv_show_answers: "Onyesha majibu", rv_hint: "Washa Onyesha majibu ili uone yaliyo sahihi, majibu sahihi na maelezo.",
+  rv_f_all: "Yote", rv_f_right: "Sahihi", rv_f_part: "Sehemu sahihi", rv_f_wrong: "Makosa", rv_f_skip: "Yaliyorukwa", rv_filter: "Onyesha maswali", rv_jump: "Nenda kwenye swali", rv_top: "Rudi juu",
+  rv_right: "Sahihi", rv_partly: "Sehemu sahihi", rv_wrong: "Kosa", rv_not_answered: "Hukujibu", rv_accepted: "Jibu sahihi", rv_belongs: "Inapaswa kuwa hapa",
+  rv_questions: "Maswali {n}", rv_minutes: "Dakika {n}", rv_score: "Alama zako", rv_section: "Sehemu {l}", rv_none_here: "Hakuna maswali hapa.",
+  rv_l_ok: "Sahihi", rv_l_mid: "Sahihi, lakini swali limepata alama kwa sehemu tu", rv_l_bad: "Kosa",
+  rv_off_title: "Mtihani mzima hauonekani", rv_off: "Shule imezima kuonyesha mtihani mzima kwa mtihani huu. Bado unaweza kupitia majibu yako swali kwa swali.",
 };
 
 export const dict: Record<"en" | "sw", Dict> = { en, sw };

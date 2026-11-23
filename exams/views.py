@@ -25,7 +25,7 @@ from questions.models import Question
 from questions.views import QuestionSerializer
 from proctoring import services as proctoring
 from . import corrections, services
-from .sections import letters, qtype_rank
+from .sections import SECTION_ORDER, letters, qtype_rank
 from . import timing
 from .models import Answer, Attempt, AttemptEvent, BuilderDraft, Exam, ExamGrant, ExamQuestion, Result, SavedQuestion
 from .services import ExamError
@@ -225,6 +225,7 @@ def _result_payload(attempt, result):
         "attempt_id": attempt.pk, "exam": attempt.exam.title, "subject": attempt.exam.subject.name,
         "score": result.score, "total": result.total, "percent": result.percent, "grade": result.grade,
         "points": result.points, "passed": result.passed, "time_taken_seconds": result.time_taken_seconds,
+        "full_exam": attempt.exam.allow_review,  # shows the "Full exam" tab
         "class_average_percent": round(others.aggregate(a=Avg("percent"))["a"] or 0, 1),  # anonymous (RES-03)
         "topics": [{"topic": t, "earned": v[0], "possible": v[1],
                     "percent": round(v[0] / v[1] * 100, 1) if v[1] else 0} for t, v in result.topic_stats.items()],
@@ -302,6 +303,32 @@ def result_review(request, attempt_id):
     if err:
         return err
     return Response(_review_rows(attempt))
+
+
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def result_full_exam(request, attempt_id):
+    """The whole paper as she sat it: every question in paper order, grouped into sections, with her answer, the key and the explanation.
+    Only after her result is visible, and only while an administrator has the full-exam review switched on for this exam."""
+    attempt, err = _visible_result_or_404(request, attempt_id)
+    if err:
+        return err
+    exam = attempt.exam
+    if not exam.allow_review:
+        return Response({"detail": "Your school has switched off the full exam review for this exam.", "code": "review_off"}, status=403)
+    rows = _review_rows(attempt)
+    sec = letters(r["type"] for r in rows)
+    for r in rows:
+        r["section"] = sec.get(r["type"], "")
+    result = Result.objects.filter(attempt=attempt).first()
+    titles = {k: (t, h) for k, t, h in SECTION_ORDER}
+    return Response({
+        "exam": {"title": exam.title, "subject": exam.subject.name, "duration_minutes": exam.duration_minutes,
+                 "score": result.score if result else 0, "total": result.total if result else 0,
+                 "percent": result.percent if result else 0, "grade": result.grade if result else ""},
+        "sections": [{"letter": sec[k], "type": k, "title": titles[k][0], "instructions": titles[k][1]} for k, _, _ in SECTION_ORDER if k in sec],
+        "questions": rows,
+    })
 
 
 def _review_rows(attempt):
@@ -407,10 +434,10 @@ class ExamSerializer(serializers.ModelSerializer):
         model = Exam
         fields = ["id", "title", "subject", "term", "classes", "students", "start_at", "end_at", "duration_minutes",
                   "pass_mark_percent", "rules_text", "shuffle_questions", "shuffle_options", "allow_skip",
-                  "late_entry_minutes", "time_warnings", "partial_marks", "negative_marking", "negative_fraction",
+                  "late_entry_minutes", "time_warnings", "partial_marks", "negative_marking", "negative_fraction", "allow_review",
                   "status", "question_count", "total_marks", "subject_name", "class_names", "created_at", "created_by",
                   "created_by_name", "submitted_at", "submitted_by", "submitted_by_name", "awaiting_scheduling"]
-        read_only_fields = ["status", "created_at", "created_by", "submitted_at", "submitted_by"]
+        read_only_fields = ["status", "created_at", "created_by", "submitted_at", "submitted_by", "allow_review"]  # allow_review has its own admin switch (review-switch)
 
     def get_question_count(self, o):
         return o.questions.filter(voided=False).count()
@@ -580,7 +607,7 @@ class ExamViewSet(viewsets.ModelViewSet):
                 k += 1
                 title = f"{base} ({k})"
         keep = {f: getattr(src, f) for f in ("duration_minutes", "shuffle_questions", "shuffle_options", "allow_skip", "partial_marks",
-                                             "negative_marking", "negative_fraction")}
+                                             "negative_marking", "negative_fraction", "allow_review")}
         if admin:
             keep.update({f: getattr(src, f) for f in ("pass_mark_percent", "rules_text", "late_entry_minutes", "time_warnings", "term")})
         with transaction.atomic():
@@ -781,6 +808,19 @@ class ExamViewSet(viewsets.ModelViewSet):
         exam.save(update_fields=["status"])
         audit(request.user, "exam.schedule", exam.pk)
         return Response({"status": exam.status})
+
+    @action(detail=True, methods=["post"], url_path="review-switch", permission_classes=[IsAdminRole])
+    def review_switch(self, request, pk=None):
+        """Turn the students' full-exam review on or off for this exam. Works at any time, also after the results are out."""
+        exam = self.get_object()
+        allow = request.data.get("allow")
+        if not isinstance(allow, bool):
+            raise ValidationError({"detail": "Say whether students may review the full exam (true or false)."})
+        if exam.allow_review != allow:
+            exam.allow_review = allow
+            exam.save(update_fields=["allow_review"])
+            audit(request.user, "exam.review_on" if allow else "exam.review_off", exam.pk)
+        return Response({"allow_review": exam.allow_review})
 
     @action(detail=True, methods=["post"], permission_classes=[IsAdminRole])
     def unschedule(self, request, pk=None):

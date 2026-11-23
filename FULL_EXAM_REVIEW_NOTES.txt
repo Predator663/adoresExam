@@ -1,0 +1,10 @@
+FULL EXAM REVIEW (students) - deploy notes
+1. Backend: python manage.py migrate_schemas   (adds exams.0010_exam_allow_review, default ON for every exam), restart gunicorn.
+2. Frontend: npm run build.
+3. Students: result page now has a sliding "Summary | Full exam" tab (also /result/?id=N&tab=exam). Full paper by section, Show answers switch,
+   filters, question-number strip, bookmark button, XP/"seen" tracking like the question review. English + Swahili.
+4. Admins: exam > Admin actions > "Full exam review for students" switch. Works any time, also after results are out. Audited (exam.review_on/off).
+   The switch hides the Full exam tab and the endpoint (403). The older question-by-question review (/review/) is not affected.
+5. Matching: wrong pairs red, right pairs orange when the question is only partly right (green when fully right). Also used in /review/.
+   Also in the full view: multiple-answer picks, blanks and ordering items use the same green / orange / red.
+6. Tests (not run here): python manage.py test exams.test_full_review

@@ -24,6 +24,7 @@ class Exam(models.Model):
     late_entry_minutes = models.PositiveIntegerField(null=True, blank=True)  # null = school default
     time_warnings = models.JSONField(default=list)  # minutes before end; [] = default [10, 5, 1]
     partial_marks = models.BooleanField(default=True)  # EXM-05
+    allow_review = models.BooleanField(default=True)  # students may open the full exam (her answers, the key, the explanations) once her result is out; an admin switches it
     negative_marking = models.BooleanField(default=False)
     negative_fraction = models.FloatField(default=0.25)  # share of a question's marks deducted when wrong
     status = models.CharField(max_length=10, choices=STATUSES, default=DRAFT)

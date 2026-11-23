@@ -5,6 +5,7 @@ import ExamBuilder from "./ExamBuilder";
 import ExamWindowPicker from "./ExamWindowPicker";
 import { useToast } from "./SubmitFlow";
 import { ErrorNote, Loading, useLoad } from "./ui";
+import "./exam-review.css";
 import { api, downloadFile } from "@/lib/api";
 import { DATETIME, eatDate } from "@/lib/clock";
 import { classLabel, errorLines, fromIso, plain, toIso } from "@/lib/staff";
@@ -29,6 +30,10 @@ function Admin({ exam, reload }: { exam: any; reload: () => void }) {
         {st === "live" && <button className="btn danger" onClick={() => { const r = window.prompt("Close this live exam NOW? Give a reason:"); if (r) run(() => api(`/exams/${exam.id}/close/`, { body: { confirm: true, reason: r } }), "Exam closed."); }}>Close exam now</button>}
         {(st === "live" || st === "closed" || st === "published") && <a className="btn" href={`/staff/exams/package/?id=${exam.id}`}>🖨 Home package (paper)</a>}
         {(st === "closed" || st === "published") && <button className="btn" onClick={() => downloadFile(`/exports/exams/${exam.id}/results/`, `results-${exam.id}.xlsx`).catch((e) => setErrs([e.message]))}>⬇ Results (Excel)</button>}
+      </div>
+      <div className="ef-review">
+        <label className="switch"><input type="checkbox" checked={exam.allow_review !== false} onChange={(ev) => run(() => api(`/exams/${exam.id}/review-switch/`, { body: { allow: ev.target.checked } }), ev.target.checked ? "Students can now open the full exam after their results." : "Students can no longer open the full exam.")} /> <b>Full exam review for students</b> {exam.allow_review !== false ? "(on)" : "(off)"}</label>
+        <p className="muted small">When on, each student sees a “Full exam” tab on her result page after her result is released: the whole paper, her answers, and a Show answers switch. Turn it off to keep the paper private. You can change this at any time, even after the results are out.</p>
       </div>
       {(st === "closed" || st === "published") && paper.data && (
         <>
