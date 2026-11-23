@@ -24,7 +24,7 @@ from questions import shares
 from questions.models import Question
 from questions.views import QuestionSerializer
 from proctoring import services as proctoring
-from . import corrections, services
+from . import corrections, myresults, services
 from .sections import SECTION_ORDER, letters, qtype_rank
 from . import timing
 from .models import Answer, Attempt, AttemptEvent, BuilderDraft, Exam, ExamGrant, ExamQuestion, Result, SavedQuestion
@@ -244,20 +244,6 @@ def _result_payload(attempt, result):
 
 @api_view(["GET"])
 @permission_classes([IsStudent])
-def my_results(request):
-    now = timezone.now()
-    rows = []
-    for r in Result.objects.filter(student=request.user).select_related("attempt__exam__subject"):
-        if services.result_visible(r.attempt, now):
-            rows.append({"attempt_id": r.attempt_id, "exam": r.exam.title, "subject": r.exam.subject.name,
-                         "percent": r.percent, "grade": r.grade, "date": r.exam.start_at,
-                         "updated": r.revision > 0, "previous_percent": (r.previous or {}).get("percent") if r.revision else None})
-    rows.sort(key=lambda x: x["date"], reverse=True)
-    return Response(paginate(request, rows) or rows)
-
-
-@api_view(["GET"])
-@permission_classes([IsStudent])
 def my_results_pending(request):
     """Exams I have submitted whose results are not out yet, with the time they will be. Running sync_exam
     here publishes anything that is due (and sends the results-ready notification) without waiting for cron."""
@@ -278,6 +264,7 @@ def result_detail(request, attempt_id):
     if err:
         return err
     data = _result_payload(attempt, attempt.result)
+    data.update(myresults.extras(attempt, attempt.result, _review_rows(attempt)))  # how the questions went, the previous exam, vs the class
     data["rewards"] = _rewards_for(attempt)  # RES-03: XP and badges earned from this exam
     return Response(data)
 

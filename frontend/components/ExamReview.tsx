@@ -136,10 +136,10 @@ function Card({ q, on, saved, onSave }: { q: RQ; on: boolean; saved: boolean; on
   );
 }
 
-export default function ExamReview({ id }: { id: number }) {
+export default function ExamReview({ id, initial = "all" }: { id: number; initial?: "all" | Verdict }) {
   const { t } = useSession();
   const { data, error, err, loading, reload } = useLoad(() => api<Data>(`/results/${id}/full-exam/`), [id]);
-  const [on, setOn] = useState(false), [filter, setFilter] = useState<"all" | Verdict>("all"), [saved, setSaved] = useState<Set<number>>(new Set()), [toast, setToast] = useState("");
+  const [on, setOn] = useState(false), [filter, setFilter] = useState<"all" | Verdict>(initial), [saved, setSaved] = useState<Set<number>>(new Set()), [toast, setToast] = useState("");
   const top = useRef<HTMLDivElement>(null), seen = useRef<Set<number>>(new Set()), timer = useRef<any>(null);
 
   useEffect(() => { try { setOn(sessionStorage.getItem("rv-key") === "1"); } catch { /* private mode */ } }, []);

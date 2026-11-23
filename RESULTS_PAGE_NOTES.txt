@@ -1,0 +1,9 @@
+RESULTS PAGES (students) - deploy notes
+No new migration. Restart gunicorn, then npm run build. (Includes all files of v6 too, so v7 can replace v6.)
+Results list (/results/): dashboard (average, exams, passed, best, animated trend line, "N exams improving" streak), subject chips with
+average and change, search, Newest/Highest sort, cards with Full exam / Review / Slip buttons. Touching a card starts loading its result.
+Result page (/result/?id=): opens instantly from cache then refreshes; "how your questions went" bar (tap a part to open the Full exam on
+just those questions); change vs the previous exam in the subject; "better than X% of your class" (only when the school shows class
+position); time used vs exam length; "What would you like to do?" tiles: Full exam, Review one by one, Retry my mistakes, Practise weak
+topics, Share (phone share sheet, or copies the text), Download slip.
+Backend: exams/myresults.py (list filters, /api/results/summary/, extras on /api/results/<id>/). Tests (not run here): python manage.py test exams.test_myresults

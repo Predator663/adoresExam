@@ -165,6 +165,13 @@ const en: Dict = {
   rv_questions: "{n} questions", rv_minutes: "{n} minutes", rv_score: "Your score", rv_section: "Section {l}", rv_none_here: "No questions here.",
   rv_l_ok: "Right", rv_l_mid: "Right, but the question is only partly correct", rv_l_bad: "Wrong",
   rv_off_title: "The full exam is not available", rv_off: "Your school has switched off the full exam view for this exam. You can still review your answers one question at a time.",
+  rs_breakdown: "How your questions went", rs_next: "What would you like to do?", rs_a_full_sub: "Every question with your answers", rs_a_review: "Review one by one", rs_a_review_sub: "Step through the questions you missed",
+  rs_a_mistakes: "Retry my mistakes", rs_a_mistakes_sub: "Practise the questions you got wrong", rs_a_practise_sub: "Start with {topic}", rs_a_share: "Share my result", rs_a_share_sub: "Send it to your family or friends", rs_a_slip_sub: "A PDF you can print or keep",
+  rs_shared: "Copied. Paste it anywhere to share.", rs_share_text: "I scored {pct}% (Grade {grade}) in {exam} on {app}.", rs_share_fail: "Could not share from here.",
+  rs_prev_up: "▲ {n} points better than your last {subject} exam", rs_prev_down: "▼ {n} points lower than your last {subject} exam", rs_prev_same: "● Same as your last {subject} exam",
+  rs_beat: "Better than {n}% of your class", rs_pace: "You used {a} of {b} minutes", rs_passed_chip: "✓ Passed",
+  rl_avg: "Average", rl_best_short: "Best", rl_exams: "Exams", rl_passed: "Passed", rl_best: "Best: {exam} ({pct}%)", rl_improving: "🔥 {n} exams improving in a row", rl_search: "Search exams", rl_sort_new: "Newest", rl_sort_best: "Highest",
+  rl_all: "All subjects", rl_none: "No results match.", rl_clear: "Clear filters", rl_full: "Full exam", rl_review: "Review", rl_slip: "Slip", rl_trend: "Your last results",
 };
 
 const sw: Dict = {
@@ -330,6 +337,13 @@ const sw: Dict = {
   rv_questions: "Maswali {n}", rv_minutes: "Dakika {n}", rv_score: "Alama zako", rv_section: "Sehemu {l}", rv_none_here: "Hakuna maswali hapa.",
   rv_l_ok: "Sahihi", rv_l_mid: "Sahihi, lakini swali limepata alama kwa sehemu tu", rv_l_bad: "Kosa",
   rv_off_title: "Mtihani mzima hauonekani", rv_off: "Shule imezima kuonyesha mtihani mzima kwa mtihani huu. Bado unaweza kupitia majibu yako swali kwa swali.",
+  rs_breakdown: "Maswali yako yalivyokwenda", rs_next: "Ungependa kufanya nini sasa?", rs_a_full_sub: "Kila swali na majibu yako", rs_a_review: "Pitia moja moja", rs_a_review_sub: "Pitia maswali uliyokosa",
+  rs_a_mistakes: "Rudia makosa yangu", rs_a_mistakes_sub: "Fanya mazoezi ya maswali uliyokosea", rs_a_practise_sub: "Anza na {topic}", rs_a_share: "Shiriki matokeo yangu", rs_a_share_sub: "Watumie familia au marafiki", rs_a_slip_sub: "PDF ya kuchapisha au kuhifadhi",
+  rs_shared: "Imenakiliwa. Bandika popote kushiriki.", rs_share_text: "Nimepata {pct}% (Daraja {grade}) katika {exam} kwenye {app}.", rs_share_fail: "Imeshindikana kushiriki kutoka hapa.",
+  rs_prev_up: "▲ Alama {n} juu ya mtihani wako wa mwisho wa {subject}", rs_prev_down: "▼ Alama {n} chini ya mtihani wako wa mwisho wa {subject}", rs_prev_same: "● Sawa na mtihani wako wa mwisho wa {subject}",
+  rs_beat: "Umewashinda {n}% ya darasa lako", rs_pace: "Ulitumia dakika {a} kati ya {b}", rs_passed_chip: "✓ Umefaulu",
+  rl_avg: "Wastani", rl_best_short: "Bora", rl_exams: "Mitihani", rl_passed: "Ulifaulu", rl_best: "Bora: {exam} ({pct}%)", rl_improving: "🔥 Mitihani {n} mfululizo unaopanda", rl_search: "Tafuta mitihani", rl_sort_new: "Mipya", rl_sort_best: "Ya juu",
+  rl_all: "Masomo yote", rl_none: "Hakuna matokeo yanayolingana.", rl_clear: "Futa vichujio", rl_full: "Mtihani mzima", rl_review: "Pitia", rl_slip: "Karatasi", rl_trend: "Matokeo yako ya karibuni",
 };
 
 export const dict: Record<"en" | "sw", Dict> = { en, sw };

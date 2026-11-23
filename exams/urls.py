@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from . import notsubmitted, paper, views
+from . import myresults, notsubmitted, paper, views
 
 router = DefaultRouter()
 router.register("exams", views.ExamViewSet, basename="exam")
@@ -23,7 +23,8 @@ urlpatterns = [
     path("attempts/<int:attempt_id>/answer/", views.attempt_answer),
     path("attempts/<int:attempt_id>/finish/", views.attempt_finish),
     path("attempts/<int:attempt_id>/event/", views.attempt_event),
-    path("results/", views.my_results),
+    path("results/", myresults.my_results),
+    path("results/summary/", myresults.my_results_summary),
     path("results/pending/", views.my_results_pending),
     path("results/<int:attempt_id>/", views.result_detail),
     path("results/<int:attempt_id>/review/", views.result_review),

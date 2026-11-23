@@ -2,18 +2,23 @@
 import { ResultUpdatedBanner } from "@/components/ResultUpdated";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import Breakdown from "@/components/Breakdown";
 import ExamReview from "@/components/ExamReview";
+import ResultActions from "@/components/ResultActions";
 import Icon from "@/components/Icon";
 import Shell from "@/components/Shell";
-import { GradeMedal, Ring } from "@/components/student";
-import { Bar, Confetti, CountUp, ErrorNote, Loading, useLoad, useNow, useQuery } from "@/components/ui";
+import { GradeMedal, PageSkeleton, Ring } from "@/components/student";
+import { Bar, Confetti, CountUp, ErrorNote, Loading, useNow, useQuery } from "@/components/ui";
 import { api, downloadFile } from "@/lib/api";
 import { clock, eatDate } from "@/lib/clock";
 import { BADGE_EMOJI, TIER_MARK } from "@/lib/emoji";
 import { resultMessageKey } from "@/lib/student";
 import { useSession } from "@/lib/session";
+import { useSwr } from "@/lib/swr";
+import type { Verdict } from "@/lib/review";
 import "@/components/result.css";
 import "@/components/exam-review.css";
+import "@/components/result-plus.css";
 
 /** Fades a block in the first time it scrolls into view (shows at once when IntersectionObserver is missing). */
 function Reveal({ children, className = "", d = 0, style }: { children: ReactNode; className?: string; d?: number; style?: CSSProperties }) {
@@ -44,14 +49,25 @@ function Compare({ me, avg, label }: { me: number; avg: number; label: string })
 
 /** RES-03: score, percentage, grade, time taken, anonymous class average, optional class position, XP and badges. */
 function Detail({ id }: { id: number }) {
-  const { t, lang } = useSession();
-  const { data: d, error, err, loading, reload } = useLoad(() => api<any>(`/results/${id}/`), [id]);
-  const [dl, setDl] = useState("");
+  const { t, lang, user } = useSession();
+  // shown at once from the last visit (or from the prefetch when she touched the card in the list), refreshed quietly
+  const { data: d, error, err, loading, reload } = useSwr<any>(`${user?.id}:/results/${id}/`, () => api<any>(`/results/${id}/`));
+  const [dl, setDl] = useState(""), [busy, setBusy] = useState(false), [toast, setToast] = useState(""), [filter, setFilter] = useState<"all" | Verdict>("all"), [nonce, setNonce] = useState(0);
   const now = useNow(1000);
   const [tab, setTab] = useState<"summary" | "exam">("summary");
   useEffect(() => { if (new URLSearchParams(location.search).get("tab") === "exam") setTab("exam"); }, []);
-  const pick = (x: "summary" | "exam") => { setTab(x); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  if (loading) return <Loading />;
+  const pick = (x: "summary" | "exam", f: "all" | Verdict = "all") => { setFilter(f); setNonce((n) => n + 1); setTab(x); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const say = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2700); };
+  const slip = () => { setBusy(true); downloadFile(`/results/${id}/slip/?file=pdf`, `result-slip-${id}.pdf`).catch((e) => setDl(e.message)).finally(() => setBusy(false)); };
+  const share = async () => {
+    if (!d) return;
+    const text = t("rs_share_text", { pct: Math.round(d.percent), grade: d.grade, exam: d.exam, app: t("app_name") });
+    try {
+      if (navigator.share) await navigator.share({ title: d.exam, text });
+      else { await navigator.clipboard.writeText(text); say(t("rs_shared")); }
+    } catch (e: any) { if (e?.name !== "AbortError") say(t("rs_share_fail")); }
+  };
+  if (loading) return <PageSkeleton rows={3} stats={3} />;
   if (err?.code === "not_ready") {
     const at = err.data?.results_at ? new Date(err.data.results_at).getTime() : 0;
     return <div className="card center"><h2>{t("results_not_ready")}</h2>{at > now && <p className="big-num">{clock(at - now)}</p>}<p className="muted">{at ? t("results_at", { when: eatDate(err.data.results_at, undefined, lang) }) : ""}</p><button className="btn" onClick={reload}>{t("check_again")}</button></div>;
@@ -90,12 +106,23 @@ function Detail({ id }: { id: number }) {
           <button type="button" role="tab" aria-selected={tab === "exam"} onClick={() => pick("exam")}>{t("rv_tab_exam")}</button>
         </div>
       )}
-      {d.full_exam && tab === "exam" ? <ExamReview id={id} /> : (<div className="rv-pane">
+      {d.full_exam && tab === "exam" ? <ExamReview key={nonce} id={id} initial={filter} /> : (<div className="rv-pane">
       <Reveal className="sx-stats rs-stats">
         <div className="sx-stat"><Icon n="clock" size={20} /><b>{mins}:{String(secs).padStart(2, "0")}</b><span>{t("time_taken")}</span></div>
         <div className="sx-stat"><Icon n="users" size={20} /><b><CountUp to={Math.round(d.class_average_percent)} />%</b><span>{t("class_average")}</span></div>
         {d.class_position && <div className="sx-stat"><Icon n="trophy" size={20} /><b>{d.class_position}/{d.class_size}</b><span>{t("class_position")}</span></div>}
       </Reveal>
+      <div className="rp-chips">
+        {d.previous && <span className={`rp-chip ${d.previous.delta > 0 ? "up" : d.previous.delta < 0 ? "down" : ""}`}>{d.previous.delta > 0 ? t("rs_prev_up", { n: Math.abs(d.previous.delta), subject: d.subject }) : d.previous.delta < 0 ? t("rs_prev_down", { n: Math.abs(d.previous.delta), subject: d.subject }) : t("rs_prev_same", { subject: d.subject })}</span>}
+        {d.beat_percent != null && <span className="rp-chip pop" style={{ animationDelay: ".2s" }}>🏆 {t("rs_beat", { n: d.beat_percent })}</span>}
+      </div>
+      {d.breakdown && (
+        <Reveal className="card" d={40}>
+          <h2>{t("rs_breakdown")}</h2>
+          <Breakdown b={d.breakdown} onPick={d.full_exam ? (v) => pick("exam", v) : undefined} />
+          {d.duration_minutes > 0 && <div className="rp-pace"><p className="muted small">{t("rs_pace", { a: Math.max(1, Math.round(d.time_taken_seconds / 60)), b: d.duration_minutes })}</p><Bar value={(d.time_taken_seconds / 60 / d.duration_minutes) * 100} label={t("time_taken")} /></div>}
+        </Reveal>
+      )}
       <Reveal className="card rs-cmp" d={80}>
         <h2>{t("class_average")}</h2>
         <Compare me={d.percent} avg={d.class_average_percent} label={`${pct}% / ${Math.round(d.class_average_percent)}%`} />
@@ -124,12 +151,10 @@ function Detail({ id }: { id: number }) {
         {weak.length > 0 && <Link className="btn sx-practice-cta" href="/practice/"><Icon n="pencil" size={18} /> {t("practise_now")}</Link>}
       </Reveal>
 
-      <div className="sx-actions rs-actions">
-        <Link className="btn primary big" href={`/review/?id=${id}`}><Icon n="file" size={18} /> {t("review_answers")}</Link>
-        <button className="btn big" onClick={() => downloadFile(`/results/${id}/slip/?file=pdf`, `result-slip-${id}.pdf`).catch((e) => setDl(e.message))}><Icon n="download" size={18} /> {t("download_slip")}</button>
-      </div>
+      <ResultActions id={id} hasFull={!!d.full_exam} weak={weak} onFull={() => pick("exam")} onShare={share} onSlip={slip} busy={busy} />
       {dl && <p className="no" role="alert">{dl}</p>}
       </div>)}
+      {toast && <p className="rp-toast" role="status">{toast}</p>}
     </>
   );
 }
