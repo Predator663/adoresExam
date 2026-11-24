@@ -306,6 +306,8 @@ def student_analytics(request):
             "subject": name, "exams_taken": len(h), "average": round(averages[name], 1), "latest": h[-1]["percent"],
             "change_from_previous": round(h[-1]["percent"] - h[-2]["percent"], 1) if len(h) > 1 else None,
             "progress": h, "topics": topics, **sw, "revise": [t["topic"] for t in sw["weak_areas"]][:3],
+            # Per exam (oldest first): {topic: [earned, possible]}. The study-plan model on the web app learns from this.
+            "topic_history": calc.topic_history(rs),
         })
     latest = max(rows, key=lambda r: r["date"] or timezone.now())["scale"] if rows else grading.DEFAULT_SCALE
     return Response({

@@ -219,7 +219,7 @@ def practice_start(request):
     try:
         session = services.start_practice(
             request.user, d.get("subject_id"), d.get("count", services.PRACTICE_DEFAULT), d.get("topic") or None,
-            d.get("difficulty") or None, restart=d.get("restart") is True)
+            d.get("difficulty") or None, restart=d.get("restart") is True, adaptive=d.get("adaptive") is True)
     except services.GamificationError as e:
         return _err(e)
     return Response(services.practice_state(session), status=201)

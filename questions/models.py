@@ -28,6 +28,12 @@ class Question(models.Model):
     answer = models.JSONField(default=dict)  # the correct answer(s); never sent to students
     explanation = models.TextField(blank=True)  # shown only in review after results (QB-06)
     status = models.CharField(max_length=10, choices=STATUSES, default=DRAFT)
+    # MEASURED difficulty, learned from how students really answered (questions/calibration.py, `calibrate_difficulty`). Never typed by a teacher.
+    ml_difficulty = models.FloatField(null=True, blank=True)       # logit scale: higher = harder
+    ml_label = models.CharField(max_length=6, blank=True, default="")  # easy | medium | hard, for the form the question is for
+    ml_samples = models.PositiveIntegerField(default=0)            # how many students' answers it is based on
+    ml_source = models.CharField(max_length=9, blank=True, default="")  # "data" (measured) | "predicted" (from the wording, provisional)
+    ml_updated = models.DateTimeField(null=True, blank=True)
     practice_eligible = models.BooleanField(default=False)
     version = models.PositiveIntegerField(default=1)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
@@ -37,6 +43,11 @@ class Question(models.Model):
     class Meta:
         ordering = ["-updated_at"]
         indexes = [models.Index(fields=["subject", "topic", "difficulty", "status"])]
+
+    @property
+    def effective_difficulty(self):
+        """What the app uses: the measured label when there is one, otherwise what the teacher typed."""
+        return self.ml_label or self.difficulty
 
 
 class QuestionVersion(models.Model):

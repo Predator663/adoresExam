@@ -27,8 +27,9 @@ class QuestionSerializer(serializers.ModelSerializer):
         model = Question
         fields = ["id", "subject", "form_level", "topic", "subtopic", "difficulty", "marks", "language", "qtype",
                   "time_limit_seconds", "prompt", "content", "answer", "explanation", "status", "practice_eligible", "version",
-                  "created_by", "created_by_name", "is_mine", "can_edit", "updated_at", "used_in_exam"]
-        read_only_fields = ["status", "version", "created_by", "updated_at"]
+                  "created_by", "created_by_name", "is_mine", "can_edit", "updated_at", "used_in_exam",
+                  "ml_label", "ml_samples", "ml_source"]
+        read_only_fields = ["status", "version", "created_by", "updated_at", "ml_label", "ml_samples", "ml_source"]
 
     def get_used_in_exam(self, obj):
         return obj.examquestion_set.exists()

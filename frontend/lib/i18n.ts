@@ -172,6 +172,12 @@ const en: Dict = {
   rs_beat: "Better than {n}% of your class", rs_pace: "You used {a} of {b} minutes", rs_passed_chip: "✓ Passed",
   rl_avg: "Average", rl_best_short: "Best", rl_exams: "Exams", rl_passed: "Passed", rl_best: "Best: {exam} ({pct}%)", rl_improving: "🔥 {n} exams improving in a row", rl_search: "Search exams", rl_sort_new: "Newest", rl_sort_best: "Highest",
   rl_all: "All subjects", rl_none: "No results match.", rl_clear: "Clear filters", rl_full: "Full exam", rl_review: "Review", rl_slip: "Slip", rl_trend: "Your last results",
+  smart_mode: "Smart mode", smart_hint: "Questions adjust to you after every answer, and favour your weakest topics.", smart_title: "Difficulty of this question", smart_easy: "Warm-up", smart_medium: "Steady", smart_hard: "Stretch",
+  sp_title: "My Study Plan", sp_sub: "Learns from your own results to show where your next marks are.", sp_pick: "Subject", sp_next: "Expected in your next exam", sp_range: "Likely between {low}% and {high}%",
+  sp_need2: "Finish 2 exams in this subject to unlock your forecast.", sp_conf_low: "Early estimate", sp_conf_medium: "Fairly sure", sp_conf_high: "Confident", sp_note: "An estimate from your results so far. It is not a promise.",
+  sp_focus: "Focus here first", sp_gain: "up to +{n} points", sp_thin: "Few questions so far, so we are less sure.", sp_trend_up: "improving", sp_trend_down: "slipping", sp_mastery: "Strength now",
+  sp_whatif: "What if I improve {topic}?", sp_whatif_by: "by {n} points", sp_whatif_res: "Your expected score would become {n}%", sp_check: "We tested this on your own past exams: it missed by about {n} points, while \"same as last time\" missed by {m}.",
+  sp_check_few: "Too few exams yet to test how accurate this is.", sp_practise: "Practise {subject}", sp_strong_all: "Nothing urgent here. Keep practising to stay sharp!",
 };
 
 const sw: Dict = {
@@ -344,6 +350,12 @@ const sw: Dict = {
   rs_beat: "Umewashinda {n}% ya darasa lako", rs_pace: "Ulitumia dakika {a} kati ya {b}", rs_passed_chip: "✓ Umefaulu",
   rl_avg: "Wastani", rl_best_short: "Bora", rl_exams: "Mitihani", rl_passed: "Ulifaulu", rl_best: "Bora: {exam} ({pct}%)", rl_improving: "🔥 Mitihani {n} mfululizo unaopanda", rl_search: "Tafuta mitihani", rl_sort_new: "Mipya", rl_sort_best: "Ya juu",
   rl_all: "Masomo yote", rl_none: "Hakuna matokeo yanayolingana.", rl_clear: "Futa vichujio", rl_full: "Mtihani mzima", rl_review: "Pitia", rl_slip: "Karatasi", rl_trend: "Matokeo yako ya karibuni",
+  smart_mode: "Hali ya akili", smart_hint: "Maswali yanajirekebisha kulingana nawe baada ya kila jibu, na yanapendelea mada zako dhaifu zaidi.", smart_title: "Ugumu wa swali hili", smart_easy: "Kupasha mwili", smart_medium: "Wastani", smart_hard: "Changamoto",
+  sp_title: "Mpango Wangu wa Kusoma", sp_sub: "Unajifunza kutoka kwenye matokeo yako mwenyewe ili kuonyesha alama zako zinazofuata ziko wapi.", sp_pick: "Somo", sp_next: "Inayotarajiwa katika mtihani wako ujao", sp_range: "Inawezekana kati ya {low}% na {high}%",
+  sp_need2: "Maliza mitihani 2 katika somo hili ili kupata makadirio yako.", sp_conf_low: "Makadirio ya awali", sp_conf_medium: "Kwa kiasi fulani uhakika", sp_conf_high: "Uhakika mkubwa", sp_note: "Ni makadirio kutokana na matokeo yako hadi sasa. Si ahadi.",
+  sp_focus: "Anza hapa kwanza", sp_gain: "hadi +pointi {n}", sp_thin: "Maswali machache hadi sasa, kwa hiyo hatuna uhakika sana.", sp_trend_up: "unaimarika", sp_trend_down: "unashuka", sp_mastery: "Nguvu yako sasa",
+  sp_whatif: "Je, nikiboresha {topic}?", sp_whatif_by: "kwa pointi {n}", sp_whatif_res: "Alama yako inayotarajiwa ingekuwa {n}%", sp_check: "Tumejaribu hili kwenye mitihani yako ya zamani: lilikosea kwa takriban pointi {n}, wakati \"sawa na mara ya mwisho\" ilikosea kwa pointi {m}.",
+  sp_check_few: "Mitihani bado ni michache sana kupima usahihi.", sp_practise: "Fanya mazoezi ya {subject}", sp_strong_all: "Hakuna cha dharura hapa. Endelea kufanya mazoezi!",
 };
 
 export const dict: Record<"en" | "sw", Dict> = { en, sw };

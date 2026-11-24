@@ -16,6 +16,13 @@ def row(student=1, exam=1, percent=50, grade="C", passed=True, cls=1, label="For
 
 
 class CalcTests(TestCase):
+    def test_topic_history_is_oldest_first_and_skips_empty_exams(self):
+        rows = [row(1, 2, 70, day=5, topics={"Algebra": [3, 4]}), row(1, 1, 50, day=0, topics={"Algebra": [1, 4], "Geometry": [2, 2]}),
+                row(1, 3, 60, day=9, topics={})]
+        h = calc.topic_history(rows)
+        self.assertEqual([x["exam_id"] for x in h], [1, 2])
+        self.assertEqual(h[0]["topics"], {"Algebra": [1.0, 4.0], "Geometry": [2.0, 2.0]})
+
     def test_summary_and_trend(self):
         rows = [row(1, 1, 80, "A"), row(2, 1, 20, "F", passed=False), row(1, 2, 60, "C")]
         s = calc.summary(rows[:2])

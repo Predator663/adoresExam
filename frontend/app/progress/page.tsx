@@ -4,6 +4,7 @@ import Shell from "@/components/Shell";
 import { GradeMedal, Monogram, Spark } from "@/components/student";
 import { Bar, ErrorNote } from "@/components/ui";
 import { PageSkeleton } from "@/components/student";
+import StudyPlan from "@/components/StudyPlan";
 import { useMine } from "@/lib/mine";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -25,6 +26,7 @@ export default function Progress() {
               : <p className="sx-proj-sub">{t("need_subjects", { n: p.subjects_needed, have: p.subjects_taken })}</p>}
             <p className="sx-proj-note"><Icon n="info" size={15} /> {p.note}</p>
           </section>
+          <StudyPlan subjects={d.subjects} />
           <div className="card">
             <h2>{t("subjects_label")}</h2>
             <ul className="list sx-subjrows">

@@ -148,6 +148,7 @@ export default function Questions() {
                       <dl className="ex2-stats q2-stats">
                         <div><dt>Type</dt><dd>{qtypeName(q.qtype)}</dd></div>
                         <div><dt>Level</dt><dd>{DIFF_LABEL[q.difficulty] || q.difficulty}</dd></div>
+                        {q.ml_label && <div title="Measured from how students actually answered, for this class level. It does not change your own setting."><dt>Measured</dt><dd>{DIFF_LABEL[q.ml_label] || q.ml_label}<span className="muted small"> {q.ml_source === "data" ? `(${q.ml_samples} answers)` : "(estimated from wording)"}</span></dd></div>}
                         <div><dt>Marks</dt><dd>{q.marks}</dd></div>
                       </dl>
                       <p className="ex2-when q2-flags">

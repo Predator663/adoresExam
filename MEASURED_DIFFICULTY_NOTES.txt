@@ -1,0 +1,34 @@
+Measured question difficulty (ML): copy each file over the same path. This zip is cumulative: it also contains My Study Plan and Smart practice
+(see STUDY_PLAN_NOTES.txt and SMART_PRACTICE_NOTES.txt), so install this one only.
+
+questions/calibration.py                                   the model, pure Python (no new packages): Rasch item-response model + wording predictor
+questions/calibrate.py                                     reads exam and practice answers, runs the model, saves the result
+questions/management/commands/calibrate_difficulty.py      the command (+ the two __init__.py files)
+questions/models.py                                        Question.ml_difficulty / ml_label / ml_samples / ml_source / ml_updated, effective_difficulty
+questions/migrations/0006_question_measured_difficulty.py  NEW MIGRATION: python manage.py migrate_schemas
+questions/views.py                                         ml_label, ml_samples, ml_source in the question API (read-only)
+gamification/services.py                                   Smart practice uses the measured label when there is one
+frontend/app/staff/questions/page.tsx                      "Measured: Hard (42 answers)" next to the teacher's own level
+questions/test_calibration.py, questions/test_calibrate_db.py   tests
+
+Run it (nightly is enough, e.g. a Render cron job):   python manage.py for_each_school calibrate_difficulty
+Look first without saving (inside one school):        python manage.py calibrate_difficulty --dry-run
+
+How it decides
+- Every student has an ability and every question a difficulty on one scale; P(right) = sigmoid(ability - difficulty). Fitting both together
+  means a hard question that only strong students got is NOT mistaken for an easy one (plain percent-correct makes that mistake).
+- The label is for the question's CLASS LEVEL: the expected score of an average student of that form. >= 72% easy, < 42% hard, else medium.
+- Needs at least 8 answers to a question, and a subject needs 100 answers from 15 students. Until then the question keeps the teacher's level.
+- Questions with too few answers can get a provisional label predicted from their wording, but only once 40+ questions are measured AND the
+  predictor beats "guess the average" in cross-validation. Otherwise they stay unlabelled. These show "(estimated from wording)".
+- A student's FIRST answer counts (exam first attempt, else first practice answer), so retakes and repeats do not make a question look easy.
+- Never changes a mark, a result, or the difficulty a teacher typed.
+
+Measured on simulated schools (4 forms, 180 questions, 8,400 answers), against the TRUE difficulty:
+  strong students given the hard questions: correlation with truth 0.93 (plain percent-correct 0.88); label right 82.8% (plain 78.9%)
+  questions given at random:                correlation 0.95; label right 86.1%
+Real exams are noisier than the simulation, so expect somewhat lower on your data; run --dry-run once real answers exist.
+
+Tests: python -m unittest questions.test_calibration   (no Django);  python manage.py test questions.test_calibrate_db
+On PostgreSQL 16: gamification, analytics, questions and exams give the same 15 failures/errors before and after this work (all already
+in the project), plus 19 new tests that pass.

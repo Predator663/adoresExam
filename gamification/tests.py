@@ -14,9 +14,9 @@ from . import services
 from .models import ActivityDay, BadgeAward, ExamRewardMark, PracticeSession, XPEvent
 
 
-def practice_question(subject, topic="Algebra", form_level=1, eligible=True):
+def practice_question(subject, topic="Algebra", form_level=1, eligible=True, difficulty="easy"):
     m = mcq()
-    return Question.objects.create(subject=subject, form_level=form_level, topic=topic, difficulty="easy", marks=1,
+    return Question.objects.create(subject=subject, form_level=form_level, topic=topic, difficulty=difficulty, marks=1,
                                    qtype="mcq_single", prompt="2+2?", content=m["content"], answer={"correct": "b"},
                                    explanation="Because 4.", status=Question.APPROVED, practice_eligible=eligible)
 
@@ -136,6 +136,33 @@ class PracticeTests(AnalyticsBase):
         self.assertEqual((state["summary"]["fully_correct"], state["summary"]["xp_earned"]), (5, 20))
         self.assertEqual(services.total_xp(self.amina), 20)
         self.assertTrue(ActivityDay.objects.filter(user=self.amina, day=timezone.localdate(), source="practice").exists())
+
+    def test_smart_mode_adapts_difficulty_without_repeating_or_leaking(self):
+        for d in ("easy", "medium", "hard"):
+            for _ in range(6):
+                practice_question(self.maths, topic="Geometry", difficulty=d)
+        rank = {"easy": 0, "medium": 1, "hard": 2}
+
+        def play(answer):
+            state = self.c.post("/api/practice/start/", {"subject_id": self.maths.pk, "count": 10, "adaptive": True}, format="json").json()
+            sid, ids, levels = state["session_id"], [], []
+            while not state["finished"]:
+                q = state["question"]
+                self.assertNotIn("answer", q)
+                ids.append(q["id"]); levels.append(rank[state["adaptive"]["difficulty"]])
+                state = self.c.post(f"/api/practice/{sid}/answer/", {"question_id": q["id"], "response": answer}, format="json").json()["next"]
+            return ids, levels
+
+        ids_up, up = play("b")      # always right
+        ids_down, down = play("a")  # always wrong
+        for ids in (ids_up, ids_down):
+            self.assertEqual((len(ids), len(set(ids))), (10, 10))  # ten different questions
+        self.assertGreater(sum(up[5:]), sum(down[5:]))  # the strong run ends up on harder questions than the struggling one
+
+    def test_normal_quiz_is_unchanged_by_smart_mode_code(self):
+        state = self.c.post("/api/practice/start/", {"subject_id": self.maths.pk, "count": 5}, format="json").json()
+        self.assertNotIn("adaptive", state)
+        self.assertEqual(PracticeSession.objects.get(pk=state["session_id"]).adaptive, {})
 
     def test_wrong_answers_still_earn_effort_xp_and_never_touch_results(self):
         from exams.models import Result

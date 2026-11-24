@@ -115,6 +115,17 @@ def history(rows):
             for r in sorted(rows, key=lambda r: (r["date"] is None, r["date"]))]
 
 
+def topic_history(rows):
+    """For the student's study plan: one entry per exam, oldest first, with her marks per topic ({topic: [earned, possible]}).
+    Exams without topic data are left out."""
+    out = []
+    for r in sorted(rows, key=lambda r: (r["date"] is None, r["date"])):
+        ts = {t: [round(float(v[0]), 2), round(float(v[1]), 2)] for t, v in (r.get("topic_stats") or {}).items() if v and v[1] > 0}
+        if ts:
+            out.append({"exam_id": r["exam_id"], "date": r["date"], "topics": ts})
+    return out
+
+
 def flag_for(percents):
     """percents in date order. Returns (flag, reason); flag is None, needs_support or top_performer (TCH-04)."""
     if not percents:

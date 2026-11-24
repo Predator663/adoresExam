@@ -30,7 +30,7 @@ from exams.models import Attempt, Exam, ExamQuestion, Result
 from exams.presenters import public_question
 from notifications.services import notify
 from questions.models import Question
-from . import catalog, rules
+from . import adaptive as adapt, catalog, rules
 from .models import (AVATARS, FRAMES, ActivityDay, BadgeAward, ExamRewardMark, GamificationSettings, PracticeSession, Profile,
                      ReviewProgress, XPEvent)
 
@@ -613,12 +613,70 @@ def practice_pack(student, subject_id, seed=None, offset=0, limit=None, now=None
 
 def _practice_payload(q):
     return {"qtype": q.qtype, "prompt": q.prompt, "content": q.content, "answer": q.answer, "marks": q.marks,
-            "explanation": q.explanation, "topic": q.topic, "subtopic": q.subtopic, "difficulty": q.difficulty,
+            "explanation": q.explanation, "topic": q.topic, "subtopic": q.subtopic, "difficulty": q.effective_difficulty,
             "language": q.language}
 
 
-def start_practice(student, subject_id, count=PRACTICE_DEFAULT, topic=None, difficulty=None, restart=False, now=None):
-    """Start a practice quiz, or return the one she is already in the middle of."""
+def _topic_mastery(student, subject):
+    """{topic (lower case): 0..1} from her PUBLISHED exam results in this subject: where smart mode should spend her time."""
+    got = defaultdict(lambda: [0.0, 0.0])
+    for r in Result.objects.filter(student=student, exam__subject=subject, exam__status=Exam.PUBLISHED).only("topic_stats"):
+        for topic, v in (r.topic_stats or {}).items():
+            try:
+                got[(topic or "").strip().lower()][0] += float(v[0])
+                got[(topic or "").strip().lower()][1] += float(v[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+    return {k: round(e / p, 4) for k, (e, p) in got.items() if p > 0}
+
+
+def _cand(q):
+    return {"qid": q.pk, "d": q.effective_difficulty, "topic": q.topic}
+
+
+def _smart_start(pool, count, seed, mastery):
+    """Choose the opening questions greedily (ability 0 = medium) and keep the rest of a sample as the reserve to adapt from."""
+    rng = random.Random(seed)
+    sample = rng.sample(pool, min(len(pool), 120))
+    cands, by_id, picks, recent = [_cand(q) for q in sample], {q.pk: q for q in sample}, [], []
+    for _ in range(min(count, len(cands))):
+        best = adapt.pick_next(0.0, cands, mastery, recent, rng)
+        cands.remove(best)
+        picks.append(by_id[best["qid"]])
+        recent.append(best["topic"])
+    return picks, {"theta": 0.0, "mastery": dict(mastery), "recent": [], "reserve": cands}
+
+
+def _adapt_next(s, idx, fraction):
+    """After answer number idx: update her level and topic strength, then put the best-fitting question next."""
+    st = dict(s.adaptive)
+    done = s.items[idx]["payload"]
+    st["theta"] = round(adapt.update_theta(st.get("theta", 0.0), fraction, adapt.diff_value(done.get("difficulty"))), 4)
+    st["mastery"] = adapt.update_mastery(dict(st.get("mastery", {})), done.get("topic"), fraction)
+    st["recent"] = (list(st.get("recent", [])) + [done.get("topic") or ""])[-3:]
+    nxt, items = idx + 1, list(s.items)
+    pending = [{"qid": it["qid"], "d": it["payload"].get("difficulty"), "topic": it["payload"].get("topic")} for it in items[nxt:]]
+    reserve = list(st.get("reserve", []))
+    best = adapt.pick_next(st["theta"], pending + reserve, st["mastery"], st["recent"])
+    if best and best["qid"] != items[nxt]["qid"]:
+        pos = next((i for i, c in enumerate(pending) if c["qid"] == best["qid"]), None)
+        if pos is not None:                      # already in this quiz: just move it up
+            items[nxt], items[nxt + pos] = items[nxt + pos], items[nxt]
+        else:                                    # from the reserve: it takes the place of the next question, which goes back
+            q = Question.objects.filter(pk=best["qid"], status=Question.APPROVED, practice_eligible=True).first()
+            if q:
+                displaced = items[nxt]
+                items[nxt] = {"qid": q.pk, "payload": _practice_payload(q)}
+                reserve = [c for c in reserve if c["qid"] != q.pk] + [{"qid": displaced["qid"], "d": displaced["payload"].get("difficulty"),
+                                                                       "topic": displaced["payload"].get("topic")}]
+            else:
+                reserve = [c for c in reserve if c["qid"] != best["qid"]]
+    st["reserve"] = reserve
+    s.items, s.adaptive = items, st
+
+
+def start_practice(student, subject_id, count=PRACTICE_DEFAULT, topic=None, difficulty=None, restart=False, adaptive=False, now=None):
+    """Start a practice quiz, or return the one she is already in the middle of. adaptive=True is smart mode (see adaptive.py)."""
     now = now or timezone.now()
     lang = lang_of(student)
     subject = Subject.objects.filter(pk=subject_id).first()
@@ -643,9 +701,13 @@ def start_practice(student, subject_id, count=PRACTICE_DEFAULT, topic=None, diff
     if len(pool) < PRACTICE_MIN:
         raise GamificationError(t("practice.not_enough", lang), 409, "not_enough")
     seed = random.SystemRandom().randrange(1, 2**31)
-    picks = random.Random(seed).sample(pool, min(count, len(pool)))
+    state = {}
+    if adaptive and not difficulty:  # a fixed difficulty asked for by hand wins over smart mode
+        picks, state = _smart_start(pool, count, seed, _topic_mastery(student, subject))
+    else:
+        picks = random.Random(seed).sample(pool, min(count, len(pool)))
     return PracticeSession.objects.create(
-        user=student, subject=subject, seed=seed, question_count=len(picks),
+        user=student, subject=subject, seed=seed, question_count=len(picks), adaptive=state,
         items=[{"qid": q.pk, "payload": _practice_payload(q)} for q in picks])
 
 
@@ -658,6 +720,8 @@ def practice_state(session):
         state.update(finished=True, summary=practice_summary(session))
         return state
     item = session.items[done]
+    if session.adaptive:  # lets the phone show "your level" and the difficulty of this question
+        state["adaptive"] = {"level": adapt.level_name(session.adaptive.get("theta", 0.0)), "difficulty": item["payload"].get("difficulty", "medium")}
     state.update(finished=False, index=done + 1,
                  question=public_question(SimpleNamespace(pk=item["qid"], payload=item["payload"]), session.seed, True))
     return state
@@ -700,6 +764,8 @@ def answer_practice(session_id, student, question_id, response, now=None):
         fraction = marking.fraction_correct(s.items[idx]["payload"], response, partial=True)  # instant, automatic
         s.answers = s.answers + [{"qid": question_id, "response": response, "fraction": round(fraction, 4)}]
         s.correct_score = round(sum(a["fraction"] for a in s.answers), 4)
+        if s.adaptive and len(s.answers) < len(s.items):
+            _adapt_next(s, idx, fraction)  # the next question is chosen from how she is doing right now
         if len(s.answers) >= len(s.items):
             s.status, s.completed_at, just_finished = PracticeSession.COMPLETED, now, True
         s.save()

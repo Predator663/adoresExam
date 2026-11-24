@@ -17,7 +17,7 @@ import { listPacks } from "@/lib/offline";
 import { useSession } from "@/lib/session";
 import type { Question } from "@/lib/types";
 
-type PState = { session_id: number; subject: string; total: number; answered: number; finished: boolean; index?: number; question?: Question; summary?: { questions: number; fully_correct: number; score_percent: number; xp_earned: number } };
+type PState = { session_id: number; subject: string; total: number; answered: number; finished: boolean; index?: number; adaptive?: { level: string; difficulty: string }; question?: Question; summary?: { questions: number; fully_correct: number; score_percent: number; xp_earned: number } };
 type Kind = "right" | "part" | "wrong";
 
 /** SRS 5.5: short self-paced quizzes with instant feedback. They earn XP and keep streaks alive, never exam marks. */
@@ -52,6 +52,7 @@ function Play({ initial, onAgain, onExit }: { initial: PState; onAgain: () => vo
       <div className="pr-top">
         <button type="button" className="pr-x" onClick={leave} aria-label={d.leave}>✕</button>
         <span className="pr-top-t"><b>{s.subject}</b><small className="muted">{t("question_x_of_y", { x: Math.min(s.index || s.total, s.total), y: s.total })}</small></span>
+        {s.adaptive && !fb && <span className={`pr-level ${s.adaptive.difficulty}`} title={t("smart_title")}>{t(`smart_${s.adaptive.difficulty}`)}</span>}
         {combo >= 2 && <span className="pr-combo-chip" key={combo}>🔥 {combo}</span>}
       </div>
       <Segments total={s.total} answered={s.answered} results={results} />
@@ -82,7 +83,7 @@ export default function Practice() {
   const subs = useMine<any[]>("/practice/subjects/");
   const ov = useMine<any>("/practice/overview/");
   const dflt = ov.data?.default_count;
-  const [game, setGame] = useState<{ st: PState; id: number; daily?: boolean } | null>(null), [err, setErr] = useState(""), [count, setCount] = useState(10), [busy, setBusy] = useState<number | null>(null);
+  const [game, setGame] = useState<{ st: PState; id: number; daily?: boolean } | null>(null), [err, setErr] = useState(""), [count, setCount] = useState(10), [busy, setBusy] = useState<number | null>(null), [smart, setSmart] = useState(true);
   const [offline, setOffline] = useState<string | null>(null), [packs, setPacks] = useState<ReturnType<typeof listPacks>>([]), [off, setOff] = useState(false);
   useEffect(() => {
     const sync = () => { setOff(!navigator.onLine); setPacks(listPacks()); };
@@ -92,7 +93,7 @@ export default function Practice() {
   }, [subs.loading]);
   async function start(id: number) {
     setErr(""); setBusy(id);
-    try { setGame({ st: await api<PState>("/practice/start/", { body: { subject_id: id, count } }), id }); } catch (e: any) { setErr(e.message); }
+    try { setGame({ st: await api<PState>("/practice/start/", { body: { subject_id: id, count, adaptive: smart } }), id }); } catch (e: any) { setErr(e.message); }
     setBusy(null);
   }
   async function startDaily() {
@@ -117,6 +118,12 @@ export default function Practice() {
           {!noSignal && <DailyCard onStart={startDaily} busy={busy === -1} />}
           <Tips cats={["study", "phone"]} />
           {!noSignal && <LengthPicker value={count} onChange={setCount} xp={ov.data?.xp_per_quiz ?? 0} />}
+          {!noSignal && (
+            <label className="card pr-smart">
+              <input type="checkbox" checked={smart} onChange={(e) => setSmart(e.target.checked)} />
+              <span><b>🧠 {t("smart_mode")}</b><br /><span className="muted small">{t("smart_hint")}</span></span>
+            </label>
+          )}
           {err && <p className="no" role="alert">⚠ {err}</p>}
           {noSignal && (
             <div className="card">

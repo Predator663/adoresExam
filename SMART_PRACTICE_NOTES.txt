@@ -1,0 +1,21 @@
+Smart mode for practice (adaptive questions): copy each file over the same path in your project.
+This zip also contains everything from the earlier My Study Plan update (see STUDY_PLAN_NOTES.txt), so install this one only.
+
+gamification/adaptive.py                           the engine: ability (Elo-style) + weakest-topic preference, pure Python
+gamification/models.py                             PracticeSession.adaptive (JSON, empty for normal quizzes)
+gamification/migrations/0005_practice_adaptive.py  NEW MIGRATION: run  python manage.py migrate_schemas
+gamification/services.py                           start_practice(adaptive=...), the next question is re-chosen after every answer
+gamification/views.py                              /api/practice/start/ accepts "adaptive": true
+gamification/test_adaptive.py                      no-Django tests:  python -m unittest gamification.test_adaptive
+gamification/tests.py                              2 new database tests
+frontend/app/practice/page.tsx                     "Smart mode" switch (on by default) and a Warm-up / Steady / Stretch chip
+frontend/lib/i18n.ts, frontend/app/globals.css     strings (English + Swahili) and styles
+
+How it behaves: she starts at medium. Each right answer to a hard question lifts her level a lot, each miss on an easy one lowers it a lot.
+The next question is one just above her level, from her weakest topic (from her published exam results plus how she is doing in this quiz).
+Never repeats a question, never asks one topic 3 times in a row, never changes questions she already answered, never sends answers to the phone.
+Normal quizzes, the daily challenge and offline packs are unchanged.
+
+Tested: python manage.py test gamification analytics on PostgreSQL 16: 138 tests, all pass except
+gamification.tests.LeaderboardTests.test_class_only_xp_only_and_names_not_ids, which was already out of date before this change
+(the leaderboard entries now also carry "frame" and "title", the test still expects 6 keys).

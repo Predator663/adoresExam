@@ -126,6 +126,9 @@ class PracticeSession(models.Model):
     correct_score = models.FloatField(default=0)  # sum of the fractions correct
     xp_awarded = models.PositiveIntegerField(default=0)
     daily = models.BooleanField(default=False)  # the day's challenge: a short quiz from her weakest subject, with a bonus
+    # Smart mode (gamification/adaptive.py): {"theta": ability, "mastery": {topic: 0..1}, "recent": [topics], "reserve": [{"qid","d","topic"}]}.
+    # Empty = a normal quiz whose questions never change.
+    adaptive = models.JSONField(default=dict, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

@@ -1,0 +1,20 @@
+My Study Plan (ML on the student's progress page): copy each file over the same path in your project
+
+analytics/calc.py                   new topic_history(rows): marks per topic for each exam, oldest first
+analytics/views.py                  /api/student/analytics/ now returns "topic_history" for each subject (additive, nothing removed)
+analytics/test_calc.py              test for topic_history
+frontend/lib/studyplan.ts           the model: Bayesian per-topic mastery with recency weighting, next-exam forecast with a measured range,
+                                    ranked "focus topics", what-if. Pure TypeScript, runs in the browser, no new packages.
+frontend/lib/studyplan.check.ts     simulation + unit checks:  cd frontend && npx tsx lib/studyplan.check.ts
+frontend/components/StudyPlan.tsx   the screen
+frontend/app/progress/page.tsx      shows <StudyPlan/> above the subjects list
+frontend/lib/i18n.ts                sp_* strings, English and Swahili (have a Kiswahili teacher check the Swahili)
+frontend/app/globals.css            .sp-* styles appended at the end
+
+Then rebuild the web app (cd frontend && npm run build). No migration, no new Python packages.
+Tests: python manage.py test analytics   (not run here: no PostgreSQL in my sandbox)
+
+Measured on 2000 simulated forecasts (400 students x 5 exams, 20-question papers):
+  typical miss: model 10.3 points | "same as last time" 11.9 | "my average" 10.7
+  the shown 80% range contained the real result 80.5% of the time.
+Most of the remaining error is luck on a 20-question paper (about 9 points), which no model can remove.
