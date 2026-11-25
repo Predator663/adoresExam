@@ -41,3 +41,16 @@ Not built: open challenges to anyone (it is classmate to classmate on purpose), 
 - New endpoint GET /api/tournaments/invites/ ; files: frontend/components/TournamentInvites.tsx, tournament.css,
   Shell.tsx, app/page.tsx, components/tournament.tsx, app/tournaments/page.tsx, gamification/tournaments.py (invites), views.py, urls.py.
 - No migration needed.
+
+---- Arena redesign + any-class challenges (added) ----
+- No more list of students. The challenger SEARCHES (2+ letters, max 8 results, optional class filter chips) by the name
+  classmates see (chosen name, else "Amina K."). Hidden students are not found. Recent opponents show for one-tap rematches.
+  GET /api/tournaments/search/?q=ne&form=3 . /options/ no longer returns "classmates".
+- Any class can be challenged. CLASS STAKES (frozen when declared, shown before sending and in the invite pop-up):
+    each class apart = 1 step, max 3.  Beat a HIGHER class: win XP +50% per step.  Beat a LOWER class: win XP -25% per step (min 30%).
+    LOSE to a LOWER class: -10 XP per step (never below 0 total XP, never capped by the daily limit). Lose to a higher class: nothing.
+  Questions come from the LOWER of the two classes. Tune with constants in gamification/tournaments.py (WIN_UP, WIN_DOWN, WIN_FLOOR, LOSE_COST).
+- New migration gamification/0007_tournament_stakes (Tournament.stakes). Run: python manage.py migrate_schemas
+- New XP kind tournament_penalty (negative points in the XP ledger).
+- UI: animated arena hero with count-up record, Live/Finished tabs, 2-step challenge wizard (search -> match), VS arena,
+  confetti + count-up on a win, bonus/penalty chips on the result.

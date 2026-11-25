@@ -155,6 +155,8 @@ class Tournament(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     # set once when settled: {"outcome": win|draw|no_contest|none, "winner_id", "how": score|time, "players": {uid: {...}}, "badges": {uid: [...]}}
     result = models.JSONField(default=dict, blank=True)
+    # class stakes frozen when declared: {user_id: {"gap", "win_pct", "penalty"}} (a win against a higher form pays more, losing to a lower one costs XP)
+    stakes = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

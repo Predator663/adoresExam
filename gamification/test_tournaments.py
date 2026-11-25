@@ -38,14 +38,19 @@ class TournamentBase(AnalyticsBase):
 
 
 class SetupAndPrivacyTests(TournamentBase):
-    def test_only_visible_classmates_can_be_challenged(self):
-        ids = [c["id"] for c in T.classmates(self.a)]
-        self.assertEqual(ids, [self.n.pk])                      # not herself, not zawadi (other class)
+    def test_anyone_can_be_challenged_unless_hidden_and_search_is_not_a_list(self):
+        self.assertEqual(T.search(self.a, ""), [])                 # nothing typed: no list
+        self.assertEqual(T.search(self.a, "n"), [])                # one letter is not enough
+        self.assertEqual([r["id"] for r in T.search(self.a, "nee")], [self.n.pk])
+        self.assertEqual([r["id"] for r in T.search(self.a, "zaw")], [self.zawadi.pk])   # another class is found too
+        self.assertEqual(T.search(self.a, "amina"), [])            # never herself
+        self.assertEqual(T.search(self.a, "test"), [])             # real surnames are not searchable, only what classmates see
         Profile.objects.update_or_create(user=self.n, defaults={"hide_from_leaderboard": True})
-        self.assertEqual(T.classmates(self.a), [])              # a student who hid herself is not offered
+        self.assertEqual(T.search(self.a, "nee"), [])              # a student who hid herself is not offered
         with self.assertRaises(services.GamificationError) as e:
-            T.create(self.a, self.maths.pk, self.zawadi.pk, now=self.t0)
+            T.create(self.a, self.maths.pk, self.n.pk, now=self.t0)
         self.assertEqual(e.exception.code, "not_classmate")
+        self.assertTrue(T.create(self.a, self.maths.pk, self.zawadi.pk, now=self.t0, count=5))
 
     def test_strangers_cannot_see_it_and_answers_never_travel(self):
         tour = self.declare()
@@ -236,7 +241,7 @@ class ApiFlowTests(TournamentBase):
     def test_a_whole_duel_through_the_api(self):
         ca, cn = self.client_for(self.a), self.client_for(self.n)
         opts = ca.get("/api/tournaments/options/").json()
-        self.assertEqual([c["id"] for c in opts["classmates"]], [self.n.pk])
+        self.assertNotIn("classmates", opts)                    # no full list of students is ever sent
         self.assertEqual(opts["subjects"][0]["id"], self.maths.pk)
         made = ca.post("/api/tournaments/", {"subject_id": self.maths.pk, "opponent_id": self.n.pk, "count": 5, "seconds": 30, "hours": 24}, format="json")
         self.assertEqual(made.status_code, 201)
@@ -250,5 +255,60 @@ class ApiFlowTests(TournamentBase):
         self.assertEqual(out["tournament"]["result"]["outcome"] in ("won", "lost", "draw"), True)
         hist = cn.get("/api/tournaments/").json()
         self.assertEqual((len(hist["history"]), hist["record"]["played"]), (1, 1))
-        bad = ca.post("/api/tournaments/", {"subject_id": self.maths.pk, "opponent_id": self.zawadi.pk, "count": 5, "seconds": 30, "hours": 24}, format="json")
+        bad = ca.post("/api/tournaments/", {"subject_id": self.maths.pk, "opponent_id": 999999, "count": 5, "seconds": 30, "hours": 24}, format="json")
         self.assertEqual((bad.status_code, bad.json()["code"]), (400, "not_classmate"))
+
+
+class ClassStakesTests(TournamentBase):
+    def test_stakes_numbers(self):
+        self.assertEqual(T.stakes_for(1, 3), {"gap": 2, "win_pct": 200, "penalty": 0})     # beating a higher form pays double
+        self.assertEqual(T.stakes_for(3, 1), {"gap": -2, "win_pct": 50, "penalty": 20})    # beating a lower form pays less, losing costs
+        self.assertEqual(T.stakes_for(4, 1), {"gap": -3, "win_pct": 30, "penalty": 30})
+        self.assertEqual(T.stakes_for(2, 2), {"gap": 0, "win_pct": 100, "penalty": 0})
+        self.assertEqual(T.stakes_for(None, 2), {"gap": 0, "win_pct": 100, "penalty": 0})
+
+    def _duel(self, higher, lower, higher_wins):
+        """higher / lower are users; the higher form challenges. Returns (tour, higher_user_xp_delta, lower_user_xp_delta)."""
+        for u in (higher, lower):
+            services.award_xp(u, "practice", 100, f"seed:{u.pk}")
+        before = {u.pk: services.total_xp(u) for u in (higher, lower)}
+        tour = T.create(higher, self.maths.pk, lower.pk, count=5, seconds=30, hours=48, now=self.t0)
+        right = "b"
+        end1 = self.play_run(tour, higher, right if higher_wins else "zzz", self.t0 + timedelta(minutes=1))
+        self.play_run(tour, lower, "zzz" if higher_wins else right, end1 + timedelta(minutes=1))
+        return Tournament.objects.get(pk=tour.pk), {u.pk: services.total_xp(u) - before[u.pk] for u in (higher, lower)}
+
+    def setUp(self):
+        super().setUp()
+        self.cls_a.form_level, self.cls_b.form_level = 3, 1
+        self.cls_a.save(); self.cls_b.save()
+        self.tiny = self.zawadi          # form 1; amina and neema are form 3
+
+    def test_losing_to_a_lower_form_costs_xp_and_winning_pays_less(self):
+        tour, d = self._duel(self.a, self.tiny, higher_wins=False)
+        cfg = services.config()["xp"]
+        self.assertEqual(tour.result["outcome"], "win")
+        self.assertEqual(tour.result["winner_id"], self.tiny.pk)
+        self.assertEqual(d[self.a.pk], cfg["tournament_play"] - 20)                      # play XP minus 20 penalty (two forms apart)
+        self.assertEqual(d[self.tiny.pk], cfg["tournament_play"] + round(cfg["tournament_win"] * 2.0))   # +100% for beating a higher form
+        self.assertEqual(tour.result["players"][str(self.a.pk)]["penalty"], 20)
+
+    def test_the_higher_form_winning_gets_a_smaller_win_bonus(self):
+        tour, d = self._duel(self.a, self.tiny, higher_wins=True)
+        cfg = services.config()["xp"]
+        self.assertEqual(d[self.a.pk], cfg["tournament_play"] + round(cfg["tournament_win"] * 0.5))
+        self.assertEqual(d[self.tiny.pk], cfg["tournament_play"])                        # losing to a higher form costs nothing
+
+    def test_penalty_never_takes_xp_below_zero(self):
+        XPEvent.objects.filter(user=self.a).delete()
+        tour = T.create(self.a, self.maths.pk, self.tiny.pk, count=5, seconds=30, hours=48, now=self.t0)
+        end = self.play_run(tour, self.a, "zzz", self.t0 + timedelta(minutes=1))
+        self.play_run(tour, self.tiny, "b", end + timedelta(minutes=1))
+        self.assertGreaterEqual(services.total_xp(self.a), 0)
+
+    def test_questions_come_from_the_lower_form(self):
+        tour = T.create(self.a, self.maths.pk, self.tiny.pk, count=5, seconds=30, hours=48, now=self.t0)
+        self.assertEqual(tour.stakes[str(self.a.pk)]["penalty"], 20)
+        self.assertEqual(tour.stakes[str(self.tiny.pk)]["win_pct"], 200)
+        v = T.view(tour, self.tiny, self.t0)
+        self.assertEqual(v["stakes"]["win_pct"], 200)

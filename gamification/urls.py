@@ -25,6 +25,7 @@ urlpatterns = [
     # tournaments (1v1 with a classmate)
     path("tournaments/", views.tournaments),
     path("tournaments/options/", views.tournament_options),
+    path("tournaments/search/", views.tournament_search),
     path("tournaments/invites/", views.tournament_invites),
     path("tournaments/<int:tid>/", views.tournament_detail),
     path("tournaments/<int:tid>/play/", views.tournament_play),

@@ -426,6 +426,13 @@ def tournaments(request):
 
 @api_view(["GET"])
 @permission_classes([IsStudent])
+def tournament_search(request):
+    """Find an opponent by name (any class). Needs 2+ letters; never lists everybody. ?q=ami&form=3"""
+    return Response({"results": tour_svc.search(request.user, request.GET.get("q", ""), request.GET.get("form"))})
+
+
+@api_view(["GET"])
+@permission_classes([IsStudent])
 def tournament_options(request):
     return Response(tour_svc.options(request.user))
 

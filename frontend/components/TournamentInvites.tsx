@@ -6,13 +6,13 @@ import { api } from "@/lib/api";
 import { AVATAR_EMOJI } from "@/lib/emoji";
 import { useSession } from "@/lib/session";
 
-type Invite = { id: number; subject: string; question_count: number; seconds_per_question: number; expires_at: string; opponent: { id: number; name: string; avatar: string } };
+type Invite = { id: number; subject: string; question_count: number; seconds_per_question: number; expires_at: string; stakes?: { gap: number; win_pct: number; penalty: number }; opponent: { id: number; name: string; avatar: string } };
 
 const TXT = {
   en: { challenged: "{name} challenged you!", sub: "{subject} · {n} questions · {s} s each", left_m: "{n} min left", left_h: "{n} h left", left_d: "{n} days left", accept: "Accept", decline: "Decline", later: "Later", more: "+{n} more waiting",
-    waiting_one: "1 challenge waiting", waiting_n: "{n} challenges waiting", section: "Challenges waiting for you", fail: "That did not work. Try again." },
+    waiting_one: "1 challenge waiting", waiting_n: "{n} challenges waiting", section: "Challenges waiting for you", fail: "That did not work. Try again.", up: "🔥 Win = +{n}% XP", down: "⚠️ Lose = −{n} XP" },
   sw: { challenged: "{name} amekupa changamoto!", sub: "{subject} · maswali {n} · sekunde {s} kila moja", left_m: "Dakika {n} zimebaki", left_h: "Saa {n} zimebaki", left_d: "Siku {n} zimebaki", accept: "Kubali", decline: "Kataa", later: "Baadaye", more: "+{n} zaidi zinasubiri",
-    waiting_one: "Changamoto 1 inasubiri", waiting_n: "Changamoto {n} zinasubiri", section: "Changamoto zinazokusubiri", fail: "Haikufanikiwa. Jaribu tena." },
+    waiting_one: "Changamoto 1 inasubiri", waiting_n: "Changamoto {n} zinasubiri", section: "Changamoto zinazokusubiri", fail: "Haikufanikiwa. Jaribu tena.", up: "🔥 Ushindi = +{n}% XP", down: "⚠️ Kushindwa = −XP {n}" },
 };
 const useT = () => {
   const { lang } = useSession();
@@ -20,6 +20,7 @@ const useT = () => {
   const f = (s: string, v: Record<string, string | number> = {}) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
   return { d, f };
 };
+const stakeLine = (i: Invite, d: any, f: any) => (i.stakes && i.stakes.gap > 0 ? f(d.up, { n: i.stakes.win_pct - 100 }) : i.stakes && i.stakes.gap < 0 ? f(d.down, { n: i.stakes.penalty }) : "");
 const leftText = (iso: string, d: typeof TXT.en, f: (s: string, v: any) => string) => {
   const m = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
   return m < 90 ? f(d.left_m, { n: Math.max(1, m) }) : m < 60 * 36 ? f(d.left_h, { n: Math.round(m / 60) }) : f(d.left_d, { n: Math.round(m / 1440) });
@@ -91,6 +92,7 @@ export function InviteBanner() {
           <div className="tn-pop-t">
             <b>⚔️ {f(d.challenged, { name: next.opponent.name })}</b>
             <span className="small">{f(d.sub, { subject: next.subject, n: next.question_count, s: next.seconds_per_question })} · {leftText(next.expires_at, d, f)}</span>
+            {stakeLine(next, d, f) && <span className="small tn-stake-line">{stakeLine(next, d, f)}</span>}
             {more > 0 && <span className="small muted">{f(d.more, { n: more })}</span>}
             {act.err && <span className="no small" role="alert">⚠ {act.err}</span>}
           </div>
@@ -124,7 +126,7 @@ export function InviteSection({ onChange }: { onChange?: () => void }) {
       {list.map((i) => (
         <div key={i.id} className="tn-sec-row">
           <span className="tn-av" aria-hidden>{AVATAR_EMOJI[i.opponent.avatar] || "🙂"}</span>
-          <span className="grow"><b>{f(d.challenged, { name: i.opponent.name })}</b><br /><span className="muted small">{f(d.sub, { subject: i.subject, n: i.question_count, s: i.seconds_per_question })} · {leftText(i.expires_at, d, f)}</span></span>
+          <span className="grow"><b>{f(d.challenged, { name: i.opponent.name })}</b><br /><span className="muted small">{f(d.sub, { subject: i.subject, n: i.question_count, s: i.seconds_per_question })} · {leftText(i.expires_at, d, f)}</span>{stakeLine(i, d, f) && <><br /><span className="small tn-stake-line">{stakeLine(i, d, f)}</span></>}</span>
           <span className="row">
             <button className="btn primary" onClick={() => act.accept(i.id)}>{d.accept}</button>
             <button className="btn danger" disabled={act.busy === i.id} onClick={async () => { await act.decline(i.id); onChange?.(); }}>{d.decline}</button>

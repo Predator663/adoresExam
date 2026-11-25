@@ -1,7 +1,7 @@
-"""1v1 tournaments between classmates, played at different times.
+"""1v1 tournaments between students of ANY class, played at different times.
 
 How it works (the rules that keep it fair):
-- A student declares a tournament to a classmate: subject, number of questions, seconds per question, and how long the classmate has
+- A student finds an opponent by SEARCH (never a full list) and declares a tournament: subject, number of questions, seconds per question, and how long the classmate has
   (`hours`) before it times out. The questions are chosen once and frozen, so BOTH play the same ones.
 - Each player gets her own question order and her own option order (so one cannot just say "the answer to number 3 is B").
 - The timer belongs to the SERVER. A question's clock starts when it is first shown to her; an answer that arrives later than the
@@ -12,6 +12,9 @@ How it works (the rules that keep it fair):
   one who played still gets the small play XP. Declined and cancelled tournaments give no XP.
 - XP: play XP for finishing, plus a bonus for winning or drawing; at most DAILY_XP_CAP tournaments per day pay XP (so it cannot be farmed).
   Badges come from the same badge engine as everything else. No exam mark is ever touched.
+- CLASS STAKES (frozen when declared): each form apart counts as one step, up to 3. Beating a HIGHER form pays +50% win XP per step;
+  beating a LOWER form pays less (-25% per step, never below 30%); LOSING to a lower form costs 10 XP per step (never below zero total XP).
+  Losing to a higher form costs nothing. Questions come from the LOWER of the two forms so both have met the material.
 """
 import random
 from datetime import timedelta
@@ -22,7 +25,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from accounts.models import User
-from academics.models import Subject
+from academics.models import SchoolClass, Subject
 from core.i18n import lang_of, t
 from exams import marking
 from exams.presenters import public_question
@@ -42,26 +45,94 @@ def _err(key, status=400, code="error", lang="en", **kw):
     return S.GamificationError(t(key, lang, **kw), status, code)
 
 
+def _form(user):
+    return user.school_class.form_level if user.school_class_id else None
+
+
 def _person(user, profile=None):
     profile = profile or S.get_profile(user)
-    return {"id": user.pk, "name": S.display_name(user, profile), "avatar": profile.avatar}
+    return {"id": user.pk, "name": S.display_name(user, profile), "avatar": profile.avatar,
+            "form": _form(user), "class_name": user.school_class.name if user.school_class_id else ""}
+
+
+MAX_STEP, WIN_UP, WIN_DOWN, WIN_FLOOR, LOSE_COST = 3, 50, 25, 30, 10
+
+
+def stakes_for(my_form, their_form):
+    """What the class gap does to ME. gap = their form minus my form (clamped to +-MAX_STEP).
+    win_pct: share of the normal win XP I get if I win. penalty: XP I lose if I lose (only to a LOWER form)."""
+    if my_form is None or their_form is None:
+        return {"gap": 0, "win_pct": 100, "penalty": 0}
+    gap = max(-MAX_STEP, min(MAX_STEP, their_form - my_form))
+    if gap > 0:
+        return {"gap": gap, "win_pct": 100 + WIN_UP * gap, "penalty": 0}
+    if gap < 0:
+        return {"gap": gap, "win_pct": max(WIN_FLOOR, 100 + WIN_DOWN * gap), "penalty": LOSE_COST * -gap}
+    return {"gap": 0, "win_pct": 100, "penalty": 0}
 
 
 # ---------------------------------------------------------------- who can be challenged, and the choices
 
-def classmates(student):
-    """Students of her own class who have not hidden themselves (the same people the class leaderboard shows)."""
-    if not student.school_class_id:
+def _findable(student, user_id):
+    """Any active student of the school except herself, unless that student hid herself from classmates."""
+    u = User.objects.filter(pk=user_id, role="student", is_active=True).select_related("school_class").exclude(pk=student.pk).first()
+    if not u:
+        return None
+    p = Profile.objects.filter(user=u).first()
+    return None if p and p.hide_from_leaderboard else u
+
+
+SEARCH_MIN, SEARCH_MAX = 2, 8
+
+
+def search(student, q, form=None):
+    """Find an opponent by typing part of her name. Never returns everybody: needs SEARCH_MIN letters, returns at most SEARCH_MAX.
+    Matches only what the leaderboard shows (the name she chose, else first name + last initial), so real surnames are not exposed."""
+    q = " ".join(str(q or "").split()).lower()
+    if len(q) < SEARCH_MIN:
         return []
-    users = list(User.objects.filter(role="student", is_active=True, school_class_id=student.school_class_id).exclude(pk=student.pk))
-    profiles = {p.user_id: p for p in Profile.objects.filter(user__in=users)}
+    cand = (User.objects.filter(role="student", is_active=True).exclude(pk=student.pk).select_related("school_class")
+            .filter(Q(first_name__icontains=q) | Q(gamification__display_name__icontains=q) | Q(username__icontains=q)))
+    try:
+        if form not in (None, ""):
+            cand = cand.filter(school_class__form_level=int(form))
+    except (TypeError, ValueError):
+        pass
+    cand = list(cand[:80])
+    profiles = {p.user_id: p for p in Profile.objects.filter(user__in=cand)}
+    me = _form(student)
     out = []
-    for u in users:
+    for u in cand:
         p = profiles.get(u.pk)
         if p and p.hide_from_leaderboard:
             continue
-        out.append(_person(u, p or Profile(user=u)))
-    return sorted(out, key=lambda x: x["name"].lower())
+        name = S.display_name(u, p)
+        low = name.lower()
+        if q not in low:
+            continue
+        rank = 0 if low.startswith(q) else 1 if any(w.startswith(q) for w in low.split()) else 2
+        out.append((rank, low, _person(u, p or Profile(user=u)) | {"stakes": stakes_for(me, _form(u))}))
+    out.sort(key=lambda x: (x[0], x[1]))
+    return [x[2] for x in out[:SEARCH_MAX]]
+
+
+def recent_opponents(student, limit=6):
+    """People she played or challenged lately, newest first, so a rematch is one tap."""
+    seen, out, me = set(), [], _form(student)
+    rows = (Tournament.objects.filter(Q(challenger=student) | Q(opponent=student)).select_related("challenger", "opponent", "challenger__school_class", "opponent__school_class")
+            .order_by("-created_at")[:40])
+    for t_ in rows:
+        o = t_.opponent if t_.challenger_id == student.pk else t_.challenger
+        if o.pk in seen or not o.is_active:
+            continue
+        p = Profile.objects.filter(user=o).first()
+        if p and p.hide_from_leaderboard:
+            continue
+        seen.add(o.pk)
+        out.append(_person(o, p or Profile(user=o)) | {"stakes": stakes_for(me, _form(o))})
+        if len(out) >= limit:
+            break
+    return out
 
 
 def options(student):
@@ -70,8 +141,11 @@ def options(student):
         n = S.practice_pool(student, s).count()
         if n >= S.PRACTICE_MIN:
             subjects.append({"id": s.pk, "name": s.name, "questions": n})
-    return {"subjects": subjects, "classmates": classmates(student), "counts": list(COUNTS), "seconds": list(SECONDS), "hours": list(HOURS),
-            "defaults": {"count": DEFAULT_COUNT, "seconds": DEFAULT_SECONDS, "hours": DEFAULT_HOURS}}
+    forms = sorted(set(SchoolClass.objects.values_list("form_level", flat=True)))
+    return {"subjects": subjects, "recent": recent_opponents(student), "forms": forms, "my_form": _form(student),
+            "counts": list(COUNTS), "seconds": list(SECONDS), "hours": list(HOURS),
+            "defaults": {"count": DEFAULT_COUNT, "seconds": DEFAULT_SECONDS, "hours": DEFAULT_HOURS},
+            "rules": {"win_up": WIN_UP, "win_down": WIN_DOWN, "win_floor": WIN_FLOOR, "lose_cost": LOSE_COST, "max_step": MAX_STEP}}
 
 
 # ---------------------------------------------------------------- declaring
@@ -85,13 +159,16 @@ def create(student, subject_id, opponent_id, count=DEFAULT_COUNT, seconds=DEFAUL
         raise _err("tour.err.bad_option", lang=lang)
     if count not in COUNTS or seconds not in SECONDS or hours not in HOURS:
         raise _err("tour.err.bad_option", lang=lang)
-    opponent = next((c for c in classmates(student) if c["id"] == opponent_id), None)
-    if not opponent:
+    opponent_user = _findable(student, opponent_id)
+    if not opponent_user:
         raise _err("tour.err.not_classmate", 400, "not_classmate", lang)
     subject = Subject.objects.filter(pk=subject_id, practice_enabled=True).first()
     if not subject:
         raise _err("tour.err.bad_option", lang=lang)
-    pool = list(S.practice_pool(student, subject))
+    # questions both have met: those of the LOWER form (whoever of the two is lower builds the pool)
+    fa, fb = _form(student), _form(opponent_user)
+    owner = opponent_user if (fa is not None and fb is not None and fb < fa) else student
+    pool = list(S.practice_pool(owner, subject))
     if len(pool) < count:
         raise _err("tour.err.few_questions", 400, "few_questions", lang)
     with transaction.atomic():
@@ -103,8 +180,8 @@ def create(student, subject_id, opponent_id, count=DEFAULT_COUNT, seconds=DEFAUL
         picks = random.SystemRandom().sample(pool, count)
         tour = Tournament.objects.create(
             challenger=student, opponent_id=opponent_id, subject=subject, question_count=count, seconds_per_question=seconds,
-            expires_at=now + timedelta(hours=hours), items=[{"qid": q.pk, "payload": S._practice_payload(q)} for q in picks])
-    other = User.objects.get(pk=opponent_id)
+            expires_at=now + timedelta(hours=hours), stakes={str(student.pk): stakes_for(fa, fb), str(opponent_id): stakes_for(fb, fa)}, items=[{"qid": q.pk, "payload": S._practice_payload(q)} for q in picks])
+    other = opponent_user
     ol = lang_of(other)
     until = timezone.localtime(tour.expires_at).strftime("%d %b %H:%M")
     notify([other], "tournament_invite", t("tour.invite.title", ol, name=S.display_name(student, S.get_profile(student)), subject=subject.name),
@@ -310,12 +387,22 @@ def _reward(tour, p, winner, outcome, cfg, today, now):
         ev = S.award_xp(user, "tournament", cfg["xp"]["tournament_play"], f"{base}:play", subject=tour.subject.name)
         xp += ev.points if ev else 0
         if outcome == "win" and winner.user_id == user.pk:
-            ev = S.award_xp(user, "tournament_win", cfg["xp"]["tournament_win"], f"{base}:win", subject=tour.subject.name)
+            pct = (tour.stakes or {}).get(str(user.pk), {}).get("win_pct", 100)
+            ev = S.award_xp(user, "tournament_win", round(cfg["xp"]["tournament_win"] * pct / 100), f"{base}:win", subject=tour.subject.name, pct=pct)
             xp += ev.points if ev else 0
         elif outcome == "draw":
             ev = S.award_xp(user, "tournament_draw", cfg["xp"]["tournament_draw"], f"{base}:draw", subject=tour.subject.name)
             xp += ev.points if ev else 0
+    penalty = (tour.stakes or {}).get(str(user.pk), {}).get("penalty", 0)
+    if outcome == "win" and winner.user_id != user.pk and penalty > 0:  # lost to a LOWER form: costs XP, but never below zero
+        cost = min(penalty, max(0, S.total_xp(user)))
+        if cost > 0:
+            XPEvent.objects.get_or_create(user=user, key=f"tournament:{tour.pk}:penalty",
+                                          defaults={"kind": "tournament_penalty", "points": -cost, "detail": {"subject": tour.subject.name}})
+            xp -= cost
+            row["penalty"] = cost
     row["xp"] = xp
+    row["win_pct"] = (tour.stakes or {}).get(str(user.pk), {}).get("win_pct", 100)
     S.record_activity(user, today, "practice", cfg)  # a finished tournament is a learning day
     lang = lang_of(user)
     new = S.evaluate_badges(user, cfg)
@@ -374,7 +461,8 @@ def view(tour, viewer, now=None, plays=None):
            "role": "challenger" if viewer.pk == tour.challenger_id else "opponent", "me": me, "opponent": them,
            "can_play": open_ and me["status"] != "finished",
            "can_decline": open_ and viewer.pk == tour.opponent_id and not mine,
-           "can_cancel": open_ and viewer.pk == tour.challenger_id and them["status"] == "not_started"}
+           "can_cancel": open_ and viewer.pk == tour.challenger_id and them["status"] == "not_started",
+           "stakes": (tour.stakes or {}).get(str(viewer.pk)) or stakes_for(None, None)}
     if tour.status != Tournament.OPEN:
         out["result"] = _result_for(tour, viewer, other, plays)
     return out

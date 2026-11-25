@@ -106,7 +106,7 @@ def award_xp(user, kind, points, key, exam_id=None, **detail):
 def xp_label(event, lang="en"):
     key = {"submit": "xp.submit", "early": "xp.early", "score": "xp.score", "improve": "xp.improve",
            "perfect": "xp.perfect", "review": "xp.review", "practice": "xp.practice", "streak": "xp.streak", "daily": "xp.daily",
-           "tournament": "xp.tournament", "tournament_win": "xp.tournament_win", "tournament_draw": "xp.tournament_draw"}.get(event.kind)
+           "tournament": "xp.tournament", "tournament_win": "xp.tournament_win", "tournament_draw": "xp.tournament_draw", "tournament_penalty": "xp.tournament_penalty"}.get(event.kind)
     return t(key, lang, **(event.detail or {})) if key else event.kind
 
 
