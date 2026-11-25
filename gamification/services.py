@@ -17,7 +17,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Exists, OuterRef, Sum
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.utils import timezone
 
 from academics.models import SchoolClass, Subject, Term
@@ -31,7 +31,7 @@ from exams.presenters import public_question
 from notifications.services import notify
 from questions.models import Question
 from . import adaptive as adapt, catalog, rules
-from .models import (AVATARS, FRAMES, ActivityDay, BadgeAward, ExamRewardMark, GamificationSettings, PracticeSession, Profile,
+from .models import (AVATARS, FRAMES, ActivityDay, BadgeAward, ExamRewardMark, GamificationSettings, PracticeSession, Profile, Tournament,
                      ReviewProgress, XPEvent)
 
 log = logging.getLogger(__name__)
@@ -105,7 +105,8 @@ def award_xp(user, kind, points, key, exam_id=None, **detail):
 
 def xp_label(event, lang="en"):
     key = {"submit": "xp.submit", "early": "xp.early", "score": "xp.score", "improve": "xp.improve",
-           "perfect": "xp.perfect", "review": "xp.review", "practice": "xp.practice", "streak": "xp.streak", "daily": "xp.daily"}.get(event.kind)
+           "perfect": "xp.perfect", "review": "xp.review", "practice": "xp.practice", "streak": "xp.streak", "daily": "xp.daily",
+           "tournament": "xp.tournament", "tournament_win": "xp.tournament_win", "tournament_draw": "xp.tournament_draw"}.get(event.kind)
     return t(key, lang, **(event.detail or {})) if key else event.kind
 
 
@@ -200,6 +201,7 @@ def compute_metrics(student, cfg, today=None):
     m["best_streak"] = rules.streak_status(activity_days(student), today, cfg["freezes"])["best"]
     m["reviewed_exams"] = ReviewProgress.objects.filter(attempt__student=student, completed=True).count()
     m.update(_practice_metrics(student))
+    m.update(_tournament_metrics(student))
     m["total_xp"] = total_xp(student)
     return m
 
@@ -228,6 +230,22 @@ def _practice_metrics(student):
             weekend.add(done.date())
     m["weekend_days"] = len(weekend)
     m["practice_subjects"] = len({s.subject_id for s in sessions})
+    return m
+
+
+def _tournament_metrics(student):
+    """Tournaments she finished, won, and won without a wrong answer (from the settled result stored on each tournament)."""
+    m = {"tournaments_played": 0, "tournament_wins": 0, "flawless_wins": 0}
+    mine = str(student.pk)
+    for r in (Tournament.objects.filter(status=Tournament.FINISHED).filter(Q(challenger=student) | Q(opponent=student)).values_list("result", flat=True)):
+        p = (r or {}).get("players", {}).get(mine)
+        if not p:
+            continue
+        m["tournaments_played"] += 1
+        if r.get("winner_id") == student.pk:
+            m["tournament_wins"] += 1
+            if p.get("score", 0) >= p.get("total", 1) - 1e-6:
+                m["flawless_wins"] += 1
     return m
 
 

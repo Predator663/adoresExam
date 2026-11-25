@@ -15,7 +15,7 @@ from core.models import SchoolSettings, audit
 from core.pagination import envelope, page_params, paginate, wants_page
 from exams.views import _visible_result_or_404
 from questions.models import Question
-from . import adminstats, catalog, rules, services
+from . import adminstats, catalog, rules, services, tournaments as tour_svc
 from .models import AVATARS, FRAMES, GamificationSettings
 
 log = logging.getLogger(__name__)
@@ -404,3 +404,85 @@ def admin_students(request):
 def admin_student(request, student_id):
     """One student's gamification: XP, level, badges, streak, rank and recent XP."""
     return Response(adminstats.detail(get_object_or_404(adminstats.students(), pk=student_id)))
+
+
+# ---------------------------------------------------------------- tournaments (1v1 with a classmate)
+
+@api_view(["GET", "POST"])
+@permission_classes([IsStudent])
+def tournaments(request):
+    """GET = my invites, tournaments in play, history and win record. POST = declare one:
+    {"subject_id": 3, "opponent_id": 41, "count": 10, "seconds": 30, "hours": 48}."""
+    if request.method == "GET":
+        return Response(tour_svc.overview(request.user))
+    d = request.data
+    try:
+        tour = tour_svc.create(request.user, d.get("subject_id"), d.get("opponent_id"), d.get("count", tour_svc.DEFAULT_COUNT),
+                               d.get("seconds", tour_svc.DEFAULT_SECONDS), d.get("hours", tour_svc.DEFAULT_HOURS))
+        return Response(tour_svc.detail(tour.pk, request.user), status=201)
+    except services.GamificationError as e:
+        return _err(e)
+
+
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def tournament_options(request):
+    return Response(tour_svc.options(request.user))
+
+
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def tournament_detail(request, tid):
+    try:
+        return Response(tour_svc.detail(tid, request.user))
+    except services.GamificationError as e:
+        return _err(e)
+
+
+@api_view(["POST"])
+@permission_classes([IsStudent])
+def tournament_play(request, tid):
+    """Start or resume my run. The timer of the current question is kept by the server."""
+    try:
+        current = tour_svc.play(tid, request.user)
+        return Response({"tournament": tour_svc.detail(tid, request.user), "current": current})
+    except services.GamificationError as e:
+        return _err(e)
+
+
+@api_view(["POST"])
+@permission_classes([IsStudent])
+def tournament_answer(request, tid):
+    """{"question_id": 12, "response": ...}. A late answer is scored 0 by the server. Returns the next question, or current = null at the end."""
+    try:
+        current = tour_svc.answer(tid, request.user, request.data.get("question_id"), request.data.get("response"))
+        return Response({"tournament": tour_svc.detail(tid, request.user), "current": current})
+    except services.GamificationError as e:
+        return _err(e)
+
+
+@api_view(["POST"])
+@permission_classes([IsStudent])
+def tournament_decline(request, tid):
+    try:
+        tour_svc.decline(tid, request.user)
+        return Response(tour_svc.detail(tid, request.user))
+    except services.GamificationError as e:
+        return _err(e)
+
+
+@api_view(["POST"])
+@permission_classes([IsStudent])
+def tournament_cancel(request, tid):
+    try:
+        tour_svc.cancel(tid, request.user)
+        return Response(tour_svc.detail(tid, request.user))
+    except services.GamificationError as e:
+        return _err(e)
+
+
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def tournament_invites(request):
+    """Only the challenges waiting for me: drives the pop-up at the top of the screen and the 'waiting for you' card."""
+    return Response({"invites": tour_svc.invites(request.user)})

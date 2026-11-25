@@ -14,6 +14,7 @@ import Footer from "./Footer";
 import Icon from "./Icon";
 import Logo from "./Logo";
 import MessageBanner from "./MessageBanner";
+import { InviteBanner } from "./TournamentInvites";
 import { Dropdown, Loading, Modal } from "./ui";
 
 /** HOME-04: during an exam window every page shows how many students are online (a number, never names, BR-08). */
@@ -167,7 +168,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
     { items: [
       { href: "/", icon: "home", label: t("nav_home") }, { href: "/results/", icon: "chart", label: t("nav_results") },
       { href: "/practice/", icon: "pencil", label: t("nav_practice") }, { href: "/badges/", icon: "medal", label: t("nav_badges") },
-      { href: "/leaderboard/", icon: "trophy", label: t("leaderboard") }, { href: "/progress/", icon: "trend", label: t("my_analytics") } ] },
+      { href: "/leaderboard/", icon: "trophy", label: t("leaderboard") }, { href: "/tournaments/", icon: "zap", label: t("nav_tournaments") }, { href: "/progress/", icon: "trend", label: t("my_analytics") } ] },
     { title: t("nav_more"), items: [
       { href: "/notifications/", icon: "bell", label: t("notifications") }, { href: "/messages/", icon: "mail", label: t("messages") },
       { href: "/settings/", icon: "sliders", label: t("nav_settings") },
@@ -193,6 +194,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
   return (
     <div className={`app ${side ? "with-side" : "focus"} ${isStudent && side ? "is-student" : ""}`}>
       <MessageBanner items={msgs.items} onClose={msgs.dismiss} />
+      {isStudent && <InviteBanner />}
       <a href="#main" className="skip">{t("skip_to_content")}</a>
       {side && (
         <>

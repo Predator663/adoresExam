@@ -11,6 +11,7 @@ from django.core.management.base import BaseCommand
 from exams.models import Exam
 from exams.services import sync_exam
 from gamification.services import reward_pending
+from gamification.tournaments import settle_due as settle_tournaments
 from notifications.services import run_exam_notifications, run_streak_reminders
 
 
@@ -38,6 +39,9 @@ class Command(BaseCommand):
             rewarded = reward_pending()  # XP, streaks and badges for published results (BR-10)
             if rewarded:
                 self.stdout.write(f"{rewarded} exam reward(s) processed")
+            settled = settle_tournaments()  # tournaments whose deadline has passed: result, XP and badges
+            if settled:
+                self.stdout.write(f"{settled} tournament(s) settled")
             if not opts["loop"]:
                 break
             time.sleep(opts["loop"])

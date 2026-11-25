@@ -135,3 +135,47 @@ class PracticeSession(models.Model):
     class Meta:
         ordering = ["-started_at"]
         indexes = [models.Index(fields=["user", "status"], name="gam_prac_user_status")]
+
+
+class Tournament(models.Model):
+    """A 1v1 tournament between two classmates. Both get the SAME questions (frozen here, answers included, never sent to a phone),
+    each in her own order, and each question has a timer the SERVER enforces. They play at different times: the challenger can finish
+    today and the opponent any time before `expires_at`. When both have finished (or the deadline passes) it is settled once."""
+    OPEN, FINISHED, EXPIRED, DECLINED, CANCELLED = "open", "finished", "expired", "declined", "cancelled"
+
+    challenger = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tournaments_made")
+    opponent = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tournaments_received")
+    subject = models.ForeignKey("academics.Subject", on_delete=models.CASCADE, related_name="tournaments")
+    items = models.JSONField(default=list)          # [{"qid": 3, "payload": {...}}]
+    question_count = models.PositiveSmallIntegerField(default=0)
+    seconds_per_question = models.PositiveSmallIntegerField(default=30)
+    status = models.CharField(max_length=10, default=OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()             # the timeout after the challenge was declared
+    finished_at = models.DateTimeField(null=True, blank=True)
+    # set once when settled: {"outcome": win|draw|no_contest|none, "winner_id", "how": score|time, "players": {uid: {...}}, "badges": {uid: [...]}}
+    result = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["status", "expires_at"], name="tour_status_expires_idx")]
+
+
+class TournamentPlay(models.Model):
+    """One student's run through a tournament."""
+    IN_PROGRESS, FINISHED = "in_progress", "finished"
+
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="plays")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tournament_plays")
+    seed = models.PositiveIntegerField(default=0)    # her own question order and option order
+    order = models.JSONField(default=list)           # indexes into Tournament.items
+    answers = models.JSONField(default=list, blank=True)  # [{"i": item index, "response": ..., "fraction": 1.0, "ms": 8200, "timed_out": false}]
+    question_started_at = models.DateTimeField(null=True, blank=True)  # when the current question was first shown: the timer starts here
+    status = models.CharField(max_length=12, default=IN_PROGRESS)
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    score = models.FloatField(default=0)             # sum of the fractions correct
+    time_ms = models.PositiveIntegerField(default=0)  # total thinking time; a timed-out question counts its full time
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tournament", "user"], name="one_play_per_player")]

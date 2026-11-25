@@ -22,6 +22,15 @@ urlpatterns = [
     path("practice/pack/<int:subject_id>/", views.practice_pack),
     path("practice/<int:session_id>/", views.practice_current),
     path("practice/<int:session_id>/answer/", views.practice_answer),
+    # tournaments (1v1 with a classmate)
+    path("tournaments/", views.tournaments),
+    path("tournaments/options/", views.tournament_options),
+    path("tournaments/invites/", views.tournament_invites),
+    path("tournaments/<int:tid>/", views.tournament_detail),
+    path("tournaments/<int:tid>/play/", views.tournament_play),
+    path("tournaments/<int:tid>/answer/", views.tournament_answer),
+    path("tournaments/<int:tid>/decline/", views.tournament_decline),
+    path("tournaments/<int:tid>/cancel/", views.tournament_cancel),
     # staff
     path("practice/subjects/<int:subject_id>/toggle/", views.practice_toggle_subject),
     path("practice/mark-eligible/", views.practice_mark_eligible),

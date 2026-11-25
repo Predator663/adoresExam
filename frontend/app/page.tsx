@@ -1,5 +1,6 @@
 "use client";
 import DailyCard from "@/components/daily";
+import { InviteSection } from "@/components/TournamentInvites";
 import { Frame, GoalCard } from "@/components/personal";
 import Link from "next/link";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
@@ -121,6 +122,8 @@ function StudentHome() {
             <div className="ux-stats-skel" aria-hidden><span className="ux-sk" /><span className="ux-sk" /><span className="ux-sk" /></div>
           )}
         </section>
+
+        <InviteSection />
 
         <Tips />
 

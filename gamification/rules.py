@@ -19,6 +19,9 @@ DEFAULT_XP = {
     "perfect_score": 100,     # Perfect score (100 percent)
     "review_wrong": 10,       # Review your wrong answers after results (per exam)
     "practice_quiz": 20,      # Complete a practice quiz
+    "tournament_play": 15,    # Finish a tournament (win or lose)
+    "tournament_win": 35,     # ... plus this for winning it
+    "tournament_draw": 15,    # ... plus this for a draw
     "streak_3": 15, "streak_7": 50, "streak_14": 100, "streak_30": 250,  # streak milestones
 }
 

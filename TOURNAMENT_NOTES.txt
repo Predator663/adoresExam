@@ -1,0 +1,43 @@
+Tournaments (1v1 with a classmate): copy each file over the same path. This zip is cumulative: it also contains My Study Plan, Smart practice and
+Measured difficulty (see their notes), so install this one only.
+
+NEW MIGRATION: gamification/migrations/0006_tournaments.py  ->  python manage.py migrate_schemas
+
+gamification/models.py                    Tournament, TournamentPlay
+gamification/tournaments.py               all the rules (create, play with server timers, settle, rewards, lists)
+gamification/views.py, urls.py            /api/tournaments/ ... endpoints
+gamification/rules.py                     XP: tournament_play 15, tournament_win 35, tournament_draw 15 (admins can change them)
+gamification/catalog.py                   3 new badges: Duelist, Tournament Champion, Flawless Victory (bronze/silver/gold tiers)
+gamification/services.py                  XP label, badge metrics
+core/i18n.py                              English + Swahili messages (invites, results, errors)
+exams/management/commands/run_scheduler.py   settles tournaments whose deadline passed (the list/detail pages also do it, so a missed run is harmless)
+gamification/test_tournaments.py          15 tests
+frontend/components/tournament.tsx, tournament.css, frontend/app/tournaments/page.tsx   the page: /tournaments/
+frontend/components/Shell.tsx, app/notifications/page.tsx, lib/i18n.ts   menu item "Tournaments" and notification links
+
+How it works
+- A student picks a classmate (same class, not hidden from the leaderboard), a subject, 5/10/15 questions, 15-90 seconds per question and
+  6/24/48/72 hours for it to be finished. The classmate gets a notification. At most 3 waiting at once, one open tournament per pair.
+- Both get the SAME questions, each in her own order with her own option order. The challenger can play now; the classmate any time
+  before the deadline.
+- Timer: kept by the server. The clock starts when a question is first shown; closing the app does not stop it; a late answer (limit + 2.5 s for
+  slow networks) scores 0. Correct answers and the other player's score are hidden until it is settled.
+- Settled once, when both finished or at the deadline. Higher score wins; equal score -> faster total time; times within 1 s -> draw.
+  Only one finished before the deadline -> "no contest": nobody wins, the finisher gets the 15 XP play reward only. Declined/cancelled: no XP.
+- XP: 15 for finishing + 35 for a win (+15 for a draw). At most 5 tournaments a day pay XP, so it cannot be farmed. Level, streak day and badges
+  use the normal engines. Result screen: winner, scores, XP, new badges, question by question.
+- Never touches exam marks, results or teachers' settings.
+
+Tests: python manage.py test gamification.test_tournaments  (15 pass). gamification, analytics, questions, exams, notifications:
+the same 15 failures/errors as in the original project before and after, no new ones.
+Not built: open challenges to anyone (it is classmate to classmate on purpose), live head-to-head, tournaments of 3+ players.
+
+---- Invite pop-up (added) ----
+- A challenge now drops down from the top of every student page as a wide banner: Accept / Decline / Later.
+- Accept opens the rules screen (clock starts only when she presses Start). Decline tells the challenger.
+- Later rolls the banner down into her screen: a "Challenges waiting for you" card on the home page and the
+  tournaments hub, plus a small pill at the top. Pill click brings the banner back. She can still accept or decline there.
+- Not shown on /exam, /tournaments, /login (never interrupts an exam).
+- New endpoint GET /api/tournaments/invites/ ; files: frontend/components/TournamentInvites.tsx, tournament.css,
+  Shell.tsx, app/page.tsx, components/tournament.tsx, app/tournaments/page.tsx, gamification/tournaments.py (invites), views.py, urls.py.
+- No migration needed.
