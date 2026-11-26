@@ -66,6 +66,16 @@ def user_payload(u):
     }
 
 
+def _device_detail(request):
+    """Device, system and browser she signed in on, kept with the login entry for the Login activity breakdown. Never blocks a login."""
+    try:
+        from core.presence import parse_ua
+        u = parse_ua(request.META.get("HTTP_USER_AGENT", "")[:300])
+        return {"device_type": u["device_type"], "os": u["os"] or "Unknown", "browser": u["browser"] or "Unknown", "device": u["device"]}
+    except Exception:
+        return {}
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -95,7 +105,7 @@ class LoginView(APIView):
         # AUTH-09: one active session. A new login replaces the old token, ending the first session.
         Token.objects.filter(user=authed).delete()
         token = Token.objects.create(user=authed)
-        audit(authed, "login", authed.pk)
+        audit(authed, "login", authed.pk, **_device_detail(request))
         try:  # a student logging in again while an exam attempt runs is recorded for the anti-cheat review; it must never block a login
             from proctoring import services as proctoring
             proctoring.note_login(authed, ip=proctoring.client_ip(request), ua=request.META.get("HTTP_USER_AGENT", "")[:300])

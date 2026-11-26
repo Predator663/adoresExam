@@ -6,6 +6,7 @@ urlpatterns = [
     path("presence/", views.presence),
     path("online-now/", views.online_now),
     path("page-visits/", views.page_visits_in),
+    path("screen-guard/", views.screen_capture_log),
     path("page-visits/log/", views.page_visits),
     path("page-visits/summary/", views.page_visits_summary),
     path("branding/", views.branding),

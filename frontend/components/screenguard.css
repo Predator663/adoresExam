@@ -1,0 +1,6 @@
+/* Screen protection (ScreenGuard.tsx). The page behind the cover is blurred too, so nothing readable is left if the cover is captured late. */
+html.sg-cover body>*:not(.sg-cover-box){filter:blur(26px) brightness(.6)!important;pointer-events:none!important;user-select:none!important}
+.sg-cover-box{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:1rem;background:rgba(9,20,16,.94);color:#fff;backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);text-align:center}
+.sg-card{display:grid;gap:.5rem;justify-items:center;max-width:320px}.sg-card span{font-size:3rem}.sg-card b{font-size:1.3rem}.sg-card p{margin:0;opacity:.85}
+html.sg-on body{-webkit-touch-callout:none}
+@media print{html.sg-on body>*{display:none!important}html.sg-on body::before{content:"Printing is switched off on this screen.";display:block;padding:2rem}}

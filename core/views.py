@@ -104,7 +104,7 @@ SETTINGS_FIELDS = [
     "school_name", "short_name", "contact_email", "contact_phone", "address", "result_delay_minutes", "late_entry_minutes", "question_approval_required",
     "show_class_position", "leaderboard_enabled", "grade_scale", "rules_text", "default_theme", "default_language",
     "proximity_alert_meters", "proximity_lock_enabled", "leave_lock_enabled", "leave_lock_limit",
-    "practice_default_count", "student_photos_enabled",
+    "practice_default_count", "student_photos_enabled", "screen_protection",
 ]
 
 
@@ -167,6 +167,11 @@ def clean_settings(data):
                 clean[name] = data[name]
             else:
                 errors[name] = "Must be true or false."
+    if "screen_protection" in data:
+        if data["screen_protection"] in ("off", "exams", "all"):
+            clean["screen_protection"] = data["screen_protection"]
+        else:
+            errors["screen_protection"] = "Choose off, exams or all."
     if "school_name" in data:
         v = str(data["school_name"]).strip()
         if not v or len(v) > 200:
@@ -315,6 +320,20 @@ def audit_log(request):
 def i18n_catalog(request, lang):
     """ACC-08: server-side English or Swahili text, badge and level names, for the app to use. Public, no secrets."""
     return Response(i18n.catalog_for(lang))
+
+
+# ---------------------------------------------------------------- screen protection log
+@api_view(["POST"])
+def screen_capture_log(request):
+    """The student's app reports that she pressed Print Screen, a screenshot shortcut or Print while the screen blur was on. Logged for the
+    administrator's review (an attempt, never proof of anything). At most one entry every 5 seconds per student."""
+    if request.user.role != "student" or SchoolSettings.load().screen_protection == "off":
+        return Response(status=204)
+    if not cache.add(f"sg:{request.user.pk}", 1, 5):
+        return Response(status=204)
+    what = str(request.data.get("kind") or "key")[:20] if hasattr(request.data, "get") else "key"
+    audit(request.user, "screen.capture", request.user.pk, kind=what, path=pagevisits.normalise(request.data.get("path") if hasattr(request.data, "get") else ""))
+    return Response(status=204)
 
 
 # ---------------------------------------------------------------- page visits (which screens students open, and for how long)

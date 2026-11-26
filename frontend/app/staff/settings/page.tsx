@@ -20,7 +20,7 @@ const NECTA = { grades: [
 const FIELDS: Record<string, string[]> = {
   school: ["school_name", "short_name", "contact_email", "contact_phone", "address", "rules_text", "default_theme", "default_language"],
   exams: ["result_delay_minutes", "late_entry_minutes", "show_class_position"],
-  anticheat: ["proximity_alert_meters", "proximity_lock_enabled", "leave_lock_enabled", "leave_lock_limit"],
+  anticheat: ["proximity_alert_meters", "proximity_lock_enabled", "leave_lock_enabled", "leave_lock_limit", "screen_protection"],
   students: ["leaderboard_enabled", "practice_default_count", "student_photos_enabled"],
 };
 const SCHOOL_KEYS = Object.values(FIELDS).flat();
@@ -214,6 +214,11 @@ function AntiSec({ v, up, ch }: P) {
           <div style={{ opacity: leave ? 1 : .45, pointerEvents: leave ? "auto" : "none", transition: "opacity .3s" }}>
             <Stepper label="Exits allowed" value={v.leave_lock_limit ?? 3} onChange={(n) => up({ leave_lock_limit: n })} min={0} max={50} presets={[0, 1, 2, 3, 5, 10]} />
           </div>
+        </Row>
+      </Section>
+      <Section icon="eye" title="Screenshots and screen recording" hint="Hides what is on a student's screen whenever it could be captured." h={50} i={2}>
+        <Row title="Blur the screen" hint="Off: nothing changes. Exams only: the exam and answer-review screens. Everywhere: every screen a student opens. The screen is covered when the app loses focus, on Print Screen, screenshot shortcuts and printing, and each attempt is noted in Login activity. A web page cannot block the phone's own screenshot button or a hardware recorder; this hides the content in the cases a browser can see." changed={ch("screen_protection")}>
+          <Seg label="Blur the screen" value={(v.screen_protection ?? "off") as string} onChange={(m) => up({ screen_protection: m })} opts={[["off", "Off"], ["exams", "Exams only"], ["all", "Everywhere"]]} />
         </Row>
       </Section>
     </>

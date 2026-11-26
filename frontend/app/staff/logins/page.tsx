@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import { BandChart, BarChart } from "@/components/LoginCharts";
+import { DevicesTab, EngagementTab, StudentEngagement } from "@/components/LoginEngagement";
 import { Pager, usePaged } from "@/components/Pager";
 import Shell from "@/components/Shell";
 import StaffNav from "@/components/StaffNav";
-import { ErrorNote, Loading, useLoad } from "@/components/ui";
+import { ErrorNote, Loading, Tabs, useLoad } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { classLabel } from "@/lib/staff";
@@ -40,14 +41,15 @@ function StudentView({ id, days, back }: { id: number; days: number; back: () =>
       <BarChart values={s.daily.map((r: any) => r.logins)} labels={s.daily.map((r: any) => dm(r.date))} title="Logins per day" unit="logins" tickEvery={dailyTick(s.days)} />
       <h3>Time of day she logs in</h3>
       <BarChart values={s.hours} labels={HOURS} title="Logins by hour" unit="logins" tickEvery={3} height={140} />
+      <h3>Engagement, exam behaviour and devices</h3>
+      <StudentEngagement id={id} days={days} />
     </div>
   );
 }
 
-function Students({ days, cls }: { days: number; cls: string }) {
-  const [q, setQ] = useState(""), [sort, setSort] = useState("least"), [open, setOpen] = useState<number | null>(null);
+function Students({ days, cls, onOpen }: { days: number; cls: string; onOpen: (id: number) => void }) {
+  const [q, setQ] = useState(""), [sort, setSort] = useState("least");
   const list = usePaged<any>("/analytics/logins/students/", { days, class: cls, q, sort }, { size: 20 });
-  if (open) return <StudentView id={open} days={days} back={() => setOpen(null)} />;
   return (
     <div className="card">
       <h3>Each student</h3>
@@ -63,7 +65,7 @@ function Students({ days, cls }: { days: number; cls: string }) {
             <thead><tr><th>Student</th><th>Class</th><th>Days used</th><th>Per week</th><th>Logins</th><th>Wrong tries</th><th>Last login</th></tr></thead>
             <tbody>{list.rows.map((r: any) => (
               <tr key={r.id}>
-                <td><button className="btn" onClick={() => setOpen(r.id)}>{r.name}</button><br /><span className="muted small">{r.index}</span></td>
+                <td><button className="btn" onClick={() => onOpen(r.id)}>{r.name}</button><br /><span className="muted small">{r.index}</span></td>
                 <td>{r.class}</td>
                 <td style={{ minWidth: 110 }}><b>{r.active_days}</b> <span className="muted small">of {days}</span><div className="bar" aria-hidden><i style={{ width: `${Math.min(100, (r.active_days / days) * 100)}%` }} /></div></td>
                 <td>{r.per_week}</td><td>{r.logins}</td><td>{r.failed ? <b className="no">{r.failed}</b> : 0}</td>
@@ -81,7 +83,7 @@ function Students({ days, cls }: { days: number; cls: string }) {
 export default function LoginActivity() {
   const { user } = useSession();
   const admin = user?.role === "admin" || user?.role === "super_admin";
-  const [days, setDays] = useState(30), [cls, setCls] = useState("");
+  const [days, setDays] = useState(30), [cls, setCls] = useState(""), [tab, setTab] = useState("overview"), [openId, setOpenId] = useState<number | null>(null);
   const classes = useLoad(() => (admin ? api<any[]>("/classes/") : Promise.resolve([])), [admin]);
   const o = useLoad(() => (admin ? api<any>(`/analytics/logins/?days=${days}${cls ? `&class=${cls}` : ""}`) : Promise.resolve(null)), [admin, days, cls]);
   const d = o.data;
@@ -97,7 +99,11 @@ export default function LoginActivity() {
             </div>
             <p className="muted small">Counts every time a student signs in, by school day in Tanzania time. A student who stays signed in on her phone counts on the day she signed in, not for every day she keeps the app open.</p>
           </div>
-          {o.loading && !d ? <Loading /> : o.error || !d ? <ErrorNote error={o.error} retry={o.reload} /> : (
+          {openId ? <StudentView id={openId} days={days} back={() => setOpenId(null)} /> : (
+          <>
+          <Tabs tabs={[["overview", "Overview"], ["engagement", "Engagement"], ["devices", "Devices & browsers"]]} value={tab} onChange={setTab} />
+          {tab === "engagement" ? <EngagementTab days={days} cls={cls} onOpen={setOpenId} /> : tab === "devices" ? <DevicesTab days={days} cls={cls} /> :
+          o.loading && !d ? <Loading /> : o.error || !d ? <ErrorNote error={o.error} retry={o.reload} /> : (
             <>
               <div className="grid3">
                 <Stat n={`${d.active_students}/${d.students}`} label="Students who logged in" />
@@ -116,9 +122,10 @@ export default function LoginActivity() {
                 <div className="card"><h3>Busiest weekdays</h3><BarChart values={d.weekdays} labels={WEEKDAYS} title="Logins by weekday" unit="logins" height={150} /></div>
                 <div className="card"><h3>Busiest hours</h3><BarChart values={d.hours} labels={HOURS} title="Logins by hour of the day" unit="logins" tickEvery={3} height={150} /></div>
               </div>
-              <Students days={days} cls={cls} />
+              <Students days={days} cls={cls} onOpen={setOpenId} />
             </>
           )}
+          </>)}
         </>
       )}
     </Shell>

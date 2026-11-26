@@ -32,6 +32,8 @@ class SchoolSettings(models.Model):
     proximity_lock_enabled = models.BooleanField(default=False)  # anti-cheat: also lock both students' exam screens until an admin unlocks
     leave_lock_enabled = models.BooleanField(default=True)  # anti-cheat: lock a student's exam once she has left the exam screen more than leave_lock_limit times
     practice_default_count = models.PositiveSmallIntegerField(default=10)  # the quiz length a student's practice page starts on (5, 10, 15 or 20)
+    # screenshot / screen-recording protection for students (frontend/components/ScreenGuard.tsx): off | exams (only while writing an exam) | all (every screen)
+    screen_protection = models.CharField(max_length=6, default="off")
     student_photos_enabled = models.BooleanField(default=True)  # students may add or change their profile photo (existing photos stay)
     leave_lock_limit = models.PositiveSmallIntegerField(default=3)  # how many times she may leave; the next time locks her until an admin unlocks
 

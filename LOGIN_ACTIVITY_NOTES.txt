@@ -1,0 +1,29 @@
+LOGIN ACTIVITY: ENGAGEMENT, EXAM BEHAVIOUR, DEVICES, SCREEN PROTECTION
+======================================================================
+Admin > Login activity now has three tabs: Overview (as before), Engagement, Devices & browsers. Opening a student shows her
+engagement, exam behaviour and devices under the old login charts.
+
+ENGAGEMENT SCORE (0-100), shown with its four parts so it can be explained to a student or parent:
+  Regularity 35  days on the app per week (a login OR a screen visit counts, so staying signed in on a phone is not under-counted); full at 4 days/week
+  Time 20        minutes on screen per active day; full at 15
+  Practice 25    practice quizzes finished per week; full at 3
+  Exams 20       exams sat / exams she was meant to sit (left out and re-weighted when no exam was held)
+  Levels: 70+ Highly engaged, 45+ Engaged, 20+ Occasional, 1+ Rarely, otherwise Not seen. Trend: up / down / steady / "stopped using it".
+  The list is sorted "needs attention first" (stopped using it, then students with warnings, then lowest scores). Tunable constants at the top of analytics/engagement.py.
+
+EXAM BEHAVIOUR per student (plain-language notes, patterns to look at, never proof): exams missed, usually starts late, finishes very early,
+runs out of time, leaves the exam screen often, screen locked, answers very fast (<4 s per answer), skips many, many questions timed out,
+screenshot/print attempts. Per exam table: score, time used, late start, exits, skipped, seconds per answer.
+
+DEVICES: kind (mobile/tablet/desktop), system, browser, phone model, connection, installed-app share. Taken from the last device each student
+opened the app on (available immediately) plus a sign-in history (device saved with each login from this update on; older logins have none).
+
+SCREEN PROTECTION (Settings > Anti-cheat > Screenshots and screen recording): Off / Exams only / Everywhere. DEFAULT IS OFF.
+  When on, students' screens are covered and blurred when the app loses focus or is hidden, on Print Screen, screenshot shortcuts
+  (Cmd+Shift+3/4/5, Win+Shift+S) and Print. Each attempt is logged (audit action screen.capture) and shows as a note in Engagement.
+  HONEST LIMIT: a web page cannot block the phone's own screenshot button or a hardware recorder; no browser offers that. The blur covers
+  the cases a browser can see. For a real block on Android, set FLAG_SECURE in the Android wrapper app (a one-line native change).
+
+NEW API (administrators only): GET /api/analytics/logins/engagement/ (?days &class &q &sort &tier &page), /engagement/<id>/, /devices/.
+  Students: POST /api/screen-guard/ (log), GET /api/settings/ now includes screen_protection.
+MIGRATION: core/0008_screen_protection.  Run: python manage.py migrate_schemas

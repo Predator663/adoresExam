@@ -16,6 +16,7 @@ import Logo from "./Logo";
 import MessageBanner from "./MessageBanner";
 import { InviteBanner } from "./TournamentInvites";
 import AnnouncementToast from "./AnnouncementToast";
+import ScreenGuard from "./ScreenGuard";
 import { Dropdown, Loading, Modal } from "./ui";
 
 /** HOME-04: during an exam window every page shows how many students are online (a number, never names, BR-08). */
@@ -197,6 +198,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
       <MessageBanner items={msgs.items} onClose={msgs.dismiss} />
       {isStudent && <InviteBanner />}
       {isStudent && <AnnouncementToast />}
+      {isStudent && <ScreenGuard />}
       <a href="#main" className="skip">{t("skip_to_content")}</a>
       {side && (
         <>
