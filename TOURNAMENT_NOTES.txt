@@ -54,3 +54,14 @@ Not built: open challenges to anyone (it is classmate to classmate on purpose), 
 - New XP kind tournament_penalty (negative points in the XP ledger).
 - UI: animated arena hero with count-up record, Live/Finished tabs, 2-step challenge wizard (search -> match), VS arena,
   confetti + count-up on a win, bonus/penalty chips on the result.
+
+---- Admin tournaments + announcement pop-up (added) ----
+- Admin page /staff/tournaments/ (menu: Administration > Tournaments, and a tile on the staff home). Shows every tournament with both players
+  (real names, class), score and time, winner, XP won/lost, penalty, win-bonus %, "Upset" (lower class won), classes apart, status
+  (Waiting / Finished / No contest / Declined / Cancelled). Totals, best players table, filters: student name, status, class level, period.
+  API: GET /api/gamification/admin/tournaments/?status=&form=&days=&q=&page=  (administrators only, read-only).
+- Announcements no longer create notifications or push messages. Each student sees a closable drop-down pop-up (same style as a
+  tournament challenge); a waiting challenge is shown first; hidden during exams. Closing is saved per student (works on other devices).
+  Shown for 14 days, max 5 queued. Admin > Announce lists sent announcements with "Reached" and "Closed by" counts.
+  API: GET /api/announcements/active/, POST /api/announcements/<id>/dismiss/ (students). Migration notifications/0003_announcement_dismissal.
+  Run: python manage.py migrate_schemas

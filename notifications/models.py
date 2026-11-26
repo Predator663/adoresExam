@@ -40,6 +40,17 @@ class Announcement(models.Model):
         ordering = ["-created_at"]
 
 
+class AnnouncementDismissal(models.Model):
+    """A student closed an announcement pop-up. It is shown again on no device after that."""
+
+    announcement = models.ForeignKey(Announcement, on_delete=models.CASCADE, related_name="dismissals")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["announcement", "user"], name="one_dismissal_per_student")]
+
+
 class PushSubscription(models.Model):
     """NOT-02: a browser/phone that agreed to Web Push."""
 

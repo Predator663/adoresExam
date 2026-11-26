@@ -82,17 +82,27 @@ function Exams({ admin }: { admin: boolean }) {
 function Announce() {
   const { t } = useSession();
   const [title, setTitle] = useState(""), [body, setBody] = useState(""), [msg, setMsg] = useState("");
+  const past = useLoad(() => api<any[]>("/announcements/"), []);
   async function send() {
     setMsg("");
-    try { const r = await api<any>("/announcements/", { body: { title, body, audience: "all" } }); setMsg(t("announce_sent", { n: r.recipients ?? "" })); setTitle(""); setBody(""); } catch (e: any) { setMsg(e.message); }
+    try { const r = await api<any>("/announcements/", { body: { title, body, audience: "all" } }); setMsg(t("announce_sent", { n: r.recipients ?? "" })); setTitle(""); setBody(""); past.reload(); } catch (e: any) { setMsg(e.message); }
   }
   return (
-    <div className="card"><h2>{t("announcements")}</h2>
-      <label className="field"><span>{t("title")}</span><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} /></label>
-      <label className="field"><span>{t("message")}</span><textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></label>
-      <button className="btn primary" disabled={!title.trim() || !body.trim()} onClick={send}>{t("send_to_all")}</button>
-      {msg && <p role="status">{msg}</p>}
-    </div>
+    <>
+      <div className="card"><h2>{t("announcements")}</h2>
+        <p className="muted small">📢 Students see this as a pop-up at the top of their screen. It stays until each student closes it (up to 14 days). It is not added to their notifications.</p>
+        <label className="field"><span>{t("title")}</span><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} /></label>
+        <label className="field"><span>{t("message")}</span><textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></label>
+        <button className="btn primary" disabled={!title.trim() || !body.trim()} onClick={send}>{t("send_to_all")}</button>
+        {msg && <p role="status">{msg}</p>}
+      </div>
+      {past.data && past.data.length > 0 && (
+        <div className="card"><h3 style={{ marginTop: 0 }}>Sent announcements</h3>
+          <div className="tbl-wrap"><table><thead><tr><th>Title</th><th>Sent</th><th>Reached</th><th>Closed by</th></tr></thead><tbody>
+            {past.data.slice(0, 15).map((a) => <tr key={a.id}><td>{a.title}</td><td>{eatDate(a.created_at)}</td><td>{a.recipients}</td><td>{a.closed}</td></tr>)}
+          </tbody></table></div></div>
+      )}
+    </>
   );
 }
 

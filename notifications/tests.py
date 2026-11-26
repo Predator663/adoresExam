@@ -65,6 +65,20 @@ class NotificationTests(AnalyticsBase):
         self.assertEqual(r.json()["recipients"], 2)
         self.assertEqual(self.client_for(self.amina).post("/api/announcements/", {"title": "x", "body": "y"}, format="json").status_code, 403)
 
+    def test_announcement_is_a_closable_popup_not_a_notification(self):
+        admin, amina, zawadi = self.client_for(self.admin), self.client_for(self.amina), self.client_for(self.zawadi)
+        before = Notification.objects.count()
+        admin.post("/api/announcements/", {"title": "A only", "body": "Bring a calculator", "audience": "class", "class_ids": [self.cls_a.pk]}, format="json")
+        aid = admin.post("/api/announcements/", {"title": "Everyone", "body": "School closes at 2pm"}, format="json").json()["id"]
+        self.assertEqual(Notification.objects.count(), before)                               # nothing in the bell
+        self.assertEqual([i["title"] for i in amina.get("/api/announcements/active/").json()["items"]], ["Everyone", "A only"])
+        self.assertEqual([i["title"] for i in zawadi.get("/api/announcements/active/").json()["items"]], ["Everyone"])  # class-targeted one is not hers
+        self.assertEqual(amina.post(f"/api/announcements/{aid}/dismiss/").status_code, 200)
+        self.assertEqual([i["title"] for i in amina.get("/api/announcements/active/").json()["items"]], ["A only"])
+        self.assertEqual(len(zawadi.get("/api/announcements/active/").json()["items"]), 1)  # closing is per student
+        self.assertEqual(admin.get("/api/announcements/").json()[0]["closed"], 1)
+        self.assertEqual(admin.get("/api/announcements/active/").status_code, 403)
+
     def test_push_subscription(self):
         c = self.client_for(self.amina)
         body = {"endpoint": "https://push.example/abc", "keys": {"p256dh": "k", "auth": "a"}}

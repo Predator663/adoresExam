@@ -1,16 +1,18 @@
+from datetime import timedelta
 from django.conf import settings
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, IsStudent
 from core.models import audit
 from core.pagination import paginate
 from . import services
 from accounts.models import User
-from .models import AdminMessage, Announcement, Notification, PushSubscription
+from .models import AdminMessage, Announcement, AnnouncementDismissal, Notification, PushSubscription
 
 
 def _row(n):
@@ -74,8 +76,8 @@ def announcements(request):
     """NOT-03."""
     if request.method == "GET":
         return Response([{"id": a.pk, "title": a.title, "audience": a.audience, "target": a.target,
-                          "recipients": a.recipients, "created_at": a.created_at}
-                         for a in Announcement.objects.all()[:100]])
+                          "recipients": a.recipients, "created_at": a.created_at, "body": a.body, "closed": a.closed}
+                         for a in Announcement.objects.annotate(closed=Count("dismissals"))[:100]])
     title, body = (request.data.get("title") or "").strip(), (request.data.get("body") or "").strip()
     audience = request.data.get("audience", "all")
     if not title or not body:
@@ -97,9 +99,41 @@ def announcements(request):
     students = list(services.audience_students(audience, target).values_list("pk", flat=True))
     ann = Announcement.objects.create(created_by=request.user, title=title[:160], body=body, audience=audience,
                                       target=target, recipients=len(students))
-    services.notify(students, "announcement", title[:160], body, data={"announcement_id": ann.pk})
+    # Deliberately NOT a notification (no bell entry, no push): students see it as a closable pop-up at the top of the screen.
     audit(request.user, "announcement.send", ann.pk, audience=audience, recipients=len(students))
     return Response({"id": ann.pk, "recipients": len(students)}, status=201)
+
+
+ANNOUNCEMENT_DAYS, ANNOUNCEMENT_SHOW = 14, 5
+
+
+def _for_student(a, u):
+    t = a.target or {}
+    if a.audience == "class":
+        return u.school_class_id in (t.get("class_ids") or [])
+    if a.audience == "stream":
+        c = u.school_class
+        return bool(c) and str(c.stream or "").strip().lower() == str(t.get("stream", "")).strip().lower() and (not t.get("form_level") or c.form_level == t["form_level"])
+    return True
+
+
+@api_view(["GET"])
+@permission_classes([IsStudent])
+def announcements_active(request):
+    """The announcements to show this student as a pop-up: recent, meant for her, and not closed yet (newest first)."""
+    u = request.user
+    closed = set(AnnouncementDismissal.objects.filter(user=u).values_list("announcement_id", flat=True))
+    since = timezone.now() - timedelta(days=ANNOUNCEMENT_DAYS)
+    items = [a for a in Announcement.objects.filter(created_at__gte=since).exclude(pk__in=closed)[:50] if _for_student(a, u)][:ANNOUNCEMENT_SHOW]
+    return Response({"items": [{"id": a.pk, "title": a.title, "body": a.body, "created_at": a.created_at} for a in items]})
+
+
+@api_view(["POST"])
+@permission_classes([IsStudent])
+def announcement_dismiss(request, announcement_id):
+    a = get_object_or_404(Announcement, pk=announcement_id)
+    AnnouncementDismissal.objects.get_or_create(announcement=a, user=request.user)
+    return Response({"ok": True})
 
 
 # ------------------------------------------------------------------ admin messages to one account

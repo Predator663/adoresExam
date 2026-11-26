@@ -82,6 +82,8 @@ export function InviteBanner() {
   const pill = !hide && ready && !next && waiting.length > 0;
   const more = waiting.filter((i) => !seen.includes(i.id)).length - 1;
   const ref = useRef<HTMLDivElement>(null);
+  const on = !!(shown && next);
+  useEffect(() => { const el = document.documentElement; if (on) el.setAttribute("data-tn-pop", "1"); else el.removeAttribute("data-tn-pop"); return () => el.removeAttribute("data-tn-pop"); }, [on]);
   useEffect(() => { if (rolling === null) return; const t = setTimeout(() => { mark(rolling); setRolling(null); window.dispatchEvent(new Event("amani:tn-landed")); }, 520); return () => clearTimeout(t); }, [rolling, mark]);
 
   if (shown && next) {

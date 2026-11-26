@@ -9,6 +9,8 @@ urlpatterns = [
     path("push/subscribe/", views.push_subscribe),
     path("push/unsubscribe/", views.push_unsubscribe),
     path("announcements/", views.announcements),
+    path("announcements/active/", views.announcements_active),
+    path("announcements/<int:announcement_id>/dismiss/", views.announcement_dismiss),
     path("messages/", views.my_messages),
     path("messages/<int:message_id>/dismiss/", views.dismiss_message),
     path("admin/messages/", views.admin_messages),

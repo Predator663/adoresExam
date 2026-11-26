@@ -15,7 +15,7 @@ from core.models import SchoolSettings, audit
 from core.pagination import envelope, page_params, paginate, wants_page
 from exams.views import _visible_result_or_404
 from questions.models import Question
-from . import adminstats, catalog, rules, services, tournaments as tour_svc
+from . import admintour, adminstats, catalog, rules, services, tournaments as tour_svc
 from .models import AVATARS, FRAMES, GamificationSettings
 
 log = logging.getLogger(__name__)
@@ -387,6 +387,13 @@ def gamification_settings(request):
 def admin_overview(request):
     """The whole school at a glance: top three, how levels and badges are spread, XP over the last two weeks."""
     return Response(adminstats.overview())
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def admin_tournaments(request):
+    """Every tournament with both players, the winner, scores, XP paid and penalties. Filters: status, subject, form, days, q (a player's name), page."""
+    return Response(admintour.overview(request.query_params))
 
 
 @api_view(["GET"])

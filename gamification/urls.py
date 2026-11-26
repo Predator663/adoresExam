@@ -39,5 +39,6 @@ urlpatterns = [
     path("gamification/settings/", views.gamification_settings),
     path("gamification/admin/overview/", views.admin_overview),
     path("gamification/admin/students/", views.admin_students),
+    path("gamification/admin/tournaments/", views.admin_tournaments),
     path("gamification/admin/students/<int:student_id>/", views.admin_student),
 ]

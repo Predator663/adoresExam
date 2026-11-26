@@ -312,3 +312,20 @@ class ClassStakesTests(TournamentBase):
         self.assertEqual(tour.stakes[str(self.tiny.pk)]["win_pct"], 200)
         v = T.view(tour, self.tiny, self.t0)
         self.assertEqual(v["stakes"]["win_pct"], 200)
+
+    def test_admin_sees_who_won_who_lost_and_the_xp(self):
+        tour, _ = self._duel(self.a, self.tiny, higher_wins=False)           # a form-3 girl loses to a form-1 girl: an upset with a penalty
+        T.create(self.n, self.maths.pk, self.a.pk, count=5, seconds=30, hours=48, now=self.t0)   # one still open
+        admin = self.client_for(self.admin)
+        r = admin.get("/api/gamification/admin/tournaments/").json()
+        self.assertEqual((r["summary"]["total"], r["summary"]["finished"], r["summary"]["open"]), (2, 1, 1))
+        self.assertEqual((r["summary"]["upsets"], r["summary"]["cross_class"], r["summary"]["xp_taken"]), (1, 1, 20))
+        fin = next(x for x in r["results"] if x["status"] == "finished")
+        self.assertEqual(fin["winner"], self.tiny.get_full_name() or self.tiny.username)
+        self.assertTrue(fin["upset"])
+        loser = next(p for p in fin["players"] if p["outcome"] == "lost")
+        self.assertEqual((loser["id"], loser["penalty"]), (self.a.pk, 20))
+        self.assertEqual(r["top"][0]["id"], self.tiny.pk)
+        self.assertEqual(admin.get("/api/gamification/admin/tournaments/?status=open").json()["count"], 1)
+        self.assertEqual(admin.get("/api/gamification/admin/tournaments/?form=1").json()["count"], 1)
+        self.assertEqual(self.client_for(self.a).get("/api/gamification/admin/tournaments/").status_code, 403)
