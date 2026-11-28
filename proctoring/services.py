@@ -182,6 +182,32 @@ def raise_flag(attempt, kind, severity, detail, now):
     return flag
 
 
+DEVICE_SILENCE_SECONDS = int(getattr(settings, "EXAM_DEVICE_SILENCE_SECONDS", 120))
+
+
+def login_blocked(user, device, now=None):
+    """True when a student with a running exam attempt tries to log in from a DIFFERENT browser while the first one is still active.
+    Logging in deletes the old login token, so allowing it would throw the student out of her own exam. The same browser may always log
+    in again (a restart, a lost connection). A different one is allowed once the first has been silent for DEVICE_SILENCE_SECONDS
+    (dead or lost phone) and then becomes the attempt's device. Unknown device ids (old app, blocked storage) are never blocked."""
+    if not getattr(user, "is_student", False):
+        return False
+    device = spoof.clean_device(device)
+    now = now or timezone.now()
+    attempts = Attempt.objects.filter(student=user, status=Attempt.IN_PROGRESS, deadline_at__gt=now).exclude(device_id="")
+    for a in attempts:
+        if device and device == a.device_id:
+            continue
+        seen = a.device_seen_at or a.started_at
+        if device and (now - seen).total_seconds() >= DEVICE_SILENCE_SECONDS:
+            Attempt.objects.filter(pk=a.pk).update(device_id=device, device_seen_at=now)  # the new browser takes over
+            continue
+        if not device:
+            continue
+        return True
+    return False
+
+
 def note_login(user, ip="", ua="", now=None):
     """A student logged in while an exam attempt of hers is running. On its own this is often innocent (a phone that restarted,
     a lost connection), so it is only recorded as information; it matters together with a device change."""

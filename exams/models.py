@@ -35,6 +35,14 @@ class Exam(models.Model):
     submitted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                      related_name="+")
+    # An administrator can send a submitted paper back to the teacher who handed it in, with a reason. The exam is then an ordinary
+    # draft again (submitted_at is cleared). The reason shows to the teacher as a pop-up until she closes it (return_seen_at) and stays
+    # on the exam until she submits it again, which clears all five.
+    returned_at = models.DateTimeField(null=True, blank=True)
+    returned_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    returned_to = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="returned_exams")
+    return_reason = models.TextField(blank=True, default="")
+    return_seen_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["start_at"]
@@ -103,6 +111,8 @@ class Attempt(models.Model):
     status = models.CharField(max_length=14, default=IN_PROGRESS)
     started_at = models.DateTimeField()
     deadline_at = models.DateTimeField()  # BR-03: the server owns the clock
+    device_id = models.CharField(max_length=64, blank=True, default="")  # the browser that is writing this attempt (see proctoring.services.login_blocked)
+    device_seen_at = models.DateTimeField(null=True, blank=True)  # last time that browser talked to the attempt
     submitted_at = models.DateTimeField(null=True, blank=True)
     order = models.JSONField(default=list)  # ExamQuestion ids in this student's order
     current_index = models.PositiveIntegerField(default=0)

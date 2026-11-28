@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { api, getToken, setToken } from "./api";
+import { deviceId } from "./proctor";
 import { dict } from "./i18n";
 import { clearSwr } from "./swr";
 import { clearOfflineData, setCurrentUser } from "./offlineStore";
@@ -100,7 +101,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     user, ready, lang, notice,
     login: async (username, password) => {
-      const r = await api<{ token: string; user: User }>("/auth/login/", { body: { username, password }, auth: false });
+      const r = await api<{ token: string; user: User }>("/auth/login/", { body: { username, password, device: deviceId() }, auth: false });
       setToken(r.token); push(r.user); return r.user;
     },
     logout,

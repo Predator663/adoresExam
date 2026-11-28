@@ -15,6 +15,8 @@ urlpatterns = [
     path("exams/<int:exam_id>/paper-sheets/", paper.sheets_view),
     path("paper/scan/", paper.scan_view),
     path("paper/answers/", paper.answers_view),
+    path("returned-exams/", views.returned_exams_active),
+    path("returned-exams/<int:exam_id>/dismiss/", views.returned_exam_dismiss),
     path("student/exams/", views.student_exams),
     path("student/exams/calendar/", views.student_calendar),
     path("student/exams/<int:exam_id>/start/", views.student_start),

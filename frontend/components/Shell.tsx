@@ -16,6 +16,7 @@ import Logo from "./Logo";
 import MessageBanner from "./MessageBanner";
 import { InviteBanner } from "./TournamentInvites";
 import AnnouncementToast from "./AnnouncementToast";
+import ReturnedExamPopup from "./ReturnedExamPopup";
 import ScreenGuard from "./ScreenGuard";
 import { Dropdown, Loading, Modal } from "./ui";
 
@@ -198,6 +199,7 @@ export default function Shell({ children, bare, title }: { children: ReactNode; 
       <MessageBanner items={msgs.items} onClose={msgs.dismiss} />
       {isStudent && <InviteBanner />}
       {isStudent && <AnnouncementToast />}
+      {user?.role === "teacher" && <ReturnedExamPopup />}
       {isStudent && <ScreenGuard />}
       <a href="#main" className="skip">{t("skip_to_content")}</a>
       {side && (

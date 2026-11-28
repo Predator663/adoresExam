@@ -18,7 +18,7 @@ export default function Notifications() {
   const { data, error, loading, reload } = pg;
   useEffect(() => { if (data?.unread) api("/notifications/read/", { body: { all: true } }).then(() => window.dispatchEvent(new Event("amani:notifications"))).catch(() => {}); }, [data]);
   const link = (n: any) => n.kind === "results_ready" || n.kind === "results" ? "/results/" : n.data?.attempt_id ? `/result/?id=${n.data.attempt_id}`
-    : n.kind === "result_updated" && n.data?.exam_id ? `/staff/exams/?id=${n.data.exam_id}`
+    : (n.kind === "result_updated" || n.kind === "exam_returned") && n.data?.exam_id ? `/staff/exams/?id=${n.data.exam_id}`
     : n.kind === "exam_reminder" || n.kind === "exam_start" ? (n.data?.exam_id ? `/exam/?id=${n.data.exam_id}` : null)
     : n.kind === "badge" || n.kind === "level_up" ? "/badges/"
     : n.kind === "tournament_invite" || n.kind === "tournament_result" ? (n.data?.tournament_id ? `/tournaments/?id=${n.data.tournament_id}` : "/tournaments/") : null;

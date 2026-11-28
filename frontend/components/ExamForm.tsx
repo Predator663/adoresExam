@@ -22,9 +22,18 @@ function Admin({ exam, reload }: { exam: any; reload: () => void }) {
   const run = async (fn: () => Promise<any>, ok: string) => { setMsg(""); setErrs([]); try { await fn(); setMsg(ok); reload(); paper.reload(); } catch (e: any) { setErrs(errorLines(e.data, e.message)); } };
   useEffect(() => { if (q.length < 2) return setFound([]); const t = setTimeout(() => api<any[]>(`/students/?q=${encodeURIComponent(q)}`).then((r) => setFound(r.slice(0, 6))).catch(() => {}), 400); return () => clearTimeout(t); }, [q]);
   const st = exam.status;
+  const [back, setBack] = useState("");
   return (
     <div className="card">
       <h2>Admin actions</h2>
+      {exam.awaiting_scheduling && (
+        <div className="ef-review">
+          <h3>Send back to {exam.submitted_by_name || "the teacher"}</h3>
+          <p className="muted small">Found a problem? Write what to correct. The teacher sees your reason as a pop-up, the paper becomes a draft she can edit, and she submits it again when it is fixed.</p>
+          <label className="field"><span>Reason (shown to the teacher)</span><textarea className="input" rows={3} maxLength={1000} value={back} onChange={(ev) => setBack(ev.target.value)} placeholder="For example: Question 3 has two correct answers; question 7 has no marks." /></label>
+          <button className="btn danger" disabled={back.trim().length < 5} onClick={() => run(async () => { await api(`/exams/${exam.id}/send-back/`, { body: { reason: back.trim() } }); setBack(""); }, "Sent back to the teacher.")}>↩ Send back to teacher</button>
+        </div>
+      )}
       <div className="row">
         {st === "scheduled" && <button className="btn" onClick={() => run(() => api(`/exams/${exam.id}/unschedule/`, { body: {} }), "Back to draft.")}>Unschedule</button>}
         {st === "live" && <button className="btn danger" onClick={() => { const r = window.prompt("Close this live exam NOW? Give a reason:"); if (r) run(() => api(`/exams/${exam.id}/close/`, { body: { confirm: true, reason: r } }), "Exam closed."); }}>Close exam now</button>}
@@ -97,6 +106,13 @@ export default function ExamForm({ id, onClose }: { id: number | null; onClose: 
       {toast}
       <div className="row"><button className="btn" onClick={onClose}>← Back to list</button><span className="pill">{cid ? `#${cid}` : "New"} · {status}</span></div>
       {!editable && <p className="hint">A live or finished exam cannot be edited.</p>}
+      {e?.return_reason && !e.submitted_at && status === "draft" && (
+        <div className="card error" role="status" style={{ whiteSpace: "pre-wrap" }}>
+          <b>↩️ Sent back{e.returned_by_name ? ` by ${e.returned_by_name}` : ""}{e.returned_at ? ` on ${eatDate(e.returned_at, DATETIME, lang)}` : ""}</b>
+          <p style={{ margin: ".4rem 0 0" }}>{e.return_reason}</p>
+          <p className="muted small" style={{ margin: ".4rem 0 0" }}>Fix this, then submit the paper again.</p>
+        </div>
+      )}
       {e?.submitted_at && <p className="hint">📨 Submitted by <b>{e.submitted_by_name || "a teacher"}</b> on {eatDate(e.submitted_at, DATETIME, lang)}{status === "draft" ? " · waiting to be scheduled" : ""}</p>}
       <div className="card">
         <label className="field"><span>Exam title</span><input className="input" value={f.title} disabled={!editable} onChange={(ev) => up({ title: ev.target.value })} /></label>

@@ -82,8 +82,9 @@ def pick_response(question):
 
 def simulate(i, args, stats):
     base, name = args.base_url.rstrip("/"), f"{args.prefix}{i:04d}"
+    dev = f"load-phone-{args.prefix}{i:04d}"  # the random id a real browser makes for itself (lib/proctor.ts deviceId)
     time.sleep(args.ramp * (i - 1) / max(1, args.students))  # spread the logins over the ramp-up time
-    code, d = call(stats, "login", "POST", base + "/api/auth/login/", body={"username": name, "password": args.password})
+    code, d = call(stats, "login", "POST", base + "/api/auth/login/", body={"username": name, "password": args.password, "device": dev})
     if code != 200 or not d:
         return False
     token = d["token"]
@@ -94,16 +95,25 @@ def simulate(i, args, stats):
     exam = next((e for e in exams if e["state"] in ("open", "in_progress") and (not args.exam_id or e["id"] == args.exam_id)), None)
     if not exam:
         return False
-    code, state = call(stats, "start exam", "POST", f"{base}/api/student/exams/{exam['id']}/start/", token, {"agree_rules": True, "accept_legal": True, "location": {"lat": -6.8 + random.random() / 50, "lng": 39.2 + random.random() / 50, "accuracy": 10}})
+    code, state = call(stats, "start exam", "POST", f"{base}/api/student/exams/{exam['id']}/start/", token, {"device": dev, "agree_rules": True, "accept_legal": True, "location": {"lat": -6.8 + random.random() / 50, "lng": 39.2 + random.random() / 50, "accuracy": 10}})
     if code not in (200, 201) or not state:
         return False
     aid = state["attempt_id"]
+    second, tried_second, n_saved = random.random() < args.second_phone, False, 0
     while not state.get("finished"):
         time.sleep(random.uniform(args.think_min, args.think_max))  # reading and thinking
         code, state = call(stats, "save answer", "POST", f"{base}/api/attempts/{aid}/answer/", token,
                            {"question_id": state["question"]["id"], "response": pick_response(state["question"])})
         if code != 200 or not state:
             return False
+        n_saved += 1
+        if second and not tried_second and n_saved >= 10:  # once per student, a few questions in
+            tried_second = True
+            code2, _ = call(stats, "2nd-phone login (409 expected)", "POST", base + "/api/auth/login/", body={"username": name, "password": args.password, "device": dev + "-other"})
+            if code2 != 409:
+                print(f"{name}: second-phone login answered {code2}, expected 409", flush=True)
+                stats.add("2nd-phone login WRONG (not refused)", 0, code2 or 500)
+                return False
         if random.random() < 0.05:  # now and then a phone refreshes the page and resumes (EDAY-06)
             code, state = call(stats, "resume", "GET", f"{base}/api/attempts/{aid}/", token)
             if code != 200 or not state:
@@ -131,6 +141,7 @@ def main():
     ap.add_argument("--think-max", type=float, default=3.0)
     ap.add_argument("--answer-p95-ms", type=float, default=1000)
     ap.add_argument("--login-p95-ms", type=float, default=3000)
+    ap.add_argument("--second-phone", type=float, default=0.1, help="share of students whose account is also tried from a second phone mid-exam (0 = none)")
     ap.add_argument("--check-results", action="store_true")
     ap.add_argument("--report", help="write the numbers to this JSON file")
     args = ap.parse_args()
@@ -166,7 +177,7 @@ def main():
         row = {"count": len(vals), "median": statistics.median(vals), "p95": percentile(vals, 95), "p99": percentile(vals, 99), "max": max(vals)}
         report["requests"][label] = {k: round(v) for k, v in row.items()}
         print(f"{label:44s} {row['count']:6d} {row['median']:8.0f} {row['p95']:8.0f} {row['p99']:8.0f} {row['max']:8.0f}")
-    bad = {k: v for k, v in stats.errors.items() if not k.startswith("result (before")}
+    bad = {k: v for k, v in stats.errors.items() if not k.startswith(("result (before", "2nd-phone login (409"))}
     if bad:
         print("\nErrors (status 0 = no answer / timeout):")
         for label, codes in bad.items():

@@ -579,3 +579,34 @@ class FuseTests(SimpleTestCase):
     def test_long_gap_uses_the_new_one(self):
         new = (-6.8 + 2 / 111320, 39.2, 8)
         self.assertEqual(geo.fuse((-6.8, 39.2, 8), new, 300), new)
+
+
+class LoginDuringExam(ProximityBase):
+    """A second browser must not log a student out of her running exam; the same browser may; a silent one may be replaced."""
+
+    D1, D2 = "device-one-1234", "device-two-5678"
+
+    def setUp(self):
+        super().setUp()
+        self.now = self.a_amina.started_at + timedelta(minutes=5)
+        Attempt.objects.filter(pk=self.a_amina.pk).update(device_id=self.D1, device_seen_at=self.now - timedelta(seconds=10))
+        self.service = __import__("proctoring.services", fromlist=["x"])
+
+    def test_other_browser_is_blocked_while_first_is_active(self):
+        self.assertTrue(self.service.login_blocked(self.amina, self.D2, now=self.now))
+
+    def test_same_browser_may_log_in_again(self):
+        self.assertFalse(self.service.login_blocked(self.amina, self.D1, now=self.now))
+
+    def test_unknown_device_is_never_blocked(self):
+        self.assertFalse(self.service.login_blocked(self.amina, "", now=self.now))
+
+    def test_silent_first_browser_can_be_replaced(self):
+        later = self.now + timedelta(seconds=300)
+        self.assertFalse(self.service.login_blocked(self.amina, self.D2, now=later))
+        self.a_amina.refresh_from_db()
+        self.assertEqual(self.a_amina.device_id, self.D2)
+
+    def test_students_without_a_running_attempt_are_not_blocked(self):
+        Attempt.objects.filter(pk=self.a_amina.pk).update(status=Attempt.SUBMITTED)
+        self.assertFalse(self.service.login_blocked(self.amina, self.D2, now=self.now))

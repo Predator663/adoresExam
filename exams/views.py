@@ -139,6 +139,9 @@ def student_start(request, exam_id):
         attempt = services.start_attempt(exam, request.user)
     except ExamError as e:
         return _err(e)
+    dev = proctoring.spoof.clean_device(request.data.get("device"))
+    if dev and attempt.status == Attempt.IN_PROGRESS and not attempt.device_id:
+        Attempt.objects.filter(pk=attempt.pk, device_id="").update(device_id=dev, device_seen_at=timezone.now())
     if proctoring.enabled():
         proctoring.record_acceptance(request.user, exam)
         if fix:
@@ -147,7 +150,12 @@ def student_start(request, exam_id):
 
 
 def _own_attempt(request, attempt_id):
-    return get_object_or_404(Attempt.objects.select_related("exam", "student"), pk=attempt_id, student=request.user)
+    a = get_object_or_404(Attempt.objects.select_related("exam", "student"), pk=attempt_id, student=request.user)
+    if a.status == Attempt.IN_PROGRESS:  # "the exam browser is still here": at most one tiny UPDATE per 30 s per student
+        now = timezone.now()
+        if not a.device_seen_at or (now - a.device_seen_at).total_seconds() > 30:
+            Attempt.objects.filter(pk=a.pk).update(device_seen_at=now)
+    return a
 
 
 @api_view(["GET"])
@@ -415,6 +423,7 @@ class ExamSerializer(serializers.ModelSerializer):
     class_names = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     submitted_by_name = serializers.SerializerMethodField()
+    returned_by_name = serializers.SerializerMethodField()
     awaiting_scheduling = serializers.SerializerMethodField()
 
     class Meta:
@@ -423,8 +432,10 @@ class ExamSerializer(serializers.ModelSerializer):
                   "pass_mark_percent", "rules_text", "shuffle_questions", "shuffle_options", "allow_skip",
                   "late_entry_minutes", "time_warnings", "partial_marks", "negative_marking", "negative_fraction", "allow_review",
                   "status", "question_count", "total_marks", "subject_name", "class_names", "created_at", "created_by",
-                  "created_by_name", "submitted_at", "submitted_by", "submitted_by_name", "awaiting_scheduling"]
-        read_only_fields = ["status", "created_at", "created_by", "submitted_at", "submitted_by", "allow_review"]  # allow_review has its own admin switch (review-switch)
+                  "created_by_name", "submitted_at", "submitted_by", "submitted_by_name", "awaiting_scheduling",
+                  "returned_at", "returned_by_name", "return_reason"]
+        read_only_fields = ["status", "created_at", "created_by", "submitted_at", "submitted_by", "allow_review",
+                            "returned_at", "return_reason"]  # allow_review has its own admin switch (review-switch)
 
     def get_question_count(self, o):
         return o.questions.filter(voided=False).count()
@@ -437,6 +448,9 @@ class ExamSerializer(serializers.ModelSerializer):
 
     def get_submitted_by_name(self, o):
         return _person(o.submitted_by)
+
+    def get_returned_by_name(self, o):
+        return _person(o.returned_by) if o.returned_at else ""
 
     def get_awaiting_scheduling(self, o):
         """A teacher's draft that an administrator has not scheduled yet."""
@@ -490,6 +504,27 @@ def _calendar_download(request, exams, audience, with_classes):
     if kind == "ics":
         return _download(cx.ics(meta, events), "text/calendar; charset=utf-8", f"{name}.ics")
     return _download(cx.pdf(meta, events, now.date()), "application/pdf", f"{name}.pdf")
+
+
+RETURN_REASON_MAX = 1000
+
+
+@api_view(["GET"])
+@permission_classes([IsStaffUser])
+def returned_exams_active(request):
+    """The papers an administrator sent back to this teacher that she has not closed the pop-up for (newest first)."""
+    rows = (Exam.objects.filter(returned_to=request.user, returned_at__isnull=False, return_seen_at__isnull=True, submitted_at__isnull=True,
+                                status=Exam.DRAFT).select_related("returned_by").order_by("-returned_at")[:5])
+    return Response({"items": [{"id": e.pk, "title": e.title, "reason": e.return_reason, "returned_at": e.returned_at,
+                                "returned_by": _person(e.returned_by)} for e in rows]})
+
+
+@api_view(["POST"])
+@permission_classes([IsStaffUser])
+def returned_exam_dismiss(request, exam_id):
+    """The teacher closed the pop-up. The reason stays on the exam until she submits it again."""
+    Exam.objects.filter(pk=exam_id, returned_to=request.user, return_seen_at__isnull=True).update(return_seen_at=timezone.now())
+    return Response({"ok": True})
 
 
 class ExamViewSet(viewsets.ModelViewSet):
@@ -573,9 +608,45 @@ class ExamViewSet(viewsets.ModelViewSet):
         if not exam.questions.filter(voided=False).exists():
             raise ValidationError({"detail": "Save the paper with at least one question before submitting."})
         exam.submitted_at, exam.submitted_by = timezone.now(), request.user
-        exam.save(update_fields=["submitted_at", "submitted_by"])
+        exam.returned_at = exam.returned_by = exam.returned_to = exam.return_seen_at = None  # handed in again: the old return is answered
+        exam.return_reason = ""
+        exam.save(update_fields=["submitted_at", "submitted_by", "returned_at", "returned_by", "returned_to", "return_reason", "return_seen_at"])
         audit(request.user, "exam.submit", exam.pk, title=exam.title)
         return Response({"submitted_at": exam.submitted_at, "submitted_by_name": _person(request.user)})
+
+    @action(detail=True, methods=["post"], url_path="send-back")
+    def send_back(self, request, pk=None):
+        """An administrator returns a submitted paper to the teacher who handed it in, with a reason (needed). The exam becomes an
+        ordinary draft again that the teacher can edit and submit once more; she gets a pop-up with the reason and a bell notification."""
+        if not request.user.is_admin_role:
+            raise PermissionDenied()
+        reason = str(request.data.get("reason") or "").strip()
+        if len(reason) < 5:
+            raise ValidationError({"reason": "Tell the teacher what to correct (at least a few words)."})
+        if len(reason) > RETURN_REASON_MAX:
+            raise ValidationError({"reason": f"Please keep the reason under {RETURN_REASON_MAX} characters."})
+        with transaction.atomic():
+            exam = Exam.objects.select_for_update().get(pk=self.get_object().pk)
+            services.sync_exam(exam)
+            exam.refresh_from_db()
+            if exam.status != Exam.DRAFT or exam.submitted_at is None:
+                raise ValidationError({"detail": "Only a paper that a teacher has submitted and that is not scheduled yet can be sent back."})
+            teacher = exam.submitted_by or exam.created_by
+            if teacher is None:
+                raise ValidationError({"detail": "This paper has no teacher to send it back to."})
+            now = timezone.now()
+            exam.returned_at, exam.returned_by, exam.returned_to = now, request.user, teacher
+            exam.return_reason, exam.return_seen_at = reason, None
+            exam.submitted_at, exam.submitted_by = None, None
+            exam.save(update_fields=["returned_at", "returned_by", "returned_to", "return_reason", "return_seen_at", "submitted_at", "submitted_by"])
+        audit(request.user, "exam.send_back", exam.pk, title=exam.title, teacher=teacher.pk, reason=reason[:300])
+        try:
+            from notifications.services import notify
+            notify([teacher], "exam_returned", f"Exam sent back: {exam.title}"[:160], reason[:300],
+                   key=f"exam_returned:{exam.pk}:{int(now.timestamp())}", data={"exam_id": exam.pk})
+        except Exception:
+            logging.getLogger(__name__).exception("could not notify the teacher about a returned exam")
+        return Response({"ok": True, "returned_to": _person(teacher)})
 
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):

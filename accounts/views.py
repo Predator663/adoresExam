@@ -102,6 +102,14 @@ class LoginView(APIView):
         if authed.failed_logins or authed.locked_until:  # nothing to clear for most logins: skip the write
             authed.failed_logins, authed.locked_until = 0, None
             authed.save(update_fields=["failed_logins", "locked_until"])
+        try:  # a different browser must not log a student out of her running exam (see proctoring.services.login_blocked)
+            from proctoring import services as proctoring
+            if proctoring.login_blocked(authed, request.data.get("device")):
+                audit(authed, "login.blocked_exam", authed.pk, **_device_detail(request))
+                return Response({"detail": "You are writing an exam on another phone or browser. Go back to it, or ask your invigilator for help.",
+                                 "code": "exam_other_device"}, status=409)
+        except Exception:
+            logging.getLogger(__name__).exception("exam device check failed; the login goes on")
         # AUTH-09: one active session. A new login replaces the old token, ending the first session.
         Token.objects.filter(user=authed).delete()
         token = Token.objects.create(user=authed)
